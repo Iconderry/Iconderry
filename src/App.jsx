@@ -7,7 +7,7 @@ import {
   Settings, Moon, RotateCcw, SlidersHorizontal, HardDrive, Monitor,
   ZoomIn, ZoomOut, Maximize2, Link2, Unlink2, Wand2, Scan,
   Heart, History, Shapes, MessageSquarePlus, Shield, FileText, Info,
-  Eye, EyeOff
+  Eye, EyeOff, Box, Compass, Move3d
 } from 'lucide-react';
 import { INITIAL_ELEMENTS } from './initialData';
 import { downloadAsset } from './converter';
@@ -29,6 +29,14 @@ const DEFAULT_ADJUSTMENTS = {
   rotation: 0,
   flipH: false,
   flipV: false,
+  rotateX: 0,
+  rotateY: 0,
+  perspective: 800,
+  skewX: 0,
+  skewY: 0,
+  depth3D: 0,
+  depth3DColor: '#000000',
+  is3DFloating: false,
   customColor: '',
   colorReplacements: {}
 };
@@ -933,6 +941,131 @@ const QUICK_SWATCHES = [
   { name: 'Dark Slate', hex: '#0f172a' }
 ];
 
+const PRESETS_3D = [
+  { id: 'isometric_left', name: 'Isometric L', icon: '🎲', rx: 30, ry: -30, rz: 0, desc: 'Classic 30° left isometric angle' },
+  { id: 'isometric_right', name: 'Isometric R', icon: '📐', rx: 30, ry: 30, rz: 0, desc: 'Classic 30° right isometric angle' },
+  { id: 'floating_stand', name: 'Float Stand', icon: '📱', rx: 25, ry: -20, rz: 5, desc: 'Natural perspective showcase slant' },
+  { id: 'wall_left', name: 'Wall Left', icon: '🪟', rx: 0, ry: 35, rz: 0, desc: 'Facing right wall perspective' },
+  { id: 'wall_right', name: 'Wall Right', icon: '🪞', rx: 0, ry: -35, rz: 0, desc: 'Facing left wall perspective' },
+  { id: 'birds_eye', name: "Bird's Eye", icon: '🛸', rx: 55, ry: 0, rz: 0, desc: 'Tabletop top-down perspective' },
+  { id: 'dynamic_action', name: 'Action 3D', icon: '⚡', rx: 18, ry: -28, rz: -10, desc: 'Dynamic superhero action tilt' },
+  { id: 'flat_front', name: 'Reset Front', icon: '🎯', rx: 0, ry: 0, rz: 0, desc: 'Level 0° front view' }
+];
+
+// Interactive 3D Gyro Orbit Trackball
+function Trackball3DPad({ rotateX, rotateY, onChange, onReset, appTheme }) {
+  const padRef = useRef(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartRef = useRef({ x: 0, y: 0, rx: 0, ry: 0 });
+
+  const handlePointerDown = (e) => {
+    e.preventDefault();
+    setIsDragging(true);
+    dragStartRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      rx: rotateX,
+      ry: rotateY
+    };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const handlePointerMove = (e) => {
+    if (!isDragging) return;
+    const dx = e.clientX - dragStartRef.current.x;
+    const dy = e.clientY - dragStartRef.current.y;
+    // Dragging horizontally changes Yaw (rotateY), dragging vertically changes Pitch (rotateX)
+    const newRy = Math.round(Math.max(-85, Math.min(85, dragStartRef.current.ry + dx * 0.75)));
+    const newRx = Math.round(Math.max(-85, Math.min(85, dragStartRef.current.rx - dy * 0.75)));
+    onChange(newRx, newRy);
+  };
+
+  const handlePointerUp = (e) => {
+    setIsDragging(false);
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch (_) {}
+  };
+
+  // Map rotateX [-85, 85] and rotateY [-85, 85] to puck position [-36px, 36px]
+  const puckX = Math.round((rotateY / 85) * 36);
+  const puckY = Math.round((-rotateX / 85) * 36);
+
+  return (
+    <div className={`p-3 rounded-2xl border flex flex-col items-center gap-2 select-none ${
+      appTheme === 'dark' ? 'bg-slate-900/80 border-slate-800' : 'bg-slate-50 border-slate-200 shadow-sm'
+    }`}>
+      <div className="w-full flex items-center justify-between text-[11px]">
+        <span className={`font-semibold flex items-center gap-1.5 ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+          <Compass className="w-3.5 h-3.5 text-cyan-500" /> 3D Virtual Orbit Pad
+        </span>
+        <button
+          onClick={onReset}
+          className={`px-2 py-0.5 rounded-md border text-[10px] font-medium transition ${
+            appTheme === 'dark'
+              ? 'border-slate-700 hover:border-slate-600 text-slate-400 hover:text-white'
+              : 'border-slate-300 hover:border-slate-400 text-slate-600 hover:text-slate-900'
+          }`}
+          title="Reset 3D tilt to 0° 0°"
+        >
+          Reset 0&deg;
+        </button>
+      </div>
+
+      {/* Orbit Sphere Trackpad Area */}
+      <div
+        ref={padRef}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        className={`w-36 h-36 rounded-full relative flex items-center justify-center cursor-grab active:cursor-grabbing touch-none transition-shadow ${
+          isDragging ? 'ring-2 ring-cyan-400/60 shadow-lg shadow-cyan-500/20' : ''
+        } ${
+          appTheme === 'dark'
+            ? 'bg-gradient-to-b from-slate-950 via-[#0c1425] to-slate-950 border border-cyan-500/20 shadow-inner'
+            : 'bg-gradient-to-b from-slate-100 via-white to-slate-200 border border-slate-300 shadow-inner'
+        }`}
+        title="Click & Drag in 3D space to rotate element"
+      >
+        {/* Concentric Gyro Rings */}
+        <div className="absolute inset-2.5 rounded-full border border-dashed border-cyan-500/20 pointer-events-none" />
+        <div className="absolute inset-7 rounded-full border border-cyan-500/30 pointer-events-none" />
+        <div className="absolute inset-12 rounded-full border border-cyan-500/40 pointer-events-none" />
+
+        {/* Crosshairs */}
+        <div className="absolute inset-x-0 top-1/2 h-px bg-cyan-500/25 pointer-events-none" />
+        <div className="absolute inset-y-0 left-1/2 w-px bg-cyan-500/25 pointer-events-none" />
+
+        {/* 3D Wireframe Cube in Center */}
+        <div
+          className="w-10 h-10 rounded-lg border-2 border-cyan-400/80 pointer-events-none transition-transform duration-75 flex items-center justify-center shadow-lg shadow-cyan-500/20"
+          style={{
+            transform: `perspective(200px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`,
+            background: appTheme === 'dark' ? 'rgba(6, 182, 212, 0.15)' : 'rgba(6, 182, 212, 0.25)'
+          }}
+        >
+          <Box className="w-5 h-5 text-cyan-400 drop-shadow" />
+        </div>
+
+        {/* Moving Puck Indicator */}
+        <div
+          className="absolute w-3.5 h-3.5 rounded-full bg-cyan-400 shadow-md shadow-cyan-400 pointer-events-none ring-2 ring-white/80 transition-transform duration-75"
+          style={{
+            transform: `translate(${puckX}px, ${puckY}px)`
+          }}
+        />
+      </div>
+
+      {/* Degree Readout Badges */}
+      <div className="w-full flex items-center justify-between text-[11px] font-mono font-semibold px-2">
+        <span className="text-cyan-400">Pitch (X): {rotateX > 0 ? `+${rotateX}` : rotateX}&deg;</span>
+        <span className="text-blue-400">Yaw (Y): {rotateY > 0 ? `+${rotateY}` : rotateY}&deg;</span>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [elements, setElements] = useState(() => {
     const saved = localStorage.getItem('iconderry_assets') || localStorage.getItem('pixlflow_assets');
@@ -1016,6 +1149,7 @@ export default function App() {
   const [effectSearchTerm, setEffectSearchTerm] = useState('');
   const [effectVersionFilter, setEffectVersionFilter] = useState('all'); // 'all' | 'new' | 'old'
   const [studioTab, setStudioTab] = useState('colors'); // 'colors' | 'filters' | 'effects' | 'dimensions' | 'transform' | 'export'
+  const [transformSubTab, setTransformSubTab] = useState('3d'); // '3d' | '2d' | 'skew'
   const [effectSubTab, setEffectSubTab] = useState('effects'); // 'effects' | 'adjustment'
   const [filterSubView, setFilterSubView] = useState('presets'); // 'presets' | 'materials' | 'sliders'
   const [filterCategory, setFilterCategory] = useState('All');
@@ -1350,14 +1484,21 @@ export default function App() {
     setBgShapeBorderColor('#38bdf8');
   };
 
-  // Panel 4: Transform Reset
+  // Panel 4: Transform Reset (3D & 2D)
   const handleResetTransformPanel = () => {
     recordUndo();
     setAdjustments(prev => ({
       ...prev,
       rotation: 0,
       flipH: false,
-      flipV: false
+      flipV: false,
+      rotateX: 0,
+      rotateY: 0,
+      perspective: 800,
+      skewX: 0,
+      skewY: 0,
+      depth3D: 0,
+      is3DFloating: false
     }));
   };
 
@@ -1832,7 +1973,7 @@ export default function App() {
   };
 
   const getComputedFilterStyle = () => {
-    return [
+    const rules = [
       `hue-rotate(${adjustments.hue}deg)`,
       `brightness(${adjustments.brightness}%)`,
       `saturate(${adjustments.saturation}%)`,
@@ -1844,7 +1985,19 @@ export default function App() {
       adjustments.shadowBlur > 0 
         ? `drop-shadow(0px 0px ${adjustments.shadowBlur}px ${adjustments.shadowColor || '#38bdf8'}) drop-shadow(0px 0px ${Math.max(1, Math.round(adjustments.shadowBlur * 0.4))}px ${adjustments.shadowColor || '#38bdf8'})` 
         : ''
-    ].filter(Boolean).join(' ');
+    ];
+
+    if ((adjustments.depth3D || 0) > 0) {
+      const d = adjustments.depth3D;
+      const radX = ((adjustments.rotateX || 0) * Math.PI) / 180;
+      const radY = ((adjustments.rotateY || 0) * Math.PI) / 180;
+      const offX = Math.round(-Math.sin(radY) * d * 1.5);
+      const offY = Math.round(Math.sin(radX) * d * 1.5 + (d * 0.8));
+      const sColor = adjustments.depth3DColor || 'rgba(0,0,0,0.55)';
+      rules.push(`drop-shadow(${offX}px ${offY}px ${Math.round(d * 0.6)}px ${sColor}) drop-shadow(${Math.round(offX * 0.5)}px ${Math.round(offY * 0.5)}px ${Math.round(d * 0.3)}px ${sColor})`);
+    }
+
+    return rules.filter(Boolean).join(' ');
   };
 
   return (
@@ -2572,30 +2725,33 @@ export default function App() {
 
 
               {/* Floating SVG Icon or Background Badge Shape with Interactive Selection, Custom Dimensions & Smooth Zoom */}
-              <div
-                ref={canvasSvgContainerRef}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleCanvasElementClick(e);
-                }}
-                style={{
-                  width: `${iconWidth}px`,
-                  height: `${iconHeight}px`,
-                  transform: `scale(${zoomLevel}) rotate(${adjustments.rotation}deg) scale(${adjustments.flipH ? -1 : 1}, ${adjustments.flipV ? -1 : 1})`,
-                  transformOrigin: 'center center',
-                  filter: getComputedFilterStyle(),
-                  transition: 'transform 0.08s ease-out, width 0.1s ease, height 0.1s ease',
-                  backgroundColor: bgShape !== 'none' ? bgShapeColor : 'transparent',
-                  padding: bgShape !== 'none' ? `${bgShapePadding * 0.7}%` : '0px',
-                  borderRadius: bgShape === 'circle' ? '9999px' : bgShape === 'squircle' ? '28%' : bgShape === 'rounded-square' ? '1.5rem' : '0px',
-                  clipPath: bgShape === 'hexagon' ? 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)' : 'none',
-                  border: bgShape !== 'none' && bgShapeBorder > 0 ? `${bgShapeBorder}px solid ${bgShapeBorderColor}` : 'none'
-                }}
-                className={`flex items-center justify-center interactive-svg-canvas cursor-pointer select-none [&>svg]:w-full [&>svg]:h-full [&>svg]:block ${
-                  bgShape !== 'none' ? 'shadow-2xl' : ''
-                }`}
-                dangerouslySetInnerHTML={{ __html: currentPreviewSvg }}
-              />
+              <div className={adjustments.is3DFloating ? 'animate-floating-3d' : ''}>
+                <div
+                  ref={canvasSvgContainerRef}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleCanvasElementClick(e);
+                  }}
+                  style={{
+                    width: `${iconWidth}px`,
+                    height: `${iconHeight}px`,
+                    transform: `scale(${zoomLevel}) perspective(${adjustments.perspective || 800}px) rotateX(${adjustments.rotateX || 0}deg) rotateY(${adjustments.rotateY || 0}deg) rotate(${adjustments.rotation || 0}deg) skew(${adjustments.skewX || 0}deg, ${adjustments.skewY || 0}deg) scale(${adjustments.flipH ? -1 : 1}, ${adjustments.flipV ? -1 : 1})`,
+                    transformOrigin: 'center center',
+                    transformStyle: 'preserve-3d',
+                    filter: getComputedFilterStyle(),
+                    transition: 'transform 0.08s ease-out, width 0.1s ease, height 0.1s ease',
+                    backgroundColor: bgShape !== 'none' ? bgShapeColor : 'transparent',
+                    padding: bgShape !== 'none' ? `${bgShapePadding * 0.7}%` : '0px',
+                    borderRadius: bgShape === 'circle' ? '9999px' : bgShape === 'squircle' ? '28%' : bgShape === 'rounded-square' ? '1.5rem' : '0px',
+                    clipPath: bgShape === 'hexagon' ? 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)' : 'none',
+                    border: bgShape !== 'none' && bgShapeBorder > 0 ? `${bgShapeBorder}px solid ${bgShapeBorderColor}` : 'none'
+                  }}
+                  className={`flex items-center justify-center interactive-svg-canvas cursor-pointer select-none [&>svg]:w-full [&>svg]:h-full [&>svg]:block ${
+                    bgShape !== 'none' ? 'shadow-2xl' : ''
+                  }`}
+                  dangerouslySetInnerHTML={{ __html: currentPreviewSvg }}
+                />
+              </div>
 
               {/* Bottom Floating Bar on Canvas */}
               <div className="absolute bottom-2 inset-x-2 sm:bottom-4 sm:inset-x-6 flex items-center justify-between pointer-events-none gap-2">
@@ -2714,8 +2870,8 @@ export default function App() {
                         : appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    <RotateCw className="w-3.5 h-3.5" />
-                    <span className="text-[10px] sm:text-[11px]">Rotate</span>
+                    <Move3d className="w-3.5 h-3.5" />
+                    <span className="text-[10px] sm:text-[11px]">3D Rotate</span>
                   </button>
 
                   <button
@@ -4149,18 +4305,19 @@ export default function App() {
                   </div>
                 )}
 
-                {/* TAB 4: TRANSFORM */}
+                {/* TAB 4: TRANSFORM & 3D ROTATION */}
                 {studioTab === 'transform' && (
                   <div className="space-y-4">
+                    {/* Header */}
                     <div className="flex items-center justify-between gap-2">
                       <div>
                         <h4 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
                           appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
                         }`}>
-                          <RotateCw className="w-3.5 h-3.5 text-cyan-500" /> Rotate &amp; Flip Transformations
+                          <Move3d className="w-3.5 h-3.5 text-cyan-500" /> 3D Perspective &amp; Transforms
                         </h4>
                         <p className={`text-[11px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                          Adjust rotation angle and flip orientation
+                          3D Pitch, Yaw, Orbit Pad, 2D Angle, Mirror &amp; Skew
                         </p>
                       </div>
 
@@ -4171,66 +4328,502 @@ export default function App() {
                             ? 'text-slate-300 hover:text-white bg-slate-900 border-slate-800 hover:border-slate-700'
                             : 'text-slate-700 hover:text-slate-900 bg-white border-slate-200 hover:bg-slate-50'
                         }`}
-                        title="Reset rotation and flip"
+                        title="Reset all 3D and 2D transforms"
                       >
                         <Undo2 className="w-3 h-3 text-cyan-500" />
-                        <span>Reset Transform</span>
+                        <span>Reset All</span>
                       </button>
                     </div>
 
-                    <div>
-                      <div className={`flex justify-between text-xs mb-1 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                        <span>Rotation Angle</span>
-                        <span className="text-cyan-500 font-mono font-semibold">{adjustments.rotation}&deg;</span>
+                    {/* Sub-Navigation: 3D Perspective | 2D Angle & Flips | Skew & Shear */}
+                    <div className={`grid grid-cols-3 gap-1 p-1 rounded-xl border ${
+                      appTheme === 'dark' ? 'bg-slate-900 border-slate-800' : 'bg-slate-200/80 border-slate-300'
+                    }`}>
+                      <button
+                        onClick={() => setTransformSubTab('3d')}
+                        className={`py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition ${
+                          transformSubTab === '3d'
+                            ? 'bg-blue-600 text-white shadow'
+                            : appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        <Box className="w-3.5 h-3.5" />
+                        <span>3D Rotate</span>
+                      </button>
+
+                      <button
+                        onClick={() => setTransformSubTab('2d')}
+                        className={`py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition ${
+                          transformSubTab === '2d'
+                            ? 'bg-blue-600 text-white shadow'
+                            : appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        <RotateCw className="w-3.5 h-3.5" />
+                        <span>2D Angle</span>
+                      </button>
+
+                      <button
+                        onClick={() => setTransformSubTab('skew')}
+                        className={`py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition ${
+                          transformSubTab === 'skew'
+                            ? 'bg-blue-600 text-white shadow'
+                            : appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                      >
+                        <SlidersHorizontal className="w-3.5 h-3.5" />
+                        <span>Skew &amp; Shear</span>
+                      </button>
+                    </div>
+
+                    {/* SUB-TAB 1: 3D PERSPECTIVE */}
+                    {transformSubTab === '3d' && (
+                      <div className="space-y-4">
+                        {/* Interactive 3D Orbit Trackball Pad */}
+                        <Trackball3DPad
+                          rotateX={adjustments.rotateX || 0}
+                          rotateY={adjustments.rotateY || 0}
+                          onChange={(newRx, newRy) => {
+                            setAdjustments(prev => ({
+                              ...prev,
+                              rotateX: newRx,
+                              rotateY: newRy
+                            }));
+                          }}
+                          onReset={() => {
+                            recordUndo();
+                            setAdjustments(prev => ({ ...prev, rotateX: 0, rotateY: 0 }));
+                          }}
+                          appTheme={appTheme}
+                        />
+
+                        {/* 1-Click 3D Angle Presets */}
+                        <div>
+                          <div className={`text-xs font-semibold mb-2 flex items-center justify-between ${
+                            appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
+                          }`}>
+                            <span>1-Click 3D Angle Presets</span>
+                            <span className="text-[10px] text-cyan-500 font-normal">8 Angles</span>
+                          </div>
+
+                          <div className="grid grid-cols-4 gap-1.5">
+                            {PRESETS_3D.map(p => {
+                              const isActive = (adjustments.rotateX || 0) === p.rx && (adjustments.rotateY || 0) === p.ry;
+                              return (
+                                <button
+                                  key={p.id}
+                                  onClick={() => {
+                                    recordUndo();
+                                    setAdjustments(prev => ({
+                                      ...prev,
+                                      rotateX: p.rx,
+                                      rotateY: p.ry,
+                                      rotation: p.rz !== undefined ? p.rz : prev.rotation
+                                    }));
+                                  }}
+                                  title={`${p.name}: ${p.desc} (X: ${p.rx}°, Y: ${p.ry}°)`}
+                                  className={`p-2 rounded-xl border text-center transition flex flex-col items-center justify-center gap-1 ${
+                                    isActive
+                                      ? 'bg-blue-600 text-white border-blue-400 shadow-md ring-1 ring-blue-400'
+                                      : appTheme === 'dark'
+                                      ? 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300'
+                                      : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700 shadow-sm'
+                                  }`}
+                                >
+                                  <span className="text-base leading-none">{p.icon}</span>
+                                  <span className="text-[10px] font-medium truncate w-full">{p.name}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* 3D Pitch (X-Axis Tilt) Slider */}
+                        <div>
+                          <div className={`flex justify-between text-xs mb-1 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                            <span className="flex items-center gap-1">
+                              <strong>3D Tilt X (Pitch)</strong>
+                              <span className="text-[10px] text-slate-500 font-normal">(Forward / Backward)</span>
+                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-cyan-500 font-mono font-semibold">{adjustments.rotateX || 0}&deg;</span>
+                              {(adjustments.rotateX || 0) !== 0 && (
+                                <button
+                                  onClick={() => setAdjustments(prev => ({ ...prev, rotateX: 0 }))}
+                                  className="text-[9px] px-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-400"
+                                >
+                                  0&deg;
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => setAdjustments(prev => ({ ...prev, rotateX: Math.max(-85, (prev.rotateX || 0) - 5) }))}
+                              className="px-2 py-1 rounded-lg border border-slate-700 bg-slate-800 text-[10px] text-slate-300 font-mono hover:text-white"
+                            >
+                              -5&deg;
+                            </button>
+                            <input
+                              type="range"
+                              min="-85"
+                              max="85"
+                              step="1"
+                              value={adjustments.rotateX || 0}
+                              onChange={(e) => setAdjustments({ ...adjustments, rotateX: Number(e.target.value) })}
+                              className="theme-slider w-full flex-1"
+                            />
+                            <button
+                              onClick={() => setAdjustments(prev => ({ ...prev, rotateX: Math.min(85, (prev.rotateX || 0) + 5) }))}
+                              className="px-2 py-1 rounded-lg border border-slate-700 bg-slate-800 text-[10px] text-slate-300 font-mono hover:text-white"
+                            >
+                              +5&deg;
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* 3D Yaw (Y-Axis Tilt) Slider */}
+                        <div>
+                          <div className={`flex justify-between text-xs mb-1 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                            <span className="flex items-center gap-1">
+                              <strong>3D Tilt Y (Yaw)</strong>
+                              <span className="text-[10px] text-slate-500 font-normal">(Left / Right Angle)</span>
+                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-cyan-500 font-mono font-semibold">{adjustments.rotateY || 0}&deg;</span>
+                              {(adjustments.rotateY || 0) !== 0 && (
+                                <button
+                                  onClick={() => setAdjustments(prev => ({ ...prev, rotateY: 0 }))}
+                                  className="text-[9px] px-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-400"
+                                >
+                                  0&deg;
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => setAdjustments(prev => ({ ...prev, rotateY: Math.max(-85, (prev.rotateY || 0) - 5) }))}
+                              className="px-2 py-1 rounded-lg border border-slate-700 bg-slate-800 text-[10px] text-slate-300 font-mono hover:text-white"
+                            >
+                              -5&deg;
+                            </button>
+                            <input
+                              type="range"
+                              min="-85"
+                              max="85"
+                              step="1"
+                              value={adjustments.rotateY || 0}
+                              onChange={(e) => setAdjustments({ ...adjustments, rotateY: Number(e.target.value) })}
+                              className="theme-slider w-full flex-1"
+                            />
+                            <button
+                              onClick={() => setAdjustments(prev => ({ ...prev, rotateY: Math.min(85, (prev.rotateY || 0) + 5) }))}
+                              className="px-2 py-1 rounded-lg border border-slate-700 bg-slate-800 text-[10px] text-slate-300 font-mono hover:text-white"
+                            >
+                              +5&deg;
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Camera Perspective Distance Slider */}
+                        <div>
+                          <div className={`flex justify-between text-xs mb-1 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                            <span className="flex items-center gap-1">
+                              <span>3D Focal Depth</span>
+                              <span className="text-[10px] text-slate-500 font-normal">
+                                {(adjustments.perspective || 800) <= 500 ? '(Fisheye 3D)' : (adjustments.perspective || 800) >= 1400 ? '(Telephoto)' : '(Studio 3D)'}
+                              </span>
+                            </span>
+                            <span className="text-cyan-500 font-mono font-semibold">{adjustments.perspective || 800}px</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="300"
+                            max="2000"
+                            step="50"
+                            value={adjustments.perspective || 800}
+                            onChange={(e) => setAdjustments({ ...adjustments, perspective: Number(e.target.value) })}
+                            className="theme-slider w-full"
+                          />
+                        </div>
+
+                        {/* 3D Elevation / Depth Shadow */}
+                        <div className={`p-3 rounded-2xl border ${
+                          appTheme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'
+                        }`}>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className={`text-xs font-semibold ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                              3D Elevation &amp; Cast Shadow
+                            </span>
+                            <span className="text-xs text-cyan-500 font-mono font-semibold">{adjustments.depth3D || 0}px</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="0"
+                            max="35"
+                            step="1"
+                            value={adjustments.depth3D || 0}
+                            onChange={(e) => setAdjustments({ ...adjustments, depth3D: Number(e.target.value) })}
+                            className="theme-slider w-full mb-2"
+                          />
+                          <p className={`text-[10px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                            Projects a realistic physical drop shadow in the direction of the 3D tilt
+                          </p>
+                        </div>
+
+                        {/* 3D Floating Levitation Toggle */}
+                        <div className={`p-3 rounded-2xl border flex items-center justify-between transition ${
+                          adjustments.is3DFloating
+                            ? 'bg-blue-600/10 border-blue-500/40'
+                            : appTheme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'
+                        }`}>
+                          <div>
+                            <span className={`text-xs font-semibold flex items-center gap-1.5 ${
+                              appTheme === 'dark' ? 'text-slate-200' : 'text-slate-800'
+                            }`}>
+                              <Sparkles className="w-3.5 h-3.5 text-cyan-400" /> 3D Floating Levitation
+                            </span>
+                            <p className={`text-[10px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                              Subtle smooth floating animation preview
+                            </p>
+                          </div>
+
+                          <button
+                            onClick={() => setAdjustments(prev => ({ ...prev, is3DFloating: !prev.is3DFloating }))}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 ${
+                              adjustments.is3DFloating
+                                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                                : appTheme === 'dark' ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                            }`}
+                          >
+                            <span className={`w-2 h-2 rounded-full ${adjustments.is3DFloating ? 'bg-emerald-400 animate-pulse' : 'bg-slate-400'}`} />
+                            <span>{adjustments.is3DFloating ? 'Active' : 'Off'}</span>
+                          </button>
+                        </div>
                       </div>
-                      <input
-                        type="range"
-                        min="0"
-                        max="360"
-                        step="15"
-                        value={adjustments.rotation}
-                        onChange={(e) => setAdjustments({ ...adjustments, rotation: Number(e.target.value) })}
-                        className="theme-slider w-full"
-                      />
-                    </div>
+                    )}
 
-                    <div className="grid grid-cols-3 gap-2 pt-2">
-                      <button
-                        onClick={() => setAdjustments({ ...adjustments, rotation: (adjustments.rotation + 90) % 360 })}
-                        className={`py-3.5 rounded-2xl border text-xs font-medium flex flex-col items-center justify-center gap-1.5 transition ${
-                          appTheme === 'dark'
-                            ? 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300'
-                            : 'bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-700 shadow-sm'
-                        }`}
-                      >
-                        <RotateCw className="w-4 h-4 text-cyan-500" />
-                        <span>Rotate 90&deg;</span>
-                      </button>
+                    {/* SUB-TAB 2: 2D ANGLE & FLIPS */}
+                    {transformSubTab === '2d' && (
+                      <div className="space-y-4">
+                        {/* 2D Angle Slider */}
+                        <div>
+                          <div className={`flex justify-between text-xs mb-1 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                            <span>Rotation Angle</span>
+                            <span className="text-cyan-500 font-mono font-semibold">{adjustments.rotation}&deg;</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="0"
+                            max="360"
+                            step="1"
+                            value={adjustments.rotation}
+                            onChange={(e) => setAdjustments({ ...adjustments, rotation: Number(e.target.value) })}
+                            className="theme-slider w-full"
+                          />
+                        </div>
 
-                      <button
-                        onClick={() => setAdjustments({ ...adjustments, flipH: !adjustments.flipH })}
-                        className={`py-3.5 rounded-2xl border text-xs font-medium flex flex-col items-center justify-center gap-1.5 transition ${
-                          adjustments.flipH 
-                            ? 'bg-blue-600 text-white border-blue-500 shadow-md' 
-                            : appTheme === 'dark' ? 'bg-slate-900 border-slate-800 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
-                        }`}
-                      >
-                        <FlipHorizontal className="w-4 h-4 text-cyan-500" />
-                        <span>Flip Horizontal</span>
-                      </button>
+                        {/* Quick Angle Snap Pills */}
+                        <div>
+                          <span className={`text-[11px] font-medium block mb-1.5 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                            Quick Angle Snap
+                          </span>
+                          <div className="grid grid-cols-6 gap-1">
+                            {[0, 45, 90, 135, 180, 270].map(deg => (
+                              <button
+                                key={deg}
+                                onClick={() => {
+                                  recordUndo();
+                                  setAdjustments({ ...adjustments, rotation: deg });
+                                }}
+                                className={`py-1.5 rounded-lg border text-xs font-mono font-semibold transition ${
+                                  adjustments.rotation === deg
+                                    ? 'bg-blue-600 text-white border-blue-400 shadow'
+                                    : appTheme === 'dark'
+                                    ? 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700'
+                                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                                }`}
+                              >
+                                {deg}&deg;
+                              </button>
+                            ))}
+                          </div>
+                        </div>
 
-                      <button
-                        onClick={() => setAdjustments({ ...adjustments, flipV: !adjustments.flipV })}
-                        className={`py-3.5 rounded-2xl border text-xs font-medium flex flex-col items-center justify-center gap-1.5 transition ${
-                          adjustments.flipV 
-                            ? 'bg-blue-600 text-white border-blue-500 shadow-md' 
-                            : appTheme === 'dark' ? 'bg-slate-900 border-slate-800 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
-                        }`}
-                      >
-                        <FlipVertical className="w-4 h-4 text-cyan-500" />
-                        <span>Flip Vertical</span>
-                      </button>
-                    </div>
+                        {/* Directional 90° and 180° Rotations */}
+                        <div className="grid grid-cols-3 gap-2 pt-1">
+                          <button
+                            onClick={() => {
+                              recordUndo();
+                              setAdjustments(prev => ({ ...prev, rotation: (prev.rotation + 90) % 360 }));
+                            }}
+                            className={`py-3 rounded-2xl border text-xs font-medium flex flex-col items-center justify-center gap-1.5 transition ${
+                              appTheme === 'dark'
+                                ? 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300'
+                                : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700 shadow-sm'
+                            }`}
+                          >
+                            <RotateCw className="w-4 h-4 text-cyan-500" />
+                            <span>Rotate 90&deg; CW</span>
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              recordUndo();
+                              setAdjustments(prev => ({ ...prev, rotation: (prev.rotation - 90 + 360) % 360 }));
+                            }}
+                            className={`py-3 rounded-2xl border text-xs font-medium flex flex-col items-center justify-center gap-1.5 transition ${
+                              appTheme === 'dark'
+                                ? 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300'
+                                : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700 shadow-sm'
+                            }`}
+                          >
+                            <RotateCcw className="w-4 h-4 text-cyan-500" />
+                            <span>Rotate 90&deg; CCW</span>
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              recordUndo();
+                              setAdjustments(prev => ({ ...prev, rotation: (prev.rotation + 180) % 360 }));
+                            }}
+                            className={`py-3 rounded-2xl border text-xs font-medium flex flex-col items-center justify-center gap-1.5 transition ${
+                              appTheme === 'dark'
+                                ? 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300'
+                                : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700 shadow-sm'
+                            }`}
+                          >
+                            <RefreshCw className="w-4 h-4 text-cyan-500" />
+                            <span>Invert 180&deg;</span>
+                          </button>
+                        </div>
+
+                        {/* Mirror Flips */}
+                        <div className="grid grid-cols-2 gap-2 pt-1">
+                          <button
+                            onClick={() => {
+                              recordUndo();
+                              setAdjustments(prev => ({ ...prev, flipH: !prev.flipH }));
+                            }}
+                            className={`py-3.5 rounded-2xl border text-xs font-medium flex items-center justify-center gap-2 transition ${
+                              adjustments.flipH 
+                                ? 'bg-blue-600 text-white border-blue-500 shadow-md ring-1 ring-blue-400' 
+                                : appTheme === 'dark' ? 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700' : 'bg-white border-slate-200 text-slate-700'
+                            }`}
+                          >
+                            <FlipHorizontal className="w-4 h-4 text-cyan-500" />
+                            <span>Flip Horizontal {adjustments.flipH ? '(On)' : ''}</span>
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              recordUndo();
+                              setAdjustments(prev => ({ ...prev, flipV: !prev.flipV }));
+                            }}
+                            className={`py-3.5 rounded-2xl border text-xs font-medium flex items-center justify-center gap-2 transition ${
+                              adjustments.flipV 
+                                ? 'bg-blue-600 text-white border-blue-500 shadow-md ring-1 ring-blue-400' 
+                                : appTheme === 'dark' ? 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700' : 'bg-white border-slate-200 text-slate-700'
+                            }`}
+                          >
+                            <FlipVertical className="w-4 h-4 text-cyan-500" />
+                            <span>Flip Vertical {adjustments.flipV ? '(On)' : ''}</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* SUB-TAB 3: SKEW & SHEAR */}
+                    {transformSubTab === 'skew' && (
+                      <div className="space-y-4">
+                        {/* Quick Presets for Skew */}
+                        <div>
+                          <span className={`text-[11px] font-semibold block mb-2 ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                            Slant &amp; Shear Presets
+                          </span>
+                          <div className="grid grid-cols-4 gap-1.5">
+                            {[
+                              { label: 'Italic +15°', sx: 15, sy: 0 },
+                              { label: 'Reverse -15°', sx: -15, sy: 0 },
+                              { label: 'Isometric 2.5D', sx: 20, sy: -15 },
+                              { label: 'Reset (0°)', sx: 0, sy: 0 }
+                            ].map(p => (
+                              <button
+                                key={p.label}
+                                onClick={() => {
+                                  recordUndo();
+                                  setAdjustments(prev => ({ ...prev, skewX: p.sx, skewY: p.sy }));
+                                }}
+                                className={`p-2 rounded-xl border text-[10px] font-semibold transition ${
+                                  (adjustments.skewX || 0) === p.sx && (adjustments.skewY || 0) === p.sy
+                                    ? 'bg-blue-600 text-white border-blue-400 shadow'
+                                    : appTheme === 'dark'
+                                    ? 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300'
+                                    : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'
+                                }`}
+                              >
+                                {p.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Skew X */}
+                        <div>
+                          <div className={`flex justify-between text-xs mb-1 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                            <span>Horizontal Skew (Skew X)</span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-cyan-500 font-mono font-semibold">{adjustments.skewX || 0}&deg;</span>
+                              {(adjustments.skewX || 0) !== 0 && (
+                                <button
+                                  onClick={() => setAdjustments(prev => ({ ...prev, skewX: 0 }))}
+                                  className="text-[9px] px-1 rounded bg-slate-800 text-slate-400 hover:text-white"
+                                >
+                                  0&deg;
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                          <input
+                            type="range"
+                            min="-45"
+                            max="45"
+                            step="1"
+                            value={adjustments.skewX || 0}
+                            onChange={(e) => setAdjustments({ ...adjustments, skewX: Number(e.target.value) })}
+                            className="theme-slider w-full"
+                          />
+                        </div>
+
+                        {/* Skew Y */}
+                        <div>
+                          <div className={`flex justify-between text-xs mb-1 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                            <span>Vertical Skew (Skew Y)</span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-cyan-500 font-mono font-semibold">{adjustments.skewY || 0}&deg;</span>
+                              {(adjustments.skewY || 0) !== 0 && (
+                                <button
+                                  onClick={() => setAdjustments(prev => ({ ...prev, skewY: 0 }))}
+                                  className="text-[9px] px-1 rounded bg-slate-800 text-slate-400 hover:text-white"
+                                >
+                                  0&deg;
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                          <input
+                            type="range"
+                            min="-45"
+                            max="45"
+                            step="1"
+                            value={adjustments.skewY || 0}
+                            onChange={(e) => setAdjustments({ ...adjustments, skewY: Number(e.target.value) })}
+                            className="theme-slider w-full"
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 

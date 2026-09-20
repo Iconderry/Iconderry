@@ -237,3 +237,17 @@ button, input, select, textarea, [role="button"] {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
 }
+
+/* 3D Levitating Floating Animation */
+@keyframes float3d {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.animate-floating-3d {
+  animation: float3d 3s ease-in-out infinite;
+}

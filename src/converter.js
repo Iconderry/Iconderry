@@ -23,6 +23,13 @@ export async function downloadAsset({
     rotation: 0,
     flipH: false,
     flipV: false,
+    rotateX: 0,
+    rotateY: 0,
+    perspective: 800,
+    skewX: 0,
+    skewY: 0,
+    depth3D: 0,
+    depth3DColor: '#000000',
     customColor: '',
     colorReplacements: {},
     activeStyleMode: 'original',
@@ -114,11 +121,13 @@ export async function downloadAsset({
 
       ctx.filter = filterRules || 'none';
 
-      // 4. Transformations (Rotation, Scale & Positioning)
-      ctx.save();
-      ctx.translate(targetWidth / 2, targetHeight / 2);
-      ctx.rotate((adjustments.rotation * Math.PI) / 180);
-      ctx.scale(adjustments.flipH ? -1 : 1, adjustments.flipV ? -1 : 1);
+      // 4. Transformations (Rotation, Scale, 3D Perspective & Skew)
+      const rotX = adjustments.rotateX || 0;
+      const rotY = adjustments.rotateY || 0;
+      const rotZ = adjustments.rotation || 0;
+      const skX = adjustments.skewX || 0;
+      const skY = adjustments.skewY || 0;
+      const has3D = rotX !== 0 || rotY !== 0 || skX !== 0 || skY !== 0;
 
       // Icon Padding / Inset
       let paddingRatio = adjustments.shadowBlur > 0 ? 0.82 : 0.9;
@@ -126,11 +135,28 @@ export async function downloadAsset({
         const shapePad = Number(adjustments.bgShapePadding || 20) / 100;
         paddingRatio = Math.max(0.2, (1 - shapePad * 1.5));
       }
+      if (has3D) {
+        paddingRatio *= 0.88;
+      }
 
       const drawWidth = targetWidth * paddingRatio;
       const drawHeight = targetHeight * paddingRatio;
 
-      ctx.drawImage(img, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+      // 3D Depth / Elevation Shadow
+      if ((adjustments.depth3D || 0) > 0) {
+        draw3DDepthShadow(ctx, img, drawWidth, drawHeight, adjustments, targetWidth);
+      }
+
+      ctx.save();
+      ctx.translate(targetWidth / 2, targetHeight / 2);
+
+      if (!has3D) {
+        ctx.rotate((rotZ * Math.PI) / 180);
+        ctx.scale(adjustments.flipH ? -1 : 1, adjustments.flipV ? -1 : 1);
+        ctx.drawImage(img, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+      } else {
+        render3DPerspectiveImage(ctx, img, drawWidth, drawHeight, adjustments, targetWidth);
+      }
       ctx.restore();
 
       const mimeType = format === 'jpeg' ? 'image/jpeg' : format === 'webp' ? 'image/webp' : 'image/png';
@@ -299,7 +325,134 @@ function prepareSvgWithAdjustments(svgCode, adjustments = {}, targetWidth, targe
     res = res.replace(/stroke="((?!none|url)[^"]+)"/gi, `stroke="${adjustments.customColor}"`);
   }
 
+  // 3D & 2D Vector Transform Embedding for Direct SVG Export
+  const rotX = adjustments.rotateX || 0;
+  const rotY = adjustments.rotateY || 0;
+  const rotZ = adjustments.rotation || 0;
+  const skX = adjustments.skewX || 0;
+  const skY = adjustments.skewY || 0;
+  const persp = adjustments.perspective || 800;
+  const flipH = adjustments.flipH ? -1 : 1;
+  const flipV = adjustments.flipV ? -1 : 1;
+
+  if (rotX !== 0 || rotY !== 0 || rotZ !== 0 || skX !== 0 || skY !== 0 || flipH !== 1 || flipV !== 1) {
+    const inner = res.replace(/<svg[^>]*>|<\/svg>/gi, '');
+    const svgOpenMatch = res.match(/<svg[^>]*>/i);
+    const svgOpen = svgOpenMatch ? svgOpenMatch[0] : '<svg>';
+    res = `${svgOpen}
+  <g style="transform-box: fill-box; transform-origin: center; transform: perspective(${persp}px) rotateX(${rotX}deg) rotateY(${rotY}deg) rotate(${rotZ}deg) skew(${skX}deg, ${skY}deg) scale(${flipH}, ${flipV});">
+    ${inner}
+  </g>
+</svg>`;
+  }
+
   return res;
+}
+
+// 3D Perspective Projection for HTML5 Canvas Export
+function projectPoint3D(x, y, radX, radY, radZ, tanSkX, tanSkY, scaleX, scaleY, persp) {
+  const x0 = x * scaleX;
+  const y0 = y * scaleY;
+  const x1 = x0 + y0 * tanSkX;
+  const y1 = y0 + x0 * tanSkY;
+  const y2 = y1 * Math.cos(radX);
+  const z2 = y1 * Math.sin(radX);
+  const x3 = x1 * Math.cos(radY) + z2 * Math.sin(radY);
+  const z3 = -x1 * Math.sin(radY) + z2 * Math.cos(radY);
+  const x4 = x3 * Math.cos(radZ) - y2 * Math.sin(radZ);
+  const y4 = x3 * Math.sin(radZ) + y2 * Math.cos(radZ);
+  const fov = persp / Math.max(1, (persp + z3));
+  return { x: x4 * fov, y: y4 * fov, z: z3 };
+}
+
+function getAffineTransform(u0, v0, u1, v1, u2, v2, x0, y0, x1, y1, x2, y2) {
+  const D = u0 * (v1 - v2) + u1 * (v2 - v0) + u2 * (v0 - v1);
+  if (Math.abs(D) < 1e-6) return null;
+  return {
+    a: (x0 * (v1 - v2) + x1 * (v2 - v0) + x2 * (v0 - v1)) / D,
+    c: (x0 * (u2 - u1) + x1 * (u0 - u2) + x2 * (u1 - u0)) / D,
+    e: (x0 * (u1 * v2 - u2 * v1) + x1 * (u2 * v0 - u0 * v2) + x2 * (u0 * v1 - u1 * v0)) / D,
+    b: (y0 * (v1 - v2) + y1 * (v2 - v0) + y2 * (v0 - v1)) / D,
+    d: (y0 * (u2 - u1) + y1 * (u0 - u2) + y2 * (u1 - u0)) / D,
+    f: (y0 * (u1 * v2 - u2 * v1) + y1 * (u2 * v0 - u0 * v2) + y2 * (u0 * v1 - u1 * v0)) / D
+  };
+}
+
+function render3DPerspectiveImage(ctx, img, drawWidth, drawHeight, adjustments, canvasWidth) {
+  const radX = ((adjustments.rotateX || 0) * Math.PI) / 180;
+  const radY = ((adjustments.rotateY || 0) * Math.PI) / 180;
+  const radZ = ((adjustments.rotation || 0) * Math.PI) / 180;
+  const tanSkX = Math.tan(((adjustments.skewX || 0) * Math.PI) / 180);
+  const tanSkY = Math.tan(((adjustments.skewY || 0) * Math.PI) / 180);
+  const scaleX = adjustments.flipH ? -1 : 1;
+  const scaleY = adjustments.flipV ? -1 : 1;
+  const persp = (adjustments.perspective || 800) * (canvasWidth / 384);
+
+  const N = 32; // 32 vertical slices for smooth perspective
+  const W = drawWidth;
+  const H = drawHeight;
+  const imgW = img.width || W;
+  const imgH = img.height || H;
+
+  for (let i = 0; i < N; i++) {
+    const u0 = -W / 2 + (i / N) * W;
+    const u1 = -W / 2 + ((i + 1) / N) * W;
+    const su0 = (i / N) * imgW;
+    const su1 = Math.min(imgW, ((i + 1) / N) * imgW + 0.6); // slight overlap avoids seams
+
+    const pTL = projectPoint3D(u0, -H / 2, radX, radY, radZ, tanSkX, tanSkY, scaleX, scaleY, persp);
+    const pTR = projectPoint3D(u1, -H / 2, radX, radY, radZ, tanSkX, tanSkY, scaleX, scaleY, persp);
+    const pBR = projectPoint3D(u1, H / 2, radX, radY, radZ, tanSkX, tanSkY, scaleX, scaleY, persp);
+    const pBL = projectPoint3D(u0, H / 2, radX, radY, radZ, tanSkX, tanSkY, scaleX, scaleY, persp);
+
+    // Triangle 1: TL, TR, BL
+    const m1 = getAffineTransform(su0, 0, su1, 0, su0, imgH, pTL.x, pTL.y, pTR.x, pTR.y, pBL.x, pBL.y);
+    if (m1) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(pTL.x, pTL.y);
+      ctx.lineTo(pTR.x, pTR.y);
+      ctx.lineTo(pBL.x, pBL.y);
+      ctx.closePath();
+      ctx.clip();
+      ctx.transform(m1.a, m1.b, m1.c, m1.d, m1.e, m1.f);
+      ctx.drawImage(img, 0, 0, imgW, imgH);
+      ctx.restore();
+    }
+
+    // Triangle 2: TR, BR, BL
+    const m2 = getAffineTransform(su1, 0, su1, imgH, su0, imgH, pTR.x, pTR.y, pBR.x, pBR.y, pBL.x, pBL.y);
+    if (m2) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(pTR.x, pTR.y);
+      ctx.lineTo(pBR.x, pBR.y);
+      ctx.lineTo(pBL.x, pBL.y);
+      ctx.closePath();
+      ctx.clip();
+      ctx.transform(m2.a, m2.b, m2.c, m2.d, m2.e, m2.f);
+      ctx.drawImage(img, 0, 0, imgW, imgH);
+      ctx.restore();
+    }
+  }
+}
+
+function draw3DDepthShadow(ctx, img, drawWidth, drawHeight, adjustments, canvasWidth) {
+  const depth = (adjustments.depth3D || 0) * (canvasWidth / 384);
+  if (depth <= 0) return;
+
+  const radX = ((adjustments.rotateX || 0) * Math.PI) / 180;
+  const radY = ((adjustments.rotateY || 0) * Math.PI) / 180;
+  const offX = -Math.sin(radY) * depth * 1.5;
+  const offY = Math.sin(radX) * depth * 1.5 + (depth * 0.8);
+  const color = adjustments.depth3DColor || 'rgba(0,0,0,0.55)';
+
+  ctx.save();
+  ctx.translate(canvasWidth / 2 + offX, (canvasWidth / 2) + offY);
+  ctx.filter = `blur(${Math.max(2, Math.round(depth * 0.4))}px) drop-shadow(0 0 ${Math.round(depth * 0.5)}px ${color})`;
+  ctx.globalAlpha = 0.5;
+  render3DPerspectiveImage(ctx, img, drawWidth, drawHeight, adjustments, canvasWidth);
+  ctx.restore();
 }
 
 function triggerDownload(blob, fullFilename) {
