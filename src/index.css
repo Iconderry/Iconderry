@@ -238,16 +238,68 @@ button, input, select, textarea, [role="button"] {
   overscroll-behavior: contain;
 }
 
-/* 3D Levitating Floating Animation */
+/* 3D Motion & Levitation Animations */
 @keyframes float3d {
   0%, 100% {
     transform: translateY(0px);
   }
   50% {
-    transform: translateY(-10px);
+    transform: translateY(calc(-1 * var(--anim-amp, 14px)));
+  }
+}
+
+@keyframes spin3d {
+  0% {
+    transform: rotateY(0deg);
+  }
+  100% {
+    transform: rotateY(360deg);
+  }
+}
+
+@keyframes pulse3d {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.10);
+  }
+}
+
+@keyframes wobble3d {
+  0%, 100% {
+    transform: rotateX(-6deg) rotateY(10deg);
+  }
+  50% {
+    transform: rotateX(6deg) rotateY(-10deg);
+  }
+}
+
+@keyframes wave3d {
+  0%, 100% {
+    transform: translateY(-6px) rotate(3deg);
+  }
+  50% {
+    transform: translateY(8px) rotate(-3deg);
   }
 }
 
 .animate-floating-3d {
-  animation: float3d 3s ease-in-out infinite;
+  animation: float3d var(--anim-speed, 2.4s) ease-in-out infinite;
+}
+
+.animate-spin-3d {
+  animation: spin3d var(--anim-speed, 3.5s) linear infinite;
+}
+
+.animate-pulse-3d {
+  animation: pulse3d var(--anim-speed, 2.0s) ease-in-out infinite;
+}
+
+.animate-wobble-3d {
+  animation: wobble3d var(--anim-speed, 2.6s) ease-in-out infinite;
+}
+
+.animate-wave-3d {
+  animation: wave3d var(--anim-speed, 2.8s) ease-in-out infinite;
 }

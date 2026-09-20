@@ -7,7 +7,7 @@ import {
   Settings, Moon, RotateCcw, SlidersHorizontal, HardDrive, Monitor,
   ZoomIn, ZoomOut, Maximize2, Link2, Unlink2, Wand2, Scan,
   Heart, History, Shapes, MessageSquarePlus, Shield, FileText, Info,
-  Eye, EyeOff, Box, Compass, Move3d
+  Eye, EyeOff, Box, Compass, Move3d, Film, Play, Activity
 } from 'lucide-react';
 import { INITIAL_ELEMENTS } from './initialData';
 import { downloadAsset } from './converter';
@@ -37,6 +37,10 @@ const DEFAULT_ADJUSTMENTS = {
   depth3D: 0,
   depth3DColor: '#000000',
   is3DFloating: false,
+  animPreset: 'float',
+  animSpeed: 2.2,
+  animHeight: 16,
+  animShadowSync: true,
   customColor: '',
   colorReplacements: {}
 };
@@ -1498,7 +1502,11 @@ export default function App() {
       skewX: 0,
       skewY: 0,
       depth3D: 0,
-      is3DFloating: false
+      is3DFloating: false,
+      animPreset: 'float',
+      animSpeed: 2.2,
+      animHeight: 16,
+      animShadowSync: true
     }));
   };
 
@@ -1936,6 +1944,54 @@ export default function App() {
       ));
     } catch (err) {
       alert('Download error: ' + err.message);
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const handleExportAnimatedGif = async () => {
+    if (!selectedAsset || downloading) return;
+    setDownloading(true);
+    try {
+      let finalWidth = 512;
+      let finalHeight = 512;
+      if (iconWidth && iconHeight) {
+        if (iconWidth >= iconHeight) {
+          finalWidth = 512;
+          finalHeight = Math.round(512 * (iconHeight / iconWidth));
+        } else {
+          finalHeight = 512;
+          finalWidth = Math.round(512 * (iconWidth / iconHeight));
+        }
+      }
+
+      await downloadAsset({
+        svgCode: selectedAsset.svgCode,
+        filename: selectedAsset.title,
+        format: 'gif',
+        size: 512,
+        width: finalWidth,
+        height: finalHeight,
+        isTransparent,
+        adjustments: {
+          ...adjustments,
+          activeStyleMode,
+          strokeMultiplier,
+          strokeColorMode,
+          customStrokeColor,
+          bgShape,
+          bgShapeColor,
+          bgShapePadding,
+          bgShapeBorder,
+          bgShapeBorderColor
+        }
+      });
+
+      setElements(prev => prev.map(item => 
+        item.id === selectedAsset.id ? { ...item, downloads: (item.downloads || 0) + 1 } : item
+      ));
+    } catch (err) {
+      alert('GIF export error: ' + err.message);
     } finally {
       setDownloading(false);
     }
@@ -2725,7 +2781,25 @@ export default function App() {
 
 
               {/* Floating SVG Icon or Background Badge Shape with Interactive Selection, Custom Dimensions & Smooth Zoom */}
-              <div className={adjustments.is3DFloating ? 'animate-floating-3d' : ''}>
+              <div 
+                className={
+                  adjustments.is3DFloating
+                    ? adjustments.animPreset === 'spin360'
+                      ? 'animate-spin-3d'
+                      : adjustments.animPreset === 'pulse'
+                      ? 'animate-pulse-3d'
+                      : adjustments.animPreset === 'wobble'
+                      ? 'animate-wobble-3d'
+                      : adjustments.animPreset === 'wave'
+                      ? 'animate-wave-3d'
+                      : 'animate-floating-3d'
+                    : ''
+                }
+                style={{
+                  '--anim-speed': `${adjustments.animSpeed || 2.2}s`,
+                  '--anim-amp': `${adjustments.animHeight || 16}px`
+                }}
+              >
                 <div
                   ref={canvasSvgContainerRef}
                   onClick={(e) => {
@@ -4572,34 +4646,147 @@ export default function App() {
                           </p>
                         </div>
 
-                        {/* 3D Floating Levitation Toggle */}
-                        <div className={`p-3 rounded-2xl border flex items-center justify-between transition ${
+                        {/* 3D Motion, Levitation & Animated GIF Studio */}
+                        <div className={`p-3.5 rounded-2xl border transition space-y-3 ${
                           adjustments.is3DFloating
-                            ? 'bg-blue-600/10 border-blue-500/40'
+                            ? 'bg-blue-600/10 border-blue-500/40 shadow-lg shadow-blue-500/5'
                             : appTheme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'
                         }`}>
-                          <div>
-                            <span className={`text-xs font-semibold flex items-center gap-1.5 ${
-                              appTheme === 'dark' ? 'text-slate-200' : 'text-slate-800'
-                            }`}>
-                              <Sparkles className="w-3.5 h-3.5 text-cyan-400" /> 3D Floating Levitation
-                            </span>
-                            <p className={`text-[10px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                              Subtle smooth floating animation preview
-                            </p>
+                          {/* Top Header & Live Toggle */}
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <span className={`text-xs font-semibold flex items-center gap-1.5 ${
+                                appTheme === 'dark' ? 'text-slate-200' : 'text-slate-800'
+                              }`}>
+                                <Sparkles className="w-3.5 h-3.5 text-cyan-400" /> 3D Motion & Levitation
+                              </span>
+                              <p className={`text-[10px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                                Live preview motion & looping GIF generator
+                              </p>
+                            </div>
+
+                            <button
+                              onClick={() => setAdjustments(prev => ({ ...prev, is3DFloating: !prev.is3DFloating }))}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 ${
+                                adjustments.is3DFloating
+                                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                                  : appTheme === 'dark' ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                              }`}
+                            >
+                              <span className={`w-2 h-2 rounded-full ${adjustments.is3DFloating ? 'bg-emerald-400 animate-pulse' : 'bg-slate-400'}`} />
+                              <span>{adjustments.is3DFloating ? 'Live Active' : 'Off'}</span>
+                            </button>
                           </div>
 
-                          <button
-                            onClick={() => setAdjustments(prev => ({ ...prev, is3DFloating: !prev.is3DFloating }))}
-                            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 ${
-                              adjustments.is3DFloating
-                                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                                : appTheme === 'dark' ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
-                            }`}
-                          >
-                            <span className={`w-2 h-2 rounded-full ${adjustments.is3DFloating ? 'bg-emerald-400 animate-pulse' : 'bg-slate-400'}`} />
-                            <span>{adjustments.is3DFloating ? 'Active' : 'Off'}</span>
-                          </button>
+                          {/* Motion Presets (5 dynamic motion types) */}
+                          <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <span className={`text-[11px] font-semibold uppercase tracking-wider ${
+                                appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'
+                              }`}>
+                                Motion Preset
+                              </span>
+                              <span className="text-[10px] font-mono text-cyan-400 font-semibold">
+                                {adjustments.animPreset || 'float'}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-5 gap-1.5">
+                              {[
+                                { id: 'float', name: 'Levitate', icon: '🚀' },
+                                { id: 'spin360', name: '360° Spin', icon: '🔄' },
+                                { id: 'pulse', name: 'Pulse', icon: '💓' },
+                                { id: 'wobble', name: 'Wobble', icon: '🎭' },
+                                { id: 'wave', name: 'Wave', icon: '🌊' }
+                              ].map((preset) => {
+                                const isSel = (adjustments.animPreset || 'float') === preset.id;
+                                return (
+                                  <button
+                                    key={preset.id}
+                                    onClick={() => setAdjustments(prev => ({ ...prev, animPreset: preset.id, is3DFloating: true }))}
+                                    className={`p-1.5 rounded-xl text-center border transition flex flex-col items-center gap-0.5 ${
+                                      isSel
+                                        ? 'bg-blue-600 text-white border-blue-400 shadow-md shadow-blue-600/20'
+                                        : appTheme === 'dark'
+                                          ? 'bg-slate-800/80 border-slate-700/60 text-slate-300 hover:border-slate-600'
+                                          : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                                    }`}
+                                  >
+                                    <span className="text-sm">{preset.icon}</span>
+                                    <span className="text-[9px] font-semibold truncate w-full">{preset.name}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Controls: Speed & Height Sliders */}
+                          <div className="space-y-2.5 pt-1 border-t border-slate-200/20">
+                            {/* Animation Speed / Loop Duration */}
+                            <div>
+                              <div className={`flex justify-between text-xs mb-1 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                                <span className="flex items-center gap-1">Loop Speed</span>
+                                <span className="text-cyan-400 font-mono font-semibold">{adjustments.animSpeed || 2.2}s</span>
+                              </div>
+                              <input
+                                type="range"
+                                min="0.8"
+                                max="4.0"
+                                step="0.2"
+                                value={adjustments.animSpeed || 2.2}
+                                onChange={(e) => setAdjustments(prev => ({ ...prev, animSpeed: Number(e.target.value) }))}
+                                className="theme-slider w-full"
+                              />
+                            </div>
+
+                            {/* Motion Height / Amplitude */}
+                            <div>
+                              <div className={`flex justify-between text-xs mb-1 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                                <span className="flex items-center gap-1">Motion Amplitude</span>
+                                <span className="text-cyan-400 font-mono font-semibold">{adjustments.animHeight || 16}px</span>
+                              </div>
+                              <input
+                                type="range"
+                                min="4"
+                                max="32"
+                                step="2"
+                                value={adjustments.animHeight || 16}
+                                onChange={(e) => setAdjustments(prev => ({ ...prev, animHeight: Number(e.target.value) }))}
+                                className="theme-slider w-full"
+                              />
+                            </div>
+
+                            {/* Dynamic Physical Shadow Sync */}
+                            <label className="flex items-center justify-between cursor-pointer pt-0.5">
+                              <span className={`text-[11px] font-medium ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                                Dynamic Drop Shadow Sync
+                              </span>
+                              <input
+                                type="checkbox"
+                                checked={adjustments.animShadowSync !== false}
+                                onChange={(e) => setAdjustments(prev => ({ ...prev, animShadowSync: e.target.checked }))}
+                                className="rounded text-blue-600 focus:ring-0 cursor-pointer"
+                              />
+                            </label>
+                          </div>
+
+                          {/* One-Click Animated GIF Export Button */}
+                          <div className="pt-2 border-t border-slate-200/20">
+                            <button
+                              onClick={handleExportAnimatedGif}
+                              disabled={downloading}
+                              className={`w-full py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition shadow-md ${
+                                downloading
+                                  ? 'bg-slate-700 text-slate-400 cursor-not-allowed'
+                                  : 'bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white shadow-blue-500/25 active:scale-[0.99]'
+                              }`}
+                            >
+                              <Film className={`w-3.5 h-3.5 ${downloading ? 'animate-spin' : ''}`} />
+                              <span>{downloading ? 'Rendering Looping GIF...' : '✨ Export Animated .GIF (Looping)'}</span>
+                            </button>
+                            <p className={`text-[9px] text-center mt-1.5 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                              512px • Hardware WebGL 3D frames • Clean loop
+                            </p>
+                          </div>
                         </div>
                       </div>
                     )}
@@ -4860,8 +5047,8 @@ export default function App() {
                       <label className={`block text-[11px] font-semibold mb-2 uppercase ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                         Target Format
                       </label>
-                      <div className="grid grid-cols-3 gap-2">
-                        {['png', 'webp', 'jpeg'].map((fmt) => (
+                      <div className="grid grid-cols-4 gap-2">
+                        {['png', 'webp', 'jpeg', 'gif'].map((fmt) => (
                           <button
                             key={fmt}
                             onClick={() => setExportFormat(fmt)}
@@ -4877,6 +5064,14 @@ export default function App() {
                           </button>
                         ))}
                       </div>
+                      {exportFormat === 'gif' && (
+                        <div className="mt-2 p-2.5 rounded-xl bg-blue-600/10 border border-blue-500/30 text-[11px] flex items-center gap-2">
+                          <Film className="w-4 h-4 text-cyan-400 shrink-0" />
+                          <span className={appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'}>
+                            Animated looping GIF with active 3D motion & transparency
+                          </span>
+                        </div>
+                      )}
                     </div>
 
                     {/* Resolution buttons */}

@@ -1,5 +1,6 @@
 import { replaceSvgColors, applyUniversalStroke } from './colorUtils';
 import { transformSvgStyle } from './styleTransformer';
+import { GIFEncoder, quantize, applyPalette } from 'gifenc';
 
 export async function downloadAsset({
   svgCode,
@@ -119,6 +120,24 @@ export async function downloadAsset({
           ? `drop-shadow(0px 0px ${scaledGlow}px ${adjustments.shadowColor || '#38bdf8'}) drop-shadow(0px 0px ${Math.max(1, Math.round(scaledGlow * 0.4))}px ${adjustments.shadowColor || '#38bdf8'})` 
           : ''
       ].filter(Boolean).join(' ');
+
+      // Animated GIF Export Branch
+      if (format === 'gif') {
+        exportAnimatedGif({
+          img,
+          targetWidth,
+          targetHeight,
+          adjustments,
+          isTransparent,
+          safeFilename,
+          filterRules,
+          blobUrl
+        }).then(() => resolve(true)).catch((err) => {
+          URL.revokeObjectURL(blobUrl);
+          reject(err);
+        });
+        return;
+      }
 
       // 4. Transformations (Rotation, Scale, 3D Perspective & Skew)
       const rotX = adjustments.rotateX || 0;
@@ -597,6 +616,168 @@ function render3DWithWebGL(imageSource, targetWidth, targetHeight, adjustments, 
 
   gl.drawArrays(gl.TRIANGLES, 0, 6);
   return canvas;
+}
+
+async function exportAnimatedGif({
+  img,
+  targetWidth,
+  targetHeight,
+  adjustments,
+  isTransparent,
+  safeFilename,
+  filterRules,
+  blobUrl
+}) {
+  // Cap dimensions to max 800px so encoding is fast and GIF file size remains manageable
+  const gifW = Math.min(targetWidth, 800);
+  const gifH = Math.min(targetHeight, 800);
+
+  const fps = 20;
+  const speed = Number(adjustments.animSpeed || 2.2);
+  const totalFrames = Math.max(16, Math.min(48, Math.round(fps * speed)));
+  const delay = Math.round(1000 / fps);
+
+  const gif = GIFEncoder();
+
+  const fCanvas = document.createElement('canvas');
+  fCanvas.width = gifW;
+  fCanvas.height = gifH;
+  const fCtx = fCanvas.getContext('2d', { willReadFrequently: true });
+  if (!fCtx) {
+    throw new Error('Canvas 2D context unavailable for GIF export');
+  }
+
+  const animPreset = adjustments.animPreset || 'float';
+  const animHeight = Number(adjustments.animHeight || 16);
+  const animShadowSync = adjustments.animShadowSync !== false;
+
+  for (let frame = 0; frame < totalFrames; frame++) {
+    const t = frame / totalFrames; // 0 to 1
+    fCtx.clearRect(0, 0, gifW, gifH);
+
+    // 1. Background
+    if (!isTransparent && adjustments.bgShape === 'none') {
+      fCtx.fillStyle = '#FFFFFF';
+      fCtx.fillRect(0, 0, gifW, gifH);
+    }
+    if (adjustments.bgShape && adjustments.bgShape !== 'none') {
+      drawCanvasBgShape(fCtx, gifW, gifH, adjustments);
+    }
+
+    // 2. Compute motion state for this frame
+    let frameAdj = { ...adjustments };
+    let offsetY = 0;
+    let offsetX = 0;
+    let scalePulse = 1;
+
+    if (animPreset === 'float') {
+      const sinVal = Math.sin(t * 2 * Math.PI);
+      offsetY = -sinVal * animHeight * (gifH / 384);
+      if (animShadowSync && (frameAdj.depth3D || 0) > 0) {
+        frameAdj.depth3D = (adjustments.depth3D || 10) * Math.max(0.2, (1 - sinVal * 0.35));
+      }
+    } else if (animPreset === 'spin360') {
+      frameAdj.rotateY = ((adjustments.rotateY || 0) + t * 360) % 360;
+    } else if (animPreset === 'pulse') {
+      const sinVal = Math.sin(t * 2 * Math.PI);
+      scalePulse = 1 + sinVal * 0.10;
+    } else if (animPreset === 'wobble') {
+      const sinVal = Math.sin(t * 2 * Math.PI);
+      const cosVal = Math.cos(t * 2 * Math.PI);
+      frameAdj.rotateY = (adjustments.rotateY || 0) + sinVal * 16;
+      frameAdj.rotateX = (adjustments.rotateX || 0) + cosVal * 8;
+    } else if (animPreset === 'wave') {
+      const sinVal = Math.sin(t * 2 * Math.PI);
+      const cosVal = Math.cos(t * 2 * Math.PI);
+      offsetY = -sinVal * (animHeight * 0.7) * (gifH / 384);
+      frameAdj.rotation = (adjustments.rotation || 0) + cosVal * 6;
+    }
+
+    // 3. Render icon for this frame
+    const rotX = frameAdj.rotateX || 0;
+    const rotY = frameAdj.rotateY || 0;
+    const rotZ = frameAdj.rotation || 0;
+    const skX = frameAdj.skewX || 0;
+    const skY = frameAdj.skewY || 0;
+    const has3D = rotX !== 0 || rotY !== 0 || skX !== 0 || skY !== 0 || animPreset === 'spin360' || animPreset === 'wobble';
+
+    let paddingRatio = frameAdj.shadowBlur > 0 ? 0.82 : 0.9;
+    if (frameAdj.bgShape && frameAdj.bgShape !== 'none') {
+      const shapePad = Number(frameAdj.bgShapePadding || 20) / 100;
+      paddingRatio = Math.max(0.2, (1 - shapePad * 1.5));
+    }
+    if (has3D) {
+      paddingRatio *= 0.82; // Margin for 3D rotation
+    }
+
+    const drawW = gifW * paddingRatio * scalePulse;
+    const drawH = gifH * paddingRatio * scalePulse;
+
+    if (has3D) {
+      const offCanvas = document.createElement('canvas');
+      offCanvas.width = drawW;
+      offCanvas.height = drawH;
+      const offCtx = offCanvas.getContext('2d');
+      if (offCtx) {
+        offCtx.imageSmoothingEnabled = true;
+        offCtx.imageSmoothingQuality = 'high';
+        offCtx.filter = filterRules || 'none';
+        offCtx.drawImage(img, 0, 0, drawW, drawH);
+      }
+
+      const webglCanvas = render3DWithWebGL(offCtx ? offCanvas : img, gifW, gifH, frameAdj, drawW, drawH);
+      if (webglCanvas) {
+        // Shadow
+        if ((frameAdj.depth3D || 0) > 0) {
+          const depth = (frameAdj.depth3D || 0) * (gifW / 384);
+          const radX = (rotX * Math.PI) / 180;
+          const radY = (rotY * Math.PI) / 180;
+          const offX = -Math.sin(radY) * depth * 1.5;
+          const offY = Math.sin(radX) * depth * 1.5 + (depth * 0.8);
+          const sColor = frameAdj.depth3DColor || 'rgba(0,0,0,0.55)';
+
+          fCtx.save();
+          fCtx.filter = `blur(${Math.max(2, Math.round(depth * 0.5))}px) drop-shadow(0 0 ${Math.round(depth * 0.4)}px ${sColor})`;
+          fCtx.globalAlpha = 0.55;
+          fCtx.drawImage(webglCanvas, offX, offY);
+          fCtx.restore();
+        }
+
+        // Icon with levitation offsetY
+        fCtx.save();
+        fCtx.drawImage(webglCanvas, 0, offsetY);
+        fCtx.restore();
+      }
+    } else {
+      // 2D frame
+      fCtx.save();
+      fCtx.filter = filterRules || 'none';
+      fCtx.translate(gifW / 2 + offsetX, gifH / 2 + offsetY);
+      fCtx.rotate((rotZ * Math.PI) / 180);
+      fCtx.scale(frameAdj.flipH ? -1 : 1, frameAdj.flipV ? -1 : 1);
+      fCtx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+      fCtx.restore();
+    }
+
+    // 4. Quantize and write frame into GIF
+    const imgData = fCtx.getImageData(0, 0, gifW, gifH);
+    const rgba = imgData.data;
+    const quantFormat = isTransparent ? 'rgba4444' : 'rgb565';
+    const palette = quantize(rgba, 256, { format: quantFormat, oneBitAlpha: isTransparent });
+    const index = applyPalette(rgba, palette, quantFormat);
+    gif.writeFrame(index, gifW, gifH, { 
+      palette, 
+      delay, 
+      transparent: isTransparent 
+    });
+  }
+
+  gif.finish();
+  const buffer = gif.bytes();
+  const blob = new Blob([buffer], { type: 'image/gif' });
+  triggerDownload(blob, `${safeFilename}-${gifW}x${gifH}.gif`);
+  URL.revokeObjectURL(blobUrl);
+  return true;
 }
 
 function triggerDownload(blob, fullFilename) {
