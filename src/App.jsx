@@ -1098,13 +1098,26 @@ export default function App() {
     if (!selectedAsset) return;
     setDownloading(true);
     try {
+      // Calculate true export resolution respecting custom aspect ratio
+      let finalWidth = exportSize;
+      let finalHeight = exportSize;
+      if (iconWidth && iconHeight && iconWidth > 0 && iconHeight > 0) {
+        if (iconWidth >= iconHeight) {
+          finalWidth = exportSize;
+          finalHeight = Math.round(exportSize * (iconHeight / iconWidth));
+        } else {
+          finalHeight = exportSize;
+          finalWidth = Math.round(exportSize * (iconWidth / iconHeight));
+        }
+      }
+
       await downloadAsset({
         svgCode: selectedAsset.svgCode,
         filename: selectedAsset.title,
         format: exportFormat,
         size: exportSize,
-        width: iconWidth,
-        height: iconHeight,
+        width: finalWidth,
+        height: finalHeight,
         isTransparent,
         adjustments: {
           ...adjustments,
@@ -2007,9 +2020,9 @@ export default function App() {
                 <div className={`pointer-events-auto hidden sm:flex items-center gap-2 p-2 sm:p-2.5 px-3 sm:px-4 backdrop-blur-md border rounded-xl sm:rounded-2xl text-[10px] sm:text-[11px] shadow-xl ml-auto ${
                   appTheme === 'dark' ? 'bg-slate-900/90 border-slate-800 text-slate-400' : 'bg-white/95 border-slate-200 text-slate-600'
                 }`}>
-                  <span>Size: <strong className={`font-mono text-cyan-500`}>{iconWidth}&times;{iconHeight}px</strong></span>
+                  <span>Export: <strong className={`font-mono text-cyan-500 font-bold`}>{exportSize >= 1024 ? `${exportSize / 1024}K Ultra HD` : `${exportSize}px`}</strong></span>
                   <span>&bull;</span>
-                  <span>Format: <strong className={`font-mono uppercase ${appTheme === 'dark' ? 'text-slate-200' : 'text-slate-900'}`}>.{exportFormat}</strong></span>
+                  <span>Format: <strong className={`font-mono uppercase font-bold ${appTheme === 'dark' ? 'text-slate-200' : 'text-slate-900'}`}>.{exportFormat}</strong></span>
                 </div>
               </div>
             </div>

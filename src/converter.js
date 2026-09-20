@@ -42,7 +42,7 @@ export async function downloadAsset({
 
   // DIRECT PURE VECTOR SVG EXPORT
   if (format === 'svg') {
-    let preparedSvg = prepareSvgWithAdjustments(svgCode, adjustments);
+    let preparedSvg = prepareSvgWithAdjustments(svgCode, adjustments, targetWidth, targetHeight);
 
     // If background badge shape is active, embed container shape into SVG
     if (adjustments.bgShape && adjustments.bgShape !== 'none') {
@@ -55,7 +55,8 @@ export async function downloadAsset({
   }
 
   return new Promise((resolve, reject) => {
-    let preparedSvg = prepareSvgWithAdjustments(svgCode, adjustments);
+    // Pass targetWidth and targetHeight so SVG root element has native resolution attributes
+    let preparedSvg = prepareSvgWithAdjustments(svgCode, adjustments, targetWidth, targetHeight);
 
     const blob = new Blob([preparedSvg], { type: 'image/svg+xml;charset=utf-8' });
     const URL = window.URL || window.webkitURL || window;
@@ -76,6 +77,10 @@ export async function downloadAsset({
         return;
       }
 
+      // Enable pristine high-quality subpixel vector smoothing
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+
       // 1. Solid canvas background (if not transparent or jpeg)
       if (format === 'jpeg' || (!isTransparent && adjustments.bgShape === 'none')) {
         ctx.fillStyle = '#FFFFFF';
@@ -87,10 +92,10 @@ export async function downloadAsset({
         drawCanvasBgShape(ctx, targetWidth, targetHeight, adjustments);
       }
 
-      // 3. Comprehensive Canvas CSS Filters
-      const maxDim = Math.max(targetWidth, targetHeight);
+      // 3. Scale blur and glow relative to preview baseline (384px) for exact visual parity at any resolution (1K to 8K)
+      const scaleFactor = Math.max(targetWidth, targetHeight) / 384;
       const scaledGlow = adjustments.shadowBlur > 0 
-        ? Math.max(2, (adjustments.shadowBlur / 40) * (maxDim * 0.04)) 
+        ? adjustments.shadowBlur * scaleFactor 
         : 0;
 
       const filterRules = [
@@ -101,8 +106,10 @@ export async function downloadAsset({
         `sepia(${adjustments.sepia}%)`,
         `invert(${adjustments.invert}%)`,
         `opacity(${adjustments.opacity}%)`,
-        adjustments.blur > 0 ? `blur(${(adjustments.blur / 100) * (maxDim * 0.02)}px)` : '',
-        scaledGlow > 0 ? `drop-shadow(0px 0px ${scaledGlow}px ${adjustments.shadowColor || '#00ffff'})` : ''
+        adjustments.blur > 0 ? `blur(${adjustments.blur * scaleFactor}px)` : '',
+        scaledGlow > 0 
+          ? `drop-shadow(0px 0px ${scaledGlow}px ${adjustments.shadowColor || '#38bdf8'}) drop-shadow(0px 0px ${Math.max(1, Math.round(scaledGlow * 0.4))}px ${adjustments.shadowColor || '#38bdf8'})` 
+          : ''
       ].filter(Boolean).join(' ');
 
       ctx.filter = filterRules || 'none';
@@ -227,7 +234,7 @@ function embedSvgBgShape(svgCode, adjustments, width, height) {
 </svg>`;
 }
 
-function prepareSvgWithAdjustments(svgCode, adjustments = {}) {
+function prepareSvgWithAdjustments(svgCode, adjustments = {}, targetWidth, targetHeight) {
   let res = svgCode;
   if (!res.includes('xmlns=')) {
     res = res.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
@@ -248,7 +255,7 @@ function prepareSvgWithAdjustments(svgCode, adjustments = {}) {
     res = applyUniversalStroke(res, adjustments.strokeMultiplier, adjustments.strokeColorMode, adjustments.customStrokeColor);
   }
 
-  // Ensure viewBox exists for responsive scaling
+  // Ensure viewBox exists for responsive scaling before updating width/height
   if (!res.includes('viewBox=') && !res.includes('viewbox=')) {
     const wMatch = res.match(/width="([0-9.]+)(?:px)?"/i);
     const hMatch = res.match(/height="([0-9.]+)(?:px)?"/i);
@@ -256,6 +263,8 @@ function prepareSvgWithAdjustments(svgCode, adjustments = {}) {
       const w = wMatch[1];
       const h = hMatch[1];
       res = res.replace('<svg', `<svg viewBox="0 0 ${w} ${h}"`);
+    } else {
+      res = res.replace('<svg', '<svg viewBox="0 0 100 100"');
     }
   }
 
@@ -264,6 +273,25 @@ function prepareSvgWithAdjustments(svgCode, adjustments = {}) {
     res = res.replace(/preserveAspectRatio="[^"]*"/gi, 'preserveAspectRatio="none"');
   } else {
     res = res.replace('<svg', '<svg preserveAspectRatio="none"');
+  }
+
+  // CRITICAL FOR ULTRA HD & 8K VECTOR PURITY:
+  // When an SVG is loaded into an Image for canvas rendering, browser engines rasterize
+  // the vector paths at the SVG's declared width & height attributes.
+  // Setting width and height to match the target canvas resolution ensures the browser
+  // rasterizes the vector paths directly at full 4K/8K resolution with zero scaling artifacts!
+  if (targetWidth && targetHeight) {
+    if (/\bwidth="[^"]*"/i.test(res)) {
+      res = res.replace(/\bwidth="[^"]*"/i, `width="${targetWidth}"`);
+    } else {
+      res = res.replace('<svg', `<svg width="${targetWidth}"`);
+    }
+
+    if (/\bheight="[^"]*"/i.test(res)) {
+      res = res.replace(/\bheight="[^"]*"/i, `height="${targetHeight}"`);
+    } else {
+      res = res.replace('<svg', `<svg height="${targetHeight}"`);
+    }
   }
 
   if (adjustments.customColor) {
