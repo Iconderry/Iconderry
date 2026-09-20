@@ -1,4 +1,4 @@
-import { replaceSvgColors } from './colorUtils';
+import { replaceSvgColors, applyUniversalStroke } from './colorUtils';
 import { transformSvgStyle } from './styleTransformer';
 
 export async function downloadAsset({
@@ -27,6 +27,8 @@ export async function downloadAsset({
     colorReplacements: {},
     activeStyleMode: 'original',
     strokeMultiplier: 1,
+    strokeColorMode: 'auto',
+    customStrokeColor: '#ffffff',
     bgShape: 'none',
     bgShapeColor: '#1e293b',
     bgShapePadding: 20,
@@ -241,14 +243,9 @@ function prepareSvgWithAdjustments(svgCode, adjustments = {}) {
     res = transformSvgStyle(res, adjustments.activeStyleMode);
   }
 
-  // Adjust stroke thickness
+  // Adjust stroke thickness (universal for both stroke icons and filled shapes)
   if (adjustments.strokeMultiplier && adjustments.strokeMultiplier !== 1) {
-    res = res.replace(/stroke-width="([0-9.]+)"/gi, (match, val) => {
-      return `stroke-width="${(parseFloat(val) * adjustments.strokeMultiplier).toFixed(2)}"`;
-    });
-    res = res.replace(/stroke-width:\s*([0-9.]+)(px)?/gi, (match, val) => {
-      return `stroke-width:${(parseFloat(val) * adjustments.strokeMultiplier).toFixed(2)}px`;
-    });
+    res = applyUniversalStroke(res, adjustments.strokeMultiplier, adjustments.strokeColorMode, adjustments.customStrokeColor);
   }
 
   // Ensure viewBox exists for responsive scaling

@@ -324,3 +324,48 @@ export function replaceSvgColors(svgCode, colorReplacements) {
   return result;
 }
 
+export function applyUniversalStroke(svgCode, strokeMultiplier, strokeColorMode = 'auto', customStrokeColor = '#38bdf8') {
+  if (!svgCode || !strokeMultiplier || strokeMultiplier === 1) return svgCode;
+
+  let res = svgCode;
+  const hasStrokes = /stroke="((?!none)[^"]+)"/i.test(res) || /stroke:\s*([^;]+)/i.test(res);
+
+  if (hasStrokes) {
+    // 1. Scale existing stroke-width
+    res = res.replace(/stroke-width="([0-9.]+)"/gi, (match, val) => {
+      return `stroke-width="${(parseFloat(val) * strokeMultiplier).toFixed(2)}"`;
+    });
+    res = res.replace(/stroke-width:\s*([0-9.]+)(px)?/gi, (match, val) => {
+      return `stroke-width:${(parseFloat(val) * strokeMultiplier).toFixed(2)}px`;
+    });
+
+    // 2. If elements have stroke but no stroke-width, give them explicit scaled stroke-width
+    res = res.replace(/(<(?:path|rect|circle|ellipse|line|polyline|polygon)[^>]*?\sstroke="((?!none)[^"]+)")(?![^>]*\bstroke-width=)([^>]*>)/gi, (match, p1, strokeVal, p2) => {
+      return `${p1} stroke-width="${(2 * strokeMultiplier).toFixed(2)}" ${p2}`;
+    });
+  }
+
+  // 3. For filled icons without strokes (or when strokeMultiplier > 1):
+  if (!hasStrokes && strokeMultiplier > 1) {
+    const extraWidth = Math.max(0.5, ((strokeMultiplier - 1) * 6)).toFixed(1);
+    res = res.replace(/(<(?:path|rect|circle|ellipse|polygon)(?![^>]*\bstroke=)[^>]*?)(\/?>)/gi, (match, p1, p2) => {
+      let elStroke = customStrokeColor || '#38bdf8';
+      if (strokeColorMode === 'auto') {
+        const fillMatch = p1.match(/fill="([^"]+)"/i);
+        if (fillMatch && fillMatch[1] !== 'none' && !fillMatch[1].startsWith('url(')) {
+          elStroke = fillMatch[1];
+        } else {
+          elStroke = '#38bdf8';
+        }
+      } else if (strokeColorMode === 'white') {
+        elStroke = '#ffffff';
+      } else if (strokeColorMode === 'dark') {
+        elStroke = '#0f172a';
+      }
+
+      return `${p1} stroke="${elStroke}" stroke-width="${extraWidth}" stroke-linejoin="round" stroke-linecap="round" style="paint-order: stroke fill;" ${p2}`;
+    });
+  }
+
+  return res;
+}

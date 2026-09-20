@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { INITIAL_ELEMENTS } from './initialData';
 import { downloadAsset } from './converter';
-import { extractSvgColors, replaceSvgColors, scopeSvgIds, normalizeColor, getLinkedGradientColors, adjustColorBrightness } from './colorUtils';
+import { extractSvgColors, replaceSvgColors, scopeSvgIds, normalizeColor, getLinkedGradientColors, adjustColorBrightness, applyUniversalStroke } from './colorUtils';
 import { STYLE_RENDER_MODES, transformSvgStyle } from './styleTransformer';
 import { supabase } from './supabaseClient';
 
@@ -414,6 +414,8 @@ export default function App() {
 
   // Outline Stroke Multiplier (Vector line-weight scaling)
   const [strokeMultiplier, setStrokeMultiplier] = useState(1);
+  const [strokeColorMode, setStrokeColorMode] = useState('auto'); // 'auto' | 'white' | 'dark' | 'custom'
+  const [customStrokeColor, setCustomStrokeColor] = useState('#38bdf8');
 
   // App Icon Badge & Container Background Shape
   const [bgShape, setBgShape] = useState('none'); // 'none' | 'circle' | 'squircle' | 'rounded-square' | 'hexagon'
@@ -464,14 +466,9 @@ export default function App() {
       colorReplaced = transformSvgStyle(colorReplaced, activeStyleMode);
     }
 
-    // Apply vector stroke thickness multiplier
+    // Apply vector stroke thickness (works universally for stroke & filled icons)
     if (strokeMultiplier && strokeMultiplier !== 1) {
-      colorReplaced = colorReplaced.replace(/stroke-width="([0-9.]+)"/gi, (match, val) => {
-        return `stroke-width="${(parseFloat(val) * strokeMultiplier).toFixed(2)}"`;
-      });
-      colorReplaced = colorReplaced.replace(/stroke-width:\s*([0-9.]+)(px)?/gi, (match, val) => {
-        return `stroke-width:${(parseFloat(val) * strokeMultiplier).toFixed(2)}px`;
-      });
+      colorReplaced = applyUniversalStroke(colorReplaced, strokeMultiplier, strokeColorMode, customStrokeColor);
     }
 
     // Ensure viewBox exists for responsive freeform scaling/stretching
@@ -493,7 +490,13 @@ export default function App() {
     }
 
     return scopeSvgIds(colorReplaced, 'pf_studio_');
-  }, [selectedAsset, adjustments.colorReplacements, activeStyleMode, strokeMultiplier]);
+  }, [selectedAsset, adjustments.colorReplacements, activeStyleMode, strokeMultiplier, strokeColorMode, customStrokeColor]);
+
+  // Detect whether currently selected icon is a stroke-based or filled vector
+  const isStrokeIcon = useMemo(() => {
+    if (!selectedAsset || !selectedAsset.svgCode) return false;
+    return /stroke="((?!none)[^"]+)"/i.test(selectedAsset.svgCode) || /stroke:\s*(?!none)[^;]+/i.test(selectedAsset.svgCode);
+  }, [selectedAsset]);
 
   // Count active color overrides
   const modifiedColorCount = Object.keys(adjustments.colorReplacements || {}).length;
@@ -1098,6 +1101,8 @@ export default function App() {
           ...adjustments,
           activeStyleMode,
           strokeMultiplier,
+          strokeColorMode,
+          customStrokeColor,
           bgShape,
           bgShapeColor,
           bgShapePadding,
@@ -2863,21 +2868,49 @@ export default function App() {
                       </button>
                     </div>
 
-                    {/* Outline Stroke Thickness (Vector Line Weight) */}
-                    <div className={`p-4 rounded-2xl border space-y-3 ${
+                    {/* Outline Stroke & Contour Thickness (Universal Vector Line Weight) */}
+                    <div className={`p-4 rounded-2xl border space-y-3.5 ${
                       appTheme === 'dark' ? 'bg-[#131b2e]/60 border-slate-800' : 'bg-slate-50 border-slate-200'
                     }`}>
                       <div className="flex items-center justify-between">
                         <label className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
                           appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
                         }`}>
-                          <SlidersHorizontal className="w-3.5 h-3.5 text-cyan-500" /> Vector Stroke Thickness
+                          <SlidersHorizontal className="w-3.5 h-3.5 text-cyan-500" /> Vector Stroke & Contour
                         </label>
-                        <span className="text-xs font-mono font-bold text-cyan-500">
-                          {strokeMultiplier}x {strokeMultiplier === 1 ? '(Original)' : strokeMultiplier < 1 ? '(Thin)' : '(Thick)'}
+                        <div className="flex items-center gap-2">
+                          {strokeMultiplier !== 1 && (
+                            <button
+                              onClick={() => {
+                                recordUndo();
+                                setStrokeMultiplier(1);
+                              }}
+                              className="text-[11px] text-cyan-500 hover:underline flex items-center gap-1 font-semibold"
+                            >
+                              <RotateCcw className="w-3 h-3" /> Reset
+                            </button>
+                          )}
+                          <span className="text-xs font-mono font-bold text-cyan-500">
+                            {strokeMultiplier}x {strokeMultiplier === 1 ? '(Original)' : strokeMultiplier < 1 ? '(Thin)' : '(Thick)'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Vector Type Status Badge */}
+                      <div className={`flex items-center justify-between px-2.5 py-1.5 rounded-xl text-[11px] font-medium border ${
+                        isStrokeIcon 
+                          ? (appTheme === 'dark' ? 'bg-cyan-950/40 border-cyan-800/50 text-cyan-300' : 'bg-cyan-50 border-cyan-200 text-cyan-800')
+                          : (appTheme === 'dark' ? 'bg-amber-950/30 border-amber-800/40 text-amber-300' : 'bg-amber-50 border-amber-200 text-amber-800')
+                      }`}>
+                        <span className="flex items-center gap-1.5">
+                          {isStrokeIcon ? '✏️ Outline Vector' : '🎨 Solid Filled Shape'}
+                        </span>
+                        <span className="text-[10px] opacity-80">
+                          {isStrokeIcon ? 'Scales line strokes directly' : 'Smart vector contour expansion'}
                         </span>
                       </div>
 
+                      {/* Presets */}
                       <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
                         {[
                           { label: '0.5x Thin', val: 0.5 },
@@ -2908,7 +2941,7 @@ export default function App() {
 
                       <input
                         type="range"
-                        min="0.2"
+                        min={isStrokeIcon ? 0.2 : 0.5}
                         max="4"
                         step="0.1"
                         value={strokeMultiplier}
@@ -2916,6 +2949,55 @@ export default function App() {
                         onChange={(e) => setStrokeMultiplier(Number(e.target.value))}
                         className="theme-slider w-full"
                       />
+
+                      {/* Contour options for Solid Filled Shapes when thickened */}
+                      {!isStrokeIcon && strokeMultiplier > 1 && (
+                        <div className={`mt-2 pt-2.5 border-t space-y-2 ${
+                          appTheme === 'dark' ? 'border-slate-800/80' : 'border-slate-200'
+                        }`}>
+                          <div className="flex items-center justify-between text-[11px]">
+                            <span className={appTheme === 'dark' ? 'text-slate-400 font-medium' : 'text-slate-600 font-medium'}>
+                              Contour Color:
+                            </span>
+                            <div className="flex items-center gap-1.5">
+                              {[
+                                { id: 'auto', label: 'Match Fill' },
+                                { id: 'white', label: 'White' },
+                                { id: 'dark', label: 'Dark' },
+                                { id: 'custom', label: 'Custom' }
+                              ].map((opt) => (
+                                <button
+                                  key={opt.id}
+                                  onClick={() => {
+                                    recordUndo();
+                                    setStrokeColorMode(opt.id);
+                                  }}
+                                  className={`px-2 py-0.5 rounded-lg text-[10px] font-semibold transition ${
+                                    strokeColorMode === opt.id
+                                      ? 'bg-cyan-500 text-slate-950 shadow-sm'
+                                      : appTheme === 'dark'
+                                        ? 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                                        : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                                  }`}
+                                >
+                                  {opt.label}
+                                </button>
+                              ))}
+                              {strokeColorMode === 'custom' && (
+                                <input
+                                  type="color"
+                                  value={customStrokeColor}
+                                  onChange={(e) => {
+                                    setCustomStrokeColor(e.target.value);
+                                  }}
+                                  className="w-5 h-5 rounded cursor-pointer border-0 p-0 bg-transparent"
+                                  title="Pick custom contour color"
+                                />
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* App Icon Badge & Background Container */}
