@@ -1236,10 +1236,10 @@ export default function App() {
                 <div
                   key={item.id}
                   onClick={() => handleOpenAsset(item)}
-                  className={`group border rounded-2xl p-3 sm:p-4 flex flex-col items-center cursor-pointer transition transform hover:-translate-y-1 relative ${
+                  className={`group border rounded-2xl p-3 sm:p-4 flex flex-col items-center cursor-pointer transition-all duration-300 ease-out hover:-translate-y-1.5 relative ${
                     appTheme === 'dark'
-                      ? 'bg-[#131b2e] border-slate-800 hover:border-cyan-500/50 shadow-sm'
-                      : 'bg-white border-slate-200 hover:border-blue-500/50 hover:shadow-lg shadow-sm'
+                      ? 'bg-[#131b2e] border-slate-800 hover:border-slate-700/80 shadow-sm hover:shadow-[0_16px_32px_-6px_rgba(255,255,255,0.09),0_6px_16px_-4px_rgba(255,255,255,0.05)]'
+                      : 'bg-white border-slate-200 hover:border-slate-300/80 shadow-sm hover:shadow-[0_16px_32px_-6px_rgba(0,0,0,0.15),0_8px_16px_-4px_rgba(0,0,0,0.08)]'
                   }`}
                 >
                   <div
@@ -2217,14 +2217,14 @@ export default function App() {
                             <button
                               key={preset.id}
                               onClick={() => handleSelectStyleLook(preset)}
-                              className={`p-2.5 rounded-2xl border text-left transition-all hover:scale-[1.02] flex flex-col justify-between relative overflow-hidden group ${
+                              className={`p-2.5 rounded-2xl border text-left transition-all duration-300 ease-out hover:-translate-y-1 flex flex-col justify-between relative overflow-hidden group ${
                                 isCurrentActive
                                   ? (appTheme === 'dark'
                                       ? 'border-cyan-400 bg-cyan-500/10 shadow-[0_0_18px_rgba(6,182,212,0.3)] ring-2 ring-cyan-400'
                                       : 'border-blue-600 bg-blue-50 shadow-md ring-2 ring-blue-600')
                                   : (appTheme === 'dark'
-                                      ? 'bg-slate-900/90 border-slate-800 hover:border-cyan-500/50 hover:bg-slate-900 shadow-sm'
-                                      : 'bg-white border-slate-200 hover:border-blue-500/50 hover:shadow-md shadow-sm')
+                                      ? 'bg-slate-900/90 border-slate-800 hover:border-slate-700/80 hover:bg-slate-900 shadow-sm hover:shadow-[0_12px_24px_-4px_rgba(255,255,255,0.07)]'
+                                      : 'bg-white border-slate-200 hover:border-slate-300/80 hover:shadow-lg hover:shadow-black/10 shadow-sm')
                               }`}
                             >
                               {/* Live Visual Material Preview Box on top of the button */}
