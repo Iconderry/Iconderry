@@ -651,6 +651,21 @@ async function exportAnimatedGif({
   const animHeight = Number(adjustments.animHeight || 16);
   const animShadowSync = adjustments.animShadowSync !== false;
 
+  // For transparent GIF, avoid diffuse drop-shadows because 1-bit binary alpha cannot fade to transparent and turns into solid contour rings
+  const gifFilterRules = [
+    `hue-rotate(${adjustments.hue || 0}deg)`,
+    `brightness(${adjustments.brightness ?? 100}%)`,
+    `saturate(${adjustments.saturation ?? 100}%)`,
+    `contrast(${adjustments.contrast ?? 100}%)`,
+    `sepia(${adjustments.sepia || 0}%)`,
+    `invert(${adjustments.invert || 0}%)`,
+    `opacity(${adjustments.opacity ?? 100}%)`,
+    (!isTransparent && adjustments.blur > 0) ? `blur(${adjustments.blur * (gifW / 384)}px)` : '',
+    (!isTransparent && adjustments.shadowBlur > 0)
+      ? `drop-shadow(0px 0px ${adjustments.shadowBlur * (gifW / 384)}px ${adjustments.shadowColor || '#38bdf8'})`
+      : ''
+  ].filter(Boolean).join(' ');
+
   for (let frame = 0; frame < totalFrames; frame++) {
     const t = frame / totalFrames; // 0 to 1
     fCtx.clearRect(0, 0, gifW, gifH);
@@ -721,19 +736,19 @@ async function exportAnimatedGif({
       if (offCtx) {
         offCtx.imageSmoothingEnabled = true;
         offCtx.imageSmoothingQuality = 'high';
-        offCtx.filter = filterRules || 'none';
+        offCtx.filter = gifFilterRules || 'none';
         offCtx.drawImage(img, 0, 0, drawW, drawH);
       }
 
       const webglCanvas = render3DWithWebGL(offCtx ? offCanvas : img, gifW, gifH, frameAdj, drawW, drawH);
       if (webglCanvas) {
-        // Shadow
-        if ((frameAdj.depth3D || 0) > 0) {
+        // Shadow only on solid background or badge shape to avoid 1-bit alpha stepping
+        if ((frameAdj.depth3D || 0) > 0 && (!isTransparent || adjustments.bgShape !== 'none')) {
           const depth = (frameAdj.depth3D || 0) * (gifW / 384);
           const radX = (rotX * Math.PI) / 180;
           const radY = (rotY * Math.PI) / 180;
           const offX = -Math.sin(radY) * depth * 1.5;
-          const offY = Math.sin(radX) * depth * 1.5 + (depth * 0.8);
+          const offY = Math.sin(radX) * depth * 1.5 + (depth * 0.8) + offsetY;
           const sColor = frameAdj.depth3DColor || 'rgba(0,0,0,0.55)';
 
           fCtx.save();
@@ -751,7 +766,7 @@ async function exportAnimatedGif({
     } else {
       // 2D frame
       fCtx.save();
-      fCtx.filter = filterRules || 'none';
+      fCtx.filter = gifFilterRules || 'none';
       fCtx.translate(gifW / 2 + offsetX, gifH / 2 + offsetY);
       fCtx.rotate((rotZ * Math.PI) / 180);
       fCtx.scale(frameAdj.flipH ? -1 : 1, frameAdj.flipV ? -1 : 1);
@@ -759,16 +774,34 @@ async function exportAnimatedGif({
       fCtx.restore();
     }
 
-    // 4. Quantize and write frame into GIF
+    // 4. Clean Alpha Pre-quantization to eliminate ghost halos
     const imgData = fCtx.getImageData(0, 0, gifW, gifH);
     const rgba = imgData.data;
+
+    if (isTransparent) {
+      for (let i = 0; i < rgba.length; i += 4) {
+        if (rgba[i + 3] < 80) {
+          rgba[i] = 0;
+          rgba[i + 1] = 0;
+          rgba[i + 2] = 0;
+          rgba[i + 3] = 0;
+        } else {
+          rgba[i + 3] = 255;
+        }
+      }
+    }
+
     const quantFormat = isTransparent ? 'rgba4444' : 'rgb565';
     const palette = quantize(rgba, 256, { format: quantFormat, oneBitAlpha: isTransparent });
     const index = applyPalette(rgba, palette, quantFormat);
+    const transparentIndex = isTransparent ? palette.findIndex(c => c[3] === 0) : -1;
+
     gif.writeFrame(index, gifW, gifH, { 
       palette, 
       delay, 
-      transparent: isTransparent 
+      transparent: isTransparent && transparentIndex >= 0,
+      transparentIndex: Math.max(0, transparentIndex),
+      dispose: 2 // CRITICAL FIX: Restore to background to prevent ghost trails between moving frames!
     });
   }
 
