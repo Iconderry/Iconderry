@@ -451,7 +451,7 @@ const EFFECT_PRESETS = [
   }
 ];
 
-// Set of newly introduced 3D Material Effect IDs
+// Set of newly introduced 3D & Stylized Material Effect IDs
 const NEW_EFFECT_IDS = new Set([
   'splash_water',
   'foil_balloon',
@@ -470,12 +470,33 @@ const NEW_EFFECT_IDS = new Set([
   'origami_paper',
   'aurora_bubble_glass',
   'cyber_circuit_pcb',
-  'fluffy_cloud'
+  'fluffy_cloud',
+  // 20 New Anime, Cartoon, 3D and Stylized Effects
+  'anime_cel_shading',
+  'anime_mecha_cyber',
+  'anime_speed_lines',
+  'anime_chibi_kawaii',
+  'anime_cyber_city',
+  'cartoon_comic_pop',
+  'cartoon_toontown_3d',
+  'cartoon_rubber_hose',
+  'cartoon_graffiti_sticker',
+  'cartoon_superhero_ink',
+  'cartoon_arcade_retro',
+  '3d_voxel_craft',
+  '3d_inflatable_gold_balloon',
+  '3d_metallic_chrome_foil',
+  '3d_wooden_toy',
+  '3d_hologram_matrix',
+  '3d_glossy_ceramic',
+  '3d_origami_tessellation',
+  '3d_neon_glass_capsule',
+  '3d_crystal_gemstone'
 ]);
 
 // Renders an authentic live visual preview thumbnail showing the look of each filter preset
 function FilterCardThumbnail({ preset }) {
-  const { colorA, colorB, adjustments, badge, isNew, id } = preset;
+  const { colorA, colorB, adjustments, badge } = preset;
   const glowColor = adjustments?.shadowColor || colorA || '#38bdf8';
   const hasGlow = (adjustments?.shadowBlur || 0) > 0;
 
@@ -505,17 +526,6 @@ function FilterCardThumbnail({ preset }) {
       >
         <Sparkles className="w-3.5 h-3.5 text-white drop-shadow" />
       </div>
-
-      {/* New or Classic status badge */}
-      {isNew ? (
-        <span className="absolute top-1 left-1 text-[7.5px] font-black px-1.5 py-0.5 rounded-md bg-gradient-to-r from-amber-400 to-pink-500 text-slate-950 shadow flex items-center gap-0.5 z-10">
-          ✨ NEW
-        </span>
-      ) : id !== 'original' ? (
-        <span className="absolute top-1 left-1 text-[7.5px] font-semibold px-1.5 py-0.5 rounded-md bg-slate-900/80 text-slate-400 border border-white/10 z-10">
-          CLASSIC
-        </span>
-      ) : null}
 
       {/* Filter Category / Tag Badge */}
       <span className="absolute top-1 right-1 text-[8px] font-bold px-1.5 py-0.5 rounded bg-black/65 backdrop-blur-sm text-white/90 border border-white/10 z-10">
@@ -667,17 +677,6 @@ function EffectCardThumbnail({ preset }) {
         <span className="text-sm drop-shadow">{icon}</span>
         <span className="text-[10px] font-bold text-white tracking-wide uppercase font-mono">{preset.badge}</span>
       </div>
-
-      {/* New or Classic status badge */}
-      {(preset.isNew || NEW_EFFECT_IDS.has(preset.id)) ? (
-        <span className="absolute top-1.5 left-1.5 text-[7.5px] font-black px-1.5 py-0.5 rounded-md bg-gradient-to-r from-amber-400 to-pink-500 text-slate-950 shadow flex items-center gap-0.5 z-20">
-          ✨ NEW
-        </span>
-      ) : preset.id !== 'original' ? (
-        <span className="absolute top-1.5 left-1.5 text-[7.5px] font-semibold px-1.5 py-0.5 rounded-md bg-slate-900/80 text-slate-400 border border-white/10 z-20">
-          CLASSIC
-        </span>
-      ) : null}
     </div>
   );
 }
@@ -811,15 +810,17 @@ export default function App() {
     return EFFECT_PRESETS.filter(preset => {
       // Filter by version (All / New / Old)
       if (filterVersionFilter === 'new' && !preset.isNew) return false;
-      if (filterVersionFilter === 'old' && (preset.isNew || preset.id === 'original')) return false;
+      if (filterVersionFilter === 'old' && preset.isNew) return false;
 
-      const matchesCategory = filterCategory === 'All' || preset.category === filterCategory || preset.id === 'original';
+      // Filter by category: only match if 'All' or matches preset category
+      if (filterCategory !== 'All' && preset.category !== filterCategory) return false;
+
       const q = filterSearchTerm.trim().toLowerCase();
       const matchesSearch = !q || 
         preset.name.toLowerCase().includes(q) || 
         (preset.desc && preset.desc.toLowerCase().includes(q)) || 
         (preset.badge && preset.badge.toLowerCase().includes(q));
-      return matchesCategory && matchesSearch;
+      return matchesSearch;
     });
   }, [filterCategory, filterSearchTerm, filterVersionFilter]);
 
@@ -828,15 +829,17 @@ export default function App() {
       const isNew = mode.isNew || NEW_EFFECT_IDS.has(mode.id);
       // Filter by version (All / New / Old)
       if (effectVersionFilter === 'new' && !isNew) return false;
-      if (effectVersionFilter === 'old' && (isNew || mode.id === 'original')) return false;
+      if (effectVersionFilter === 'old' && isNew) return false;
 
-      const matchesCategory = effectCategory === 'All' || mode.category === effectCategory || mode.id === 'original';
+      // Filter by category: only match if 'All' or matches mode category
+      if (effectCategory !== 'All' && mode.category !== effectCategory) return false;
+
       const q = effectSearchTerm.trim().toLowerCase();
       const matchesSearch = !q || 
         mode.name.toLowerCase().includes(q) || 
         (mode.desc && mode.desc.toLowerCase().includes(q)) || 
         (mode.badge && mode.badge.toLowerCase().includes(q));
-      return matchesCategory && matchesSearch;
+      return matchesSearch;
     });
   }, [effectCategory, effectSearchTerm, effectVersionFilter]);
 
@@ -3005,20 +3008,13 @@ export default function App() {
 
                             <div className="w-full">
                               <div className="flex items-center justify-between gap-1 mb-1">
-                                <div className="flex items-center gap-1.5 min-w-0">
-                                  <span className={`text-xs font-bold truncate ${
-                                    isCurrentActive
-                                      ? (appTheme === 'dark' ? 'text-cyan-300' : 'text-blue-700')
-                                      : (appTheme === 'dark' ? 'text-slate-200 group-hover:text-cyan-400' : 'text-slate-900 group-hover:text-blue-600')
-                                  }`}>
-                                    {pst.name}
-                                  </span>
-                                  {pst.isNew && (
-                                    <span className="text-[7.5px] font-black px-1 py-0.5 rounded bg-amber-400/20 text-amber-300 border border-amber-400/30 flex-shrink-0">
-                                      NEW
-                                    </span>
-                                  )}
-                                </div>
+                                <span className={`text-xs font-bold truncate ${
+                                  isCurrentActive
+                                    ? (appTheme === 'dark' ? 'text-cyan-300' : 'text-blue-700')
+                                    : (appTheme === 'dark' ? 'text-slate-200 group-hover:text-cyan-400' : 'text-slate-900 group-hover:text-blue-600')
+                                }`}>
+                                  {pst.name}
+                                </span>
                                 {isCurrentActive && (
                                   <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
                                 )}
@@ -3218,7 +3214,7 @@ export default function App() {
 
                         {/* Style Category Filter Chips */}
                         <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
-                          {['All', 'Glass & Water', '3D & Inflatable', 'Fire & Metal', 'Craft & Texture', 'Cyber & Neon', 'Silhouette & Vector'].map((cat) => {
+                          {['All', 'Anime & Manga', 'Cartoon & Comic', '3D & Inflatable', 'Glass & Water', 'Fire & Metal', 'Craft & Texture', 'Cyber & Neon', 'Silhouette & Vector'].map((cat) => {
                             const isCatActive = effectCategory === cat;
                             return (
                               <button
@@ -3259,20 +3255,13 @@ export default function App() {
 
                                 <div className="w-full">
                                   <div className="flex items-center justify-between gap-1 mb-1">
-                                    <div className="flex items-center gap-1.5 min-w-0">
-                                      <span className={`text-xs font-bold truncate ${
-                                        isCurrentActive
-                                          ? (appTheme === 'dark' ? 'text-cyan-300' : 'text-blue-700')
-                                          : (appTheme === 'dark' ? 'text-slate-200 group-hover:text-cyan-400' : 'text-slate-900 group-hover:text-blue-600')
-                                      }`}>
-                                        {preset.name}
-                                      </span>
-                                      {isNew && (
-                                        <span className="text-[7.5px] font-black px-1 py-0.5 rounded bg-amber-400/20 text-amber-300 border border-amber-400/30 flex-shrink-0">
-                                          NEW
-                                        </span>
-                                      )}
-                                    </div>
+                                    <span className={`text-xs font-bold truncate ${
+                                      isCurrentActive
+                                        ? (appTheme === 'dark' ? 'text-cyan-300' : 'text-blue-700')
+                                        : (appTheme === 'dark' ? 'text-slate-200 group-hover:text-cyan-400' : 'text-slate-900 group-hover:text-blue-600')
+                                    }`}>
+                                      {preset.name}
+                                    </span>
                                     {isCurrentActive && (
                                       <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
                                     )}

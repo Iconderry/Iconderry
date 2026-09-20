@@ -466,17 +466,266 @@ export const STYLE_RENDER_MODES = [
     texture: 'outline',
     adjustments: { customColor: '', opacity: 100, blur: 0, shadowBlur: 0, brightness: 100, contrast: 100, saturation: 100 }
   },
+  // --- 20 NEW ANIME, CARTOON, 3D & STYLIZED EFFECTS ---
   {
-    id: 'original',
-    name: 'Original Default Colors',
-    category: 'Silhouette & Vector',
-    desc: 'Reset all custom style transformations to original vector',
-    icon: '🔄',
-    badge: 'Original',
-    previewBg: 'linear-gradient(135deg, #475569, #334155)',
-    borderAccent: '#64748b',
-    texture: 'original',
-    adjustments: { customColor: '', colorReplacements: {}, opacity: 100, blur: 0, shadowBlur: 0, shadowColor: '#38bdf8', invert: 0, sepia: 0, hue: 0, brightness: 100, saturation: 100, contrast: 100 }
+    id: 'anime_cel_shading',
+    name: 'Anime Cel-Shading Shonen',
+    category: 'Anime & Manga',
+    desc: 'Japanese anime hand-drawn 2-tone cel-shading with bold black contour inking',
+    icon: '⚡',
+    badge: 'Anime Cel',
+    isNew: true,
+    previewBg: 'linear-gradient(135deg, #f97316, #ef4444, #3b82f6)',
+    borderAccent: '#f97316',
+    texture: 'anime_cel',
+    adjustments: { customColor: '', opacity: 100, blur: 0, shadowBlur: 18, shadowColor: '#f97316', brightness: 120, contrast: 155, saturation: 170 }
+  },
+  {
+    id: 'anime_mecha_cyber',
+    name: 'Anime Mecha Robot Armor',
+    category: 'Anime & Manga',
+    desc: 'Sci-fi Gundam anime mecha armor with panel-lines, metallic plating & optic glow',
+    icon: '🤖',
+    badge: 'Mecha Armor',
+    isNew: true,
+    previewBg: 'linear-gradient(135deg, #0284c7, #2563eb, #dc2626)',
+    borderAccent: '#38bdf8',
+    texture: 'mecha',
+    adjustments: { customColor: '', opacity: 100, blur: 0, shadowBlur: 24, shadowColor: '#00f0ff', brightness: 125, contrast: 145, saturation: 150 }
+  },
+  {
+    id: 'anime_speed_lines',
+    name: 'Anime Shonen Battle Flare',
+    category: 'Anime & Manga',
+    desc: 'Explosive radial speed lines with glowing super-saiyan energy ki aura',
+    icon: '💥',
+    badge: 'Shonen Battle',
+    isNew: true,
+    previewBg: 'linear-gradient(135deg, #fbbf24, #f59e0b, #ef4444)',
+    borderAccent: '#fbbf24',
+    texture: 'speed_lines',
+    adjustments: { customColor: '', opacity: 100, blur: 0, shadowBlur: 30, shadowColor: '#f59e0b', brightness: 130, contrast: 160, saturation: 180 }
+  },
+  {
+    id: 'anime_chibi_kawaii',
+    name: 'Kawaii Pastel Chibi Anime',
+    category: 'Anime & Manga',
+    desc: 'Sweet bubbly cherry blossom anime pastel tones with cute soft marshmallow blush',
+    icon: '🌸',
+    badge: 'Kawaii Chibi',
+    isNew: true,
+    previewBg: 'linear-gradient(135deg, #fbcfe8, #f472b6, #c084fc)',
+    borderAccent: '#f472b6',
+    texture: 'kawaii',
+    adjustments: { customColor: '', opacity: 95, blur: 0.2, shadowBlur: 20, shadowColor: '#f472b6', brightness: 120, contrast: 115, saturation: 140 }
+  },
+  {
+    id: 'anime_cyber_city',
+    name: 'Neo-Tokyo Anime Cyber City',
+    category: 'Anime & Manga',
+    desc: 'Cyberpunk anime aesthetic with neon purple rain reflections & glowing headlights',
+    icon: '🌆',
+    badge: 'Neo Tokyo',
+    isNew: true,
+    previewBg: 'linear-gradient(135deg, #1e1b4b, #a855f7, #06b6d4)',
+    borderAccent: '#a855f7',
+    texture: 'cyber_city',
+    adjustments: { customColor: '', opacity: 100, blur: 0.2, shadowBlur: 26, shadowColor: '#a855f7', brightness: 122, contrast: 145, saturation: 170 }
+  },
+  {
+    id: 'cartoon_comic_pop',
+    name: 'Retro Comic Pop-Art Halftone',
+    category: 'Cartoon & Comic',
+    desc: 'Vintage pop-art Ben-Day halftone dot matrix with punchy primary ink',
+    icon: '🗯️',
+    badge: 'Pop Halftone',
+    isNew: true,
+    previewBg: 'linear-gradient(135deg, #ef4444, #eab308, #2563eb)',
+    borderAccent: '#eab308',
+    texture: 'halftone',
+    adjustments: { customColor: '', opacity: 100, blur: 0, shadowBlur: 16, shadowColor: '#000000', brightness: 115, contrast: 160, saturation: 185 }
+  },
+  {
+    id: 'cartoon_toontown_3d',
+    name: 'Toontown Squishy 3D Cartoon',
+    category: 'Cartoon & Comic',
+    desc: 'Bouncy energetic Saturday morning cartoon with squash-and-stretch highlight',
+    icon: '🎨',
+    badge: 'Toontown',
+    isNew: true,
+    previewBg: 'linear-gradient(135deg, #38bdf8, #818cf8, #f43f5e)',
+    borderAccent: '#38bdf8',
+    texture: 'toontown',
+    adjustments: { customColor: '', opacity: 100, blur: 0, shadowBlur: 22, shadowColor: '#3b82f6', brightness: 125, contrast: 135, saturation: 165 }
+  },
+  {
+    id: 'cartoon_rubber_hose',
+    name: '1930s Rubber Hose Toon',
+    category: 'Cartoon & Comic',
+    desc: 'Vintage monochrome 1930s animation with film grain & ink-pot line weight',
+    icon: '🎞️',
+    badge: 'Rubber Hose',
+    isNew: true,
+    previewBg: 'linear-gradient(135deg, #f8fafc, #64748b, #0f172a)',
+    borderAccent: '#94a3b8',
+    texture: 'rubber_hose',
+    adjustments: { customColor: '', opacity: 100, blur: 0, shadowBlur: 14, shadowColor: '#000000', brightness: 105, contrast: 170, saturation: 0 }
+  },
+  {
+    id: 'cartoon_graffiti_sticker',
+    name: 'Street Art Graffiti Sticker',
+    category: 'Cartoon & Comic',
+    desc: 'Die-cut vinyl sticker with thick white peel-off outline & vibrant spray drips',
+    icon: '🛹',
+    badge: 'Die-Cut Vinyl',
+    isNew: true,
+    previewBg: 'linear-gradient(135deg, #ec4899, #8b5cf6, #06b6d4)',
+    borderAccent: '#ec4899',
+    texture: 'sticker',
+    adjustments: { customColor: '', opacity: 100, blur: 0, shadowBlur: 24, shadowColor: '#000000', brightness: 120, contrast: 145, saturation: 175 }
+  },
+  {
+    id: 'cartoon_superhero_ink',
+    name: 'Noir Graphic Novel Inking',
+    category: 'Cartoon & Comic',
+    desc: 'Chiaroscuro high-drama comic inking with stark black shadows & angular cuts',
+    icon: '🦇',
+    badge: 'Graphic Ink',
+    isNew: true,
+    previewBg: 'linear-gradient(135deg, #09090b, #18181b, #facc15)',
+    borderAccent: '#facc15',
+    texture: 'graphic_ink',
+    adjustments: { customColor: '', opacity: 100, blur: 0, shadowBlur: 16, shadowColor: '#000000', brightness: 110, contrast: 180, saturation: 90 }
+  },
+  {
+    id: 'cartoon_arcade_retro',
+    name: '90s Saturday Cartoon Arcade',
+    category: 'Cartoon & Comic',
+    desc: 'Vibrant 90s cartoon network palette with cheerful bubblegum highlights',
+    icon: '👾',
+    badge: 'Saturday Toon',
+    isNew: true,
+    previewBg: 'linear-gradient(135deg, #38bdf8, #f472b6, #fbbf24)',
+    borderAccent: '#38bdf8',
+    texture: 'cartoon_arcade',
+    adjustments: { customColor: '', opacity: 100, blur: 0, shadowBlur: 20, shadowColor: '#f472b6', brightness: 120, contrast: 135, saturation: 175 }
+  },
+  {
+    id: '3d_voxel_craft',
+    name: '3D Voxel Minecraft Cubes',
+    category: '3D & Inflatable',
+    desc: 'Chunky isometric cubic voxel blocks with dimensional faceted face lighting',
+    icon: '🧊',
+    badge: 'Voxel 3D',
+    isNew: true,
+    previewBg: 'linear-gradient(135deg, #15803d, #16a34a, #854d0e)',
+    borderAccent: '#22c55e',
+    texture: 'voxel',
+    adjustments: { customColor: '', opacity: 100, blur: 0, shadowBlur: 20, shadowColor: '#14532d', brightness: 110, contrast: 135, saturation: 150 }
+  },
+  {
+    id: '3d_inflatable_gold_balloon',
+    name: '24K Gold Puffy Mylar Balloon 3D',
+    category: '3D & Inflatable',
+    desc: 'Puffed reflective 24K yellow gold mylar balloon with crimped heat-sealed seams',
+    icon: '🟡',
+    badge: 'Gold Mylar',
+    isNew: true,
+    previewBg: 'linear-gradient(135deg, #fef08a, #eab308, #b45309)',
+    borderAccent: '#facc15',
+    texture: 'gold_balloon',
+    adjustments: { customColor: '', opacity: 100, blur: 0, shadowBlur: 28, shadowColor: '#ca8a04', brightness: 128, contrast: 145, saturation: 160 }
+  },
+  {
+    id: '3d_metallic_chrome_foil',
+    name: 'Hyper-Reflective Liquid Chrome 3D',
+    category: 'Fire & Metal',
+    desc: 'Mirror specular liquid mercury metal sculpture with distortion horizon waves',
+    icon: '🪞',
+    badge: 'Liquid Mirror',
+    isNew: true,
+    previewBg: 'linear-gradient(135deg, #f8fafc, #94a3b8, #334155)',
+    borderAccent: '#e2e8f0',
+    texture: 'chrome_foil',
+    adjustments: { customColor: '', opacity: 100, blur: 0, shadowBlur: 28, shadowColor: '#cbd5e1', brightness: 130, contrast: 165, saturation: 110 }
+  },
+  {
+    id: '3d_wooden_toy',
+    name: 'Polished Nordic Wooden Toy 3D',
+    category: 'Craft & Texture',
+    desc: 'Smooth turned birch wood grain with glossy hand-buffed protective lacquer',
+    icon: '🪵',
+    badge: 'Nordic Wood',
+    isNew: true,
+    previewBg: 'linear-gradient(135deg, #fde68a, #d97706, #78350f)',
+    borderAccent: '#d97706',
+    texture: 'wood_toy',
+    adjustments: { customColor: '', opacity: 100, blur: 0, shadowBlur: 18, shadowColor: '#78350f', brightness: 112, contrast: 125, saturation: 135 }
+  },
+  {
+    id: '3d_hologram_matrix',
+    name: '3D Laser Hologram Matrix',
+    category: 'Cyber & Neon',
+    badge: 'Laser Holo',
+    desc: '3D volumetric floating cyan laser scanlines with concentric ring projection',
+    icon: '🌐',
+    isNew: true,
+    previewBg: 'linear-gradient(135deg, #083344, #06b6d4, #0284c7)',
+    borderAccent: '#06b6d4',
+    texture: 'holo_matrix',
+    adjustments: { customColor: '', opacity: 90, blur: 0.3, shadowBlur: 32, shadowColor: '#00f0ff', brightness: 135, contrast: 140, saturation: 175 }
+  },
+  {
+    id: '3d_glossy_ceramic',
+    name: 'Glazed Porcelain Ceramic 3D',
+    category: 'Craft & Texture',
+    desc: 'Ultra-smooth fired glossy white porcelain with cobalt blue Ming filigree accents',
+    icon: '🏺',
+    badge: 'Porcelain',
+    isNew: true,
+    previewBg: 'linear-gradient(135deg, #ffffff, #e0f2fe, #1d4ed8)',
+    borderAccent: '#3b82f6',
+    texture: 'ceramic',
+    adjustments: { customColor: '', opacity: 100, blur: 0, shadowBlur: 22, shadowColor: '#1d4ed8', brightness: 125, contrast: 130, saturation: 130 }
+  },
+  {
+    id: '3d_origami_tessellation',
+    name: '3D Dimensional Paper Sculpture',
+    category: 'Craft & Texture',
+    desc: 'Multi-layer shadowbox paper cutouts with realistic depth casting and crisp shadows',
+    icon: '📄',
+    badge: 'Paper 3D',
+    isNew: true,
+    previewBg: 'linear-gradient(135deg, #f1f5f9, #cbd5e1, #64748b)',
+    borderAccent: '#94a3b8',
+    texture: 'paper_sculpture',
+    adjustments: { customColor: '', opacity: 100, blur: 0, shadowBlur: 22, shadowColor: '#475569', brightness: 112, contrast: 125, saturation: 105 }
+  },
+  {
+    id: '3d_neon_glass_capsule',
+    name: 'Neon Plasma Glass Capsule 3D',
+    category: 'Glass & Water',
+    desc: 'Translucent glowing glass vial containing swirling energetic neon plasma core',
+    icon: '🧪',
+    badge: 'Plasma Capsule',
+    isNew: true,
+    previewBg: 'linear-gradient(135deg, #030712, #052e16, #22c55e)',
+    borderAccent: '#22c55e',
+    texture: 'plasma_capsule',
+    adjustments: { customColor: '', opacity: 95, blur: 0.2, shadowBlur: 32, shadowColor: '#22c55e', brightness: 130, contrast: 155, saturation: 180 }
+  },
+  {
+    id: '3d_crystal_gemstone',
+    name: '3D Royal Ruby Gemstone',
+    category: 'Glass & Water',
+    desc: 'Deep crimson precious ruby with brilliant-cut geometric specular caustic refractions',
+    icon: '♦️',
+    badge: 'Ruby Gem',
+    isNew: true,
+    previewBg: 'linear-gradient(135deg, #450a0a, #dc2626, #f87171)',
+    borderAccent: '#ef4444',
+    texture: 'ruby_gem',
+    adjustments: { customColor: '', opacity: 95, blur: 0, shadowBlur: 30, shadowColor: '#ef4444', brightness: 130, contrast: 150, saturation: 185 }
   }
 ];
 
@@ -1695,6 +1944,377 @@ export function transformSvgStyle(svgCode, styleMode) {
         el.setAttribute('stroke-width', '2.5');
         el.setAttribute('stroke-linecap', 'round');
         el.setAttribute('stroke-linejoin', 'round');
+      });
+    }
+
+    // -------------------------------------------------------------
+    // ANIME: CEL-SHADING SHONEN
+    // -------------------------------------------------------------
+    else if (styleMode === 'anime_cel_shading') {
+      defs.innerHTML += `
+        <linearGradient id="${uniqueId}_animeCel" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#fb923c"/>
+          <stop offset="48%" stop-color="#ea580c"/>
+          <stop offset="50%" stop-color="#c2410c"/>
+          <stop offset="100%" stop-color="#7c2d12"/>
+        </linearGradient>
+      `;
+      elements.forEach(({ el, score }) => {
+        const isMain = score >= maxScore * 0.4;
+        el.setAttribute('fill', isMain ? `url(#${uniqueId}_animeCel)` : '#fef08a');
+        el.setAttribute('stroke', '#09090b');
+        el.setAttribute('stroke-width', isMain ? '3.5' : '2');
+        el.setAttribute('stroke-linejoin', 'miter');
+      });
+    }
+
+    // -------------------------------------------------------------
+    // ANIME: MECHA ROBOT ARMOR
+    // -------------------------------------------------------------
+    else if (styleMode === 'anime_mecha_cyber') {
+      defs.innerHTML += `
+        <linearGradient id="${uniqueId}_mechaGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#38bdf8"/>
+          <stop offset="50%" stop-color="#1d4ed8"/>
+          <stop offset="100%" stop-color="#0f172a"/>
+        </linearGradient>
+      `;
+      elements.forEach(({ el, score }) => {
+        const isMain = score >= maxScore * 0.4;
+        el.setAttribute('fill', isMain ? `url(#${uniqueId}_mechaGrad)` : '#ef4444');
+        el.setAttribute('stroke', '#00f0ff');
+        el.setAttribute('stroke-width', '2');
+        el.setAttribute('stroke-dasharray', isMain ? 'none' : '4 2');
+      });
+    }
+
+    // -------------------------------------------------------------
+    // ANIME: SPEED LINES & BATTLE FLARE
+    // -------------------------------------------------------------
+    else if (styleMode === 'anime_speed_lines') {
+      defs.innerHTML += `
+        <radialGradient id="${uniqueId}_speedBurst" cx="50%" cy="50%" r="60%">
+          <stop offset="0%" stop-color="#ffffff"/>
+          <stop offset="30%" stop-color="#fde047"/>
+          <stop offset="70%" stop-color="#f97316"/>
+          <stop offset="100%" stop-color="#dc2626"/>
+        </radialGradient>
+      `;
+      elements.forEach(({ el }) => {
+        el.setAttribute('fill', `url(#${uniqueId}_speedBurst)`);
+        el.setAttribute('stroke', '#fef08a');
+        el.setAttribute('stroke-width', '2');
+      });
+    }
+
+    // -------------------------------------------------------------
+    // ANIME: KAWAII PASTEL CHIBI
+    // -------------------------------------------------------------
+    else if (styleMode === 'anime_chibi_kawaii') {
+      defs.innerHTML += `
+        <linearGradient id="${uniqueId}_kawaiiGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#fce7f3"/>
+          <stop offset="40%" stop-color="#f472b6"/>
+          <stop offset="100%" stop-color="#c084fc"/>
+        </linearGradient>
+      `;
+      elements.forEach(({ el, score }) => {
+        const isMain = score >= maxScore * 0.4;
+        el.setAttribute('fill', isMain ? `url(#${uniqueId}_kawaiiGrad)` : '#ffffff');
+        el.setAttribute('stroke', '#ec4899');
+        el.setAttribute('stroke-width', '2.5');
+      });
+    }
+
+    // -------------------------------------------------------------
+    // ANIME: NEO-TOKYO CYBER CITY
+    // -------------------------------------------------------------
+    else if (styleMode === 'anime_cyber_city') {
+      defs.innerHTML += `
+        <linearGradient id="${uniqueId}_cyberCity" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#06b6d4"/>
+          <stop offset="50%" stop-color="#a855f7"/>
+          <stop offset="100%" stop-color="#ec4899"/>
+        </linearGradient>
+      `;
+      elements.forEach(({ el, score }) => {
+        const isMain = score >= maxScore * 0.4;
+        el.setAttribute('fill', isMain ? `url(#${uniqueId}_cyberCity)` : '#00f0ff');
+        el.setAttribute('stroke', '#e0e7ff');
+        el.setAttribute('stroke-width', '2');
+      });
+    }
+
+    // -------------------------------------------------------------
+    // CARTOON: RETRO COMIC POP-ART HALFTONE
+    // -------------------------------------------------------------
+    else if (styleMode === 'cartoon_comic_pop') {
+      defs.innerHTML += `
+        <pattern id="${uniqueId}_halftone" width="12" height="12" patternUnits="userSpaceOnUse">
+          <circle cx="6" cy="6" r="3" fill="#ef4444" opacity="0.6"/>
+        </pattern>
+        <linearGradient id="${uniqueId}_popGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#facc15"/>
+          <stop offset="100%" stop-color="#eab308"/>
+        </linearGradient>
+      `;
+      elements.forEach(({ el, score }) => {
+        const isMain = score >= maxScore * 0.4;
+        el.setAttribute('fill', isMain ? `url(#${uniqueId}_popGrad)` : '#ef4444');
+        el.setAttribute('stroke', '#09090b');
+        el.setAttribute('stroke-width', '3.5');
+      });
+    }
+
+    // -------------------------------------------------------------
+    // CARTOON: TOONTOWN SQUISHY 3D CARTOON
+    // -------------------------------------------------------------
+    else if (styleMode === 'cartoon_toontown_3d') {
+      defs.innerHTML += `
+        <radialGradient id="${uniqueId}_toontown" cx="35%" cy="30%" r="70%">
+          <stop offset="0%" stop-color="#bae6fd"/>
+          <stop offset="40%" stop-color="#38bdf8"/>
+          <stop offset="80%" stop-color="#0284c7"/>
+          <stop offset="100%" stop-color="#0369a1"/>
+        </radialGradient>
+      `;
+      elements.forEach(({ el, score }) => {
+        const isMain = score >= maxScore * 0.4;
+        el.setAttribute('fill', isMain ? `url(#${uniqueId}_toontown)` : '#fbbf24');
+        el.setAttribute('stroke', '#0f172a');
+        el.setAttribute('stroke-width', '3');
+      });
+    }
+
+    // -------------------------------------------------------------
+    // CARTOON: 1930s RUBBER HOSE TOON
+    // -------------------------------------------------------------
+    else if (styleMode === 'cartoon_rubber_hose') {
+      elements.forEach(({ el, score }) => {
+        const isMain = score >= maxScore * 0.4;
+        el.setAttribute('fill', isMain ? '#09090b' : '#f8fafc');
+        el.setAttribute('stroke', '#09090b');
+        el.setAttribute('stroke-width', '3');
+      });
+    }
+
+    // -------------------------------------------------------------
+    // CARTOON: STREET ART GRAFFITI STICKER
+    // -------------------------------------------------------------
+    else if (styleMode === 'cartoon_graffiti_sticker') {
+      defs.innerHTML += `
+        <linearGradient id="${uniqueId}_graffiti" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#f43f5e"/>
+          <stop offset="50%" stop-color="#a855f7"/>
+          <stop offset="100%" stop-color="#06b6d4"/>
+        </linearGradient>
+      `;
+      elements.forEach(({ el, score }) => {
+        const isMain = score >= maxScore * 0.4;
+        el.setAttribute('fill', isMain ? `url(#${uniqueId}_graffiti)` : '#ffffff');
+        el.setAttribute('stroke', '#ffffff');
+        el.setAttribute('stroke-width', '4.5');
+      });
+    }
+
+    // -------------------------------------------------------------
+    // CARTOON: NOIR GRAPHIC NOVEL INKING
+    // -------------------------------------------------------------
+    else if (styleMode === 'cartoon_superhero_ink') {
+      elements.forEach(({ el, score }) => {
+        const isMain = score >= maxScore * 0.4;
+        el.setAttribute('fill', isMain ? '#09090b' : '#facc15');
+        el.setAttribute('stroke', '#09090b');
+        el.setAttribute('stroke-width', '3.5');
+      });
+    }
+
+    // -------------------------------------------------------------
+    // CARTOON: 90s SATURDAY CARTOON ARCADE
+    // -------------------------------------------------------------
+    else if (styleMode === 'cartoon_arcade_retro') {
+      defs.innerHTML += `
+        <linearGradient id="${uniqueId}_arcade" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#38bdf8"/>
+          <stop offset="50%" stop-color="#ec4899"/>
+          <stop offset="100%" stop-color="#fbbf24"/>
+        </linearGradient>
+      `;
+      elements.forEach(({ el, score }) => {
+        const isMain = score >= maxScore * 0.4;
+        el.setAttribute('fill', isMain ? `url(#${uniqueId}_arcade)` : '#ffffff');
+        el.setAttribute('stroke', '#1e1b4b');
+        el.setAttribute('stroke-width', '3');
+      });
+    }
+
+    // -------------------------------------------------------------
+    // 3D: VOXEL MINECRAFT CUBES
+    // -------------------------------------------------------------
+    else if (styleMode === '3d_voxel_craft') {
+      defs.innerHTML += `
+        <linearGradient id="${uniqueId}_voxel" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#22c55e"/>
+          <stop offset="50%" stop-color="#16a34a"/>
+          <stop offset="100%" stop-color="#14532d"/>
+        </linearGradient>
+      `;
+      elements.forEach(({ el, score }) => {
+        const isMain = score >= maxScore * 0.4;
+        el.setAttribute('fill', isMain ? `url(#${uniqueId}_voxel)` : '#854d0e');
+        el.setAttribute('stroke', '#14532d');
+        el.setAttribute('stroke-width', '2.5');
+      });
+    }
+
+    // -------------------------------------------------------------
+    // 3D: 24K GOLD PUFFY MYLAR BALLOON
+    // -------------------------------------------------------------
+    else if (styleMode === '3d_inflatable_gold_balloon') {
+      defs.innerHTML += `
+        <radialGradient id="${uniqueId}_goldBalloon" cx="35%" cy="30%" r="75%">
+          <stop offset="0%" stop-color="#fef9c3"/>
+          <stop offset="30%" stop-color="#facc15"/>
+          <stop offset="70%" stop-color="#ca8a04"/>
+          <stop offset="100%" stop-color="#713f12"/>
+        </radialGradient>
+      `;
+      elements.forEach(({ el }) => {
+        el.setAttribute('fill', `url(#${uniqueId}_goldBalloon)`);
+        el.setAttribute('stroke', '#fef08a');
+        el.setAttribute('stroke-width', '2.5');
+        el.setAttribute('stroke-dasharray', '4 2');
+      });
+    }
+
+    // -------------------------------------------------------------
+    // 3D: HYPER-REFLECTIVE LIQUID CHROME
+    // -------------------------------------------------------------
+    else if (styleMode === '3d_metallic_chrome_foil') {
+      defs.innerHTML += `
+        <linearGradient id="${uniqueId}_liquidChrome" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#ffffff"/>
+          <stop offset="25%" stop-color="#cbd5e1"/>
+          <stop offset="50%" stop-color="#475569"/>
+          <stop offset="75%" stop-color="#94a3b8"/>
+          <stop offset="100%" stop-color="#1e293b"/>
+        </linearGradient>
+      `;
+      elements.forEach(({ el }) => {
+        el.setAttribute('fill', `url(#${uniqueId}_liquidChrome)`);
+        el.setAttribute('stroke', '#ffffff');
+        el.setAttribute('stroke-width', '2');
+      });
+    }
+
+    // -------------------------------------------------------------
+    // 3D: NORDIC WOODEN TOY
+    // -------------------------------------------------------------
+    else if (styleMode === '3d_wooden_toy') {
+      defs.innerHTML += `
+        <linearGradient id="${uniqueId}_woodToy" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#fed7aa"/>
+          <stop offset="50%" stop-color="#d97706"/>
+          <stop offset="100%" stop-color="#78350f"/>
+        </linearGradient>
+      `;
+      elements.forEach(({ el, score }) => {
+        const isMain = score >= maxScore * 0.4;
+        el.setAttribute('fill', isMain ? `url(#${uniqueId}_woodToy)` : '#fde68a');
+        el.setAttribute('stroke', '#451a03');
+        el.setAttribute('stroke-width', '2');
+      });
+    }
+
+    // -------------------------------------------------------------
+    // 3D: LASER HOLOGRAM MATRIX
+    // -------------------------------------------------------------
+    else if (styleMode === '3d_hologram_matrix') {
+      defs.innerHTML += `
+        <linearGradient id="${uniqueId}_holoMat" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="#67e8f9" stop-opacity="0.9"/>
+          <stop offset="50%" stop-color="#06b6d4" stop-opacity="0.6"/>
+          <stop offset="100%" stop-color="#0284c7" stop-opacity="0.85"/>
+        </linearGradient>
+      `;
+      elements.forEach(({ el }) => {
+        el.setAttribute('fill', `url(#${uniqueId}_holoMat)`);
+        el.setAttribute('stroke', '#a5f3fc');
+        el.setAttribute('stroke-width', '1.5');
+      });
+    }
+
+    // -------------------------------------------------------------
+    // 3D: GLAZED PORCELAIN CERAMIC
+    // -------------------------------------------------------------
+    else if (styleMode === '3d_glossy_ceramic') {
+      defs.innerHTML += `
+        <radialGradient id="${uniqueId}_porcelain" cx="35%" cy="30%" r="70%">
+          <stop offset="0%" stop-color="#ffffff"/>
+          <stop offset="60%" stop-color="#f1f5f9"/>
+          <stop offset="100%" stop-color="#cbd5e1"/>
+        </radialGradient>
+      `;
+      elements.forEach(({ el, score }) => {
+        const isMain = score >= maxScore * 0.4;
+        el.setAttribute('fill', isMain ? `url(#${uniqueId}_porcelain)` : '#1d4ed8');
+        el.setAttribute('stroke', '#1e40af');
+        el.setAttribute('stroke-width', '2');
+      });
+    }
+
+    // -------------------------------------------------------------
+    // 3D: DIMENSIONAL PAPER SCULPTURE
+    // -------------------------------------------------------------
+    else if (styleMode === '3d_origami_tessellation') {
+      defs.innerHTML += `
+        <linearGradient id="${uniqueId}_paper3d" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#ffffff"/>
+          <stop offset="50%" stop-color="#e2e8f0"/>
+          <stop offset="100%" stop-color="#94a3b8"/>
+        </linearGradient>
+      `;
+      elements.forEach(({ el }) => {
+        el.setAttribute('fill', `url(#${uniqueId}_paper3d)`);
+        el.setAttribute('stroke', '#64748b');
+        el.setAttribute('stroke-width', '1.8');
+      });
+    }
+
+    // -------------------------------------------------------------
+    // 3D: NEON PLASMA GLASS CAPSULE
+    // -------------------------------------------------------------
+    else if (styleMode === '3d_neon_glass_capsule') {
+      defs.innerHTML += `
+        <linearGradient id="${uniqueId}_plasmaCap" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#4ade80"/>
+          <stop offset="50%" stop-color="#16a34a"/>
+          <stop offset="100%" stop-color="#052e16"/>
+        </linearGradient>
+      `;
+      elements.forEach(({ el }) => {
+        el.setAttribute('fill', `url(#${uniqueId}_plasmaCap)`);
+        el.setAttribute('stroke', '#86efac');
+        el.setAttribute('stroke-width', '2.5');
+      });
+    }
+
+    // -------------------------------------------------------------
+    // 3D: ROYAL RUBY GEMSTONE
+    // -------------------------------------------------------------
+    else if (styleMode === '3d_crystal_gemstone') {
+      defs.innerHTML += `
+        <radialGradient id="${uniqueId}_rubyGem" cx="35%" cy="30%" r="75%">
+          <stop offset="0%" stop-color="#fca5a5"/>
+          <stop offset="35%" stop-color="#ef4444"/>
+          <stop offset="75%" stop-color="#991b1b"/>
+          <stop offset="100%" stop-color="#450a0a"/>
+        </radialGradient>
+      `;
+      elements.forEach(({ el }) => {
+        el.setAttribute('fill', `url(#${uniqueId}_rubyGem)`);
+        el.setAttribute('stroke', '#fecaca');
+        el.setAttribute('stroke-width', '2');
       });
     }
 
