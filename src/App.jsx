@@ -11,6 +11,7 @@ import { INITIAL_ELEMENTS } from './initialData';
 import { downloadAsset } from './converter';
 import { extractSvgColors, replaceSvgColors, scopeSvgIds, normalizeColor, getLinkedGradientColors, adjustColorBrightness } from './colorUtils';
 import { STYLE_RENDER_MODES, transformSvgStyle } from './styleTransformer';
+import { supabase } from './supabaseClient';
 
 const DEFAULT_ADJUSTMENTS = {
   hue: 0,
@@ -805,7 +806,32 @@ export default function App() {
     }
   };
 
-  const handlePublishSvg = (e) => {
+  // Load & sync icons from Supabase if configured
+  useEffect(() => {
+    if (!supabase) return;
+    async function fetchSupabaseIcons() {
+      try {
+        const { data, error } = await supabase.from('icons').select('*').order('created_at', { ascending: false });
+        if (data && data.length > 0 && !error) {
+          const mapped = data.map(item => ({
+            id: item.id,
+            title: item.title,
+            category: item.category,
+            tags: item.tags || '',
+            svgCode: item.svg_code,
+            downloads: item.downloads || 0
+          }));
+          setElements(mapped);
+          localStorage.setItem('iconderry_assets', JSON.stringify(mapped));
+        }
+      } catch (err) {
+        console.log('Supabase sync notice:', err);
+      }
+    }
+    fetchSupabaseIcons();
+  }, []);
+
+  const handlePublishSvg = async (e) => {
     e.preventDefault();
     if (!title.trim() || !svgInput.trim()) return;
 
@@ -818,7 +844,24 @@ export default function App() {
       downloads: 0
     };
 
-    setElements([newElement, ...elements]);
+    setElements(prev => [newElement, ...prev]);
+
+    // Save to Supabase DB if client is active
+    if (supabase) {
+      try {
+        await supabase.from('icons').insert([{
+          id: newElement.id,
+          title: newElement.title,
+          category: newElement.category,
+          tags: newElement.tags,
+          svg_code: newElement.svgCode,
+          downloads: 0
+        }]);
+      } catch (err) {
+        console.log('Supabase insert notice:', err);
+      }
+    }
+
     setTitle('');
     setSvgInput('');
     setTags('');
@@ -826,10 +869,17 @@ export default function App() {
     setTimeout(() => setFormSuccess(''), 3000);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (window.confirm('Kya aap is element ko delete karna chahte hain?')) {
       setElements(elements.filter(el => el.id !== id));
       if (selectedAsset?.id === id) setSelectedAsset(null);
+      if (supabase) {
+        try {
+          await supabase.from('icons').delete().eq('id', id);
+        } catch (err) {
+          console.log('Supabase delete notice:', err);
+        }
+      }
     }
   };
 
