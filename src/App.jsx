@@ -2210,7 +2210,7 @@ export default function App() {
               <div className={`p-2 sm:p-4 border-b flex-shrink-0 ${
                 appTheme === 'dark' ? 'border-slate-800 bg-[#0b0f19]' : 'border-slate-200 bg-slate-50'
               }`}>
-                <div className={`grid grid-cols-5 gap-1 p-0.5 sm:p-1 rounded-xl border ${
+                <div className={`grid grid-cols-6 gap-1 p-0.5 sm:p-1 rounded-xl border ${
                   appTheme === 'dark' ? 'bg-slate-900 border-slate-800' : 'bg-slate-200/70 border-slate-300/60'
                 }`}>
                   <button
@@ -2226,6 +2226,18 @@ export default function App() {
                   </button>
 
                   <button
+                    onClick={() => setStudioTab('filters')}
+                    className={`flex flex-col items-center justify-center gap-0.5 py-1.5 sm:py-2 px-0.5 sm:px-1 rounded-lg text-xs font-semibold transition ${
+                      studioTab === 'filters' 
+                        ? 'bg-blue-600 text-white shadow' 
+                        : appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Wand2 className="w-3.5 h-3.5" />
+                    <span className="text-[10px] sm:text-[11px]">Filters</span>
+                  </button>
+
+                  <button
                     onClick={() => setStudioTab('effects')}
                     className={`flex flex-col items-center justify-center gap-0.5 py-1.5 sm:py-2 px-0.5 sm:px-1 rounded-lg text-xs font-semibold transition ${
                       studioTab === 'effects' 
@@ -2233,8 +2245,8 @@ export default function App() {
                         : appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    <Wand2 className="w-3.5 h-3.5" />
-                    <span className="text-[10px] sm:text-[11px]">Filters</span>
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span className="text-[10px] sm:text-[11px]">Effects</span>
                   </button>
 
                   <button
@@ -2636,380 +2648,154 @@ export default function App() {
                   </div>
                 )}
 
-                {/* TAB 2: VISUAL FILTER PRESETS & ADVANCED EFFECTS */}
-                {studioTab === 'effects' && (
-                  <div className="space-y-4">
-                    {/* Segmented Sub-view Navigation Pill Bar */}
-                    <div className={`p-1 rounded-xl border flex items-center gap-1 ${
-                      appTheme === 'dark' ? 'bg-slate-900/90 border-slate-800' : 'bg-slate-100 border-slate-200'
-                    }`}>
-                      <button
-                        onClick={() => setFilterSubView('presets')}
-                        className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 ${
-                          filterSubView === 'presets'
-                            ? (appTheme === 'dark' ? 'bg-cyan-500 text-slate-950 shadow-md font-bold' : 'bg-blue-600 text-white shadow-md font-bold')
-                            : (appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900')
-                        }`}
-                      >
-                        <Wand2 className="w-3.5 h-3.5" />
-                        <span>Filters (25+)</span>
-                      </button>
+                {/* TAB 2: FILTERS (25+ VISUAL COLOR PRESETS) */}
+                {studioTab === 'filters' && (
+                  <div className="space-y-3.5">
+                    {/* Header & Reset Button */}
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
+                          appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
+                        }`}>
+                          <Wand2 className="w-3.5 h-3.5 text-cyan-500" /> 25+ Visual Color Filters
+                        </h4>
+                        <p className={`text-[11px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                          Click any card to apply instant gradient tone &amp; aura glow
+                        </p>
+                      </div>
 
                       <button
-                        onClick={() => setFilterSubView('materials')}
-                        className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 ${
-                          filterSubView === 'materials'
-                            ? (appTheme === 'dark' ? 'bg-cyan-500 text-slate-950 shadow-md font-bold' : 'bg-blue-600 text-white shadow-md font-bold')
-                            : (appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900')
+                        onClick={handleResetEffectsPanel}
+                        className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition flex items-center gap-1.5 flex-shrink-0 ${
+                          appTheme === 'dark'
+                            ? 'text-slate-300 hover:text-white bg-slate-900 border-slate-800 hover:border-slate-700'
+                            : 'text-slate-700 hover:text-slate-900 bg-white border-slate-200 hover:bg-slate-50'
                         }`}
+                        title="Reset all filters to original"
                       >
-                        <Sparkles className="w-3.5 h-3.5" />
-                        <span>3D Styles (29+)</span>
-                      </button>
-
-                      <button
-                        onClick={() => setFilterSubView('sliders')}
-                        className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 ${
-                          filterSubView === 'sliders'
-                            ? (appTheme === 'dark' ? 'bg-cyan-500 text-slate-950 shadow-md font-bold' : 'bg-blue-600 text-white shadow-md font-bold')
-                            : (appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900')
-                        }`}
-                      >
-                        <Sliders className="w-3.5 h-3.5" />
-                        <span>Sliders</span>
+                        <Undo2 className="w-3 h-3 text-cyan-500" />
+                        <span>Reset</span>
                       </button>
                     </div>
 
-                    {/* SUB-VIEW 1: 25+ VISUAL COLOR FILTERS WITH LIVE PREVIEW CARDS */}
-                    {filterSubView === 'presets' && (
-                      <div className="space-y-3.5">
-                        {/* Header & Reset Button */}
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h4 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
-                              appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
-                            }`}>
-                              <Wand2 className="w-3.5 h-3.5 text-cyan-500" /> 25+ Visual Color Filters
-                            </h4>
-                            <p className={`text-[11px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                              Click any card to apply instant gradient tone &amp; aura glow
-                            </p>
-                          </div>
+                    {/* Search Bar for Filters */}
+                    <div className="relative">
+                      <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                      <input
+                        type="text"
+                        placeholder="Search 25+ filters (e.g. Cyber, Neon, Vintage, Gold, Sunset)..."
+                        value={filterSearchTerm}
+                        onChange={(e) => setFilterSearchTerm(e.target.value)}
+                        className={`w-full pl-9 pr-8 py-2 rounded-xl text-xs border focus:outline-none focus:border-cyan-500 transition ${
+                          appTheme === 'dark'
+                            ? 'bg-slate-900 border-slate-800 text-slate-200 placeholder-slate-500'
+                            : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400'
+                        }`}
+                      />
+                      {filterSearchTerm && (
+                        <button
+                          onClick={() => setFilterSearchTerm('')}
+                          className="absolute right-2.5 top-2 text-slate-400 hover:text-white text-xs font-bold w-4 h-4 rounded-full bg-slate-800 flex items-center justify-center"
+                          title="Clear search"
+                        >
+                          &times;
+                        </button>
+                      )}
+                    </div>
 
+                    {/* Filter Category Chips */}
+                    <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
+                      {['All', 'Neon & Cyber', 'Cinematic & Moody', 'Warm & Golden', 'Aesthetic & Pastel', 'Retro & Vintage'].map((cat) => {
+                        const isCatActive = filterCategory === cat;
+                        return (
                           <button
-                            onClick={handleResetEffectsPanel}
-                            className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition flex items-center gap-1.5 flex-shrink-0 ${
-                              appTheme === 'dark'
-                                ? 'text-slate-300 hover:text-white bg-slate-900 border-slate-800 hover:border-slate-700'
-                                : 'text-slate-700 hover:text-slate-900 bg-white border-slate-200 hover:bg-slate-50'
+                            key={cat}
+                            onClick={() => setFilterCategory(cat)}
+                            className={`px-2.5 py-1 rounded-full text-[10px] font-semibold transition whitespace-nowrap ${
+                              isCatActive
+                                ? (appTheme === 'dark' ? 'bg-cyan-500 text-slate-950 shadow-sm font-bold' : 'bg-blue-600 text-white shadow-sm font-bold')
+                                : (appTheme === 'dark' ? 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800' : 'bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200')
                             }`}
-                            title="Reset all filters to original"
                           >
-                            <Undo2 className="w-3 h-3 text-cyan-500" />
-                            <span>Reset</span>
+                            {cat}
                           </button>
-                        </div>
+                        );
+                      })}
+                    </div>
 
-                        {/* Search Bar for Filters */}
-                        <div className="relative">
-                          <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
-                          <input
-                            type="text"
-                            placeholder="Search 25+ filters (e.g. Cyber, Neon, Vintage, Gold, Sunset)..."
-                            value={filterSearchTerm}
-                            onChange={(e) => setFilterSearchTerm(e.target.value)}
-                            className={`w-full pl-9 pr-8 py-2 rounded-xl text-xs border focus:outline-none focus:border-cyan-500 transition ${
-                              appTheme === 'dark'
-                                ? 'bg-slate-900 border-slate-800 text-slate-200 placeholder-slate-500'
-                                : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400'
+                    {/* 2-Column Visual Filter Cards with Live Visual Preview Look on Every Button */}
+                    <div className="grid grid-cols-2 gap-2.5 max-h-[480px] overflow-y-auto pr-1">
+                      {filteredPresets.map((pst) => {
+                        const isCurrentActive = activeFilterPreset === pst.id || activeFilterPreset === pst.name;
+                        return (
+                          <button
+                            key={pst.id || pst.name}
+                            onClick={() => applyPreset(pst)}
+                            className={`p-2.5 rounded-2xl border text-left transition-all duration-300 ease-out hover:-translate-y-1 flex flex-col justify-between relative overflow-hidden group ${
+                              isCurrentActive
+                                ? (appTheme === 'dark'
+                                    ? 'border-cyan-400 bg-cyan-500/10 shadow-[0_0_18px_rgba(6,182,212,0.3)] ring-2 ring-cyan-400'
+                                    : 'border-blue-600 bg-blue-50 shadow-md ring-2 ring-blue-600')
+                                : (appTheme === 'dark'
+                                    ? 'bg-slate-900/90 border-slate-800 hover:border-slate-700/80 hover:bg-slate-900 shadow-sm hover:shadow-[0_12px_24px_-4px_rgba(255,255,255,0.07)]'
+                                    : 'bg-white border-slate-200 hover:border-slate-300/80 hover:shadow-lg hover:shadow-black/10 shadow-sm')
                             }`}
-                          />
-                          {filterSearchTerm && (
-                            <button
-                              onClick={() => setFilterSearchTerm('')}
-                              className="absolute right-2.5 top-2 text-slate-400 hover:text-white text-xs font-bold w-4 h-4 rounded-full bg-slate-800 flex items-center justify-center"
-                              title="Clear search"
-                            >
-                              &times;
-                            </button>
-                          )}
-                        </div>
+                          >
+                            {/* Live Visual Filter Preview Box */}
+                            <FilterCardThumbnail preset={pst} />
 
-                        {/* Filter Category Chips */}
-                        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
-                          {['All', 'Neon & Cyber', 'Cinematic & Moody', 'Warm & Golden', 'Aesthetic & Pastel', 'Retro & Vintage'].map((cat) => {
-                            const isCatActive = filterCategory === cat;
-                            return (
-                              <button
-                                key={cat}
-                                onClick={() => setFilterCategory(cat)}
-                                className={`px-2.5 py-1 rounded-full text-[10px] font-semibold transition whitespace-nowrap ${
-                                  isCatActive
-                                    ? (appTheme === 'dark' ? 'bg-cyan-500 text-slate-950 shadow-sm' : 'bg-blue-600 text-white shadow-sm')
-                                    : (appTheme === 'dark' ? 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800' : 'bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200')
-                                }`}
-                              >
-                                {cat}
-                              </button>
-                            );
-                          })}
-                        </div>
-
-                        {/* 2-Column Visual Filter Cards with Live Visual Preview Look on Every Button */}
-                        <div className="grid grid-cols-2 gap-2.5 max-h-[480px] overflow-y-auto pr-1">
-                          {filteredPresets.map((pst) => {
-                            const isCurrentActive = activeFilterPreset === pst.id || activeFilterPreset === pst.name;
-                            return (
-                              <button
-                                key={pst.id || pst.name}
-                                onClick={() => applyPreset(pst)}
-                                className={`p-2.5 rounded-2xl border text-left transition-all duration-300 ease-out hover:-translate-y-1 flex flex-col justify-between relative overflow-hidden group ${
+                            <div className="w-full">
+                              <div className="flex items-center justify-between gap-1 mb-1">
+                                <span className={`text-xs font-bold truncate ${
                                   isCurrentActive
-                                    ? (appTheme === 'dark'
-                                        ? 'border-cyan-400 bg-cyan-500/10 shadow-[0_0_18px_rgba(6,182,212,0.3)] ring-2 ring-cyan-400'
-                                        : 'border-blue-600 bg-blue-50 shadow-md ring-2 ring-blue-600')
-                                    : (appTheme === 'dark'
-                                        ? 'bg-slate-900/90 border-slate-800 hover:border-slate-700/80 hover:bg-slate-900 shadow-sm hover:shadow-[0_12px_24px_-4px_rgba(255,255,255,0.07)]'
-                                        : 'bg-white border-slate-200 hover:border-slate-300/80 hover:shadow-lg hover:shadow-black/10 shadow-sm')
-                                }`}
-                              >
-                                {/* Live Visual Filter Preview Box */}
-                                <FilterCardThumbnail preset={pst} />
-
-                                <div className="w-full">
-                                  <div className="flex items-center justify-between gap-1 mb-1">
-                                    <span className={`text-xs font-bold truncate ${
-                                      isCurrentActive
-                                        ? (appTheme === 'dark' ? 'text-cyan-300' : 'text-blue-700')
-                                        : (appTheme === 'dark' ? 'text-slate-200 group-hover:text-cyan-400' : 'text-slate-900 group-hover:text-blue-600')
-                                    }`}>
-                                      {pst.name}
-                                    </span>
-                                    {isCurrentActive && (
-                                      <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
-                                    )}
-                                  </div>
-                                  <p className={`text-[10px] leading-tight line-clamp-2 ${
-                                    appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'
-                                  }`}>
-                                    {pst.desc}
-                                  </p>
-                                </div>
-                              </button>
-                            );
-                          })}
-                          {filteredPresets.length === 0 && (
-                            <div className="col-span-2 py-8 text-center text-xs text-slate-400">
-                              No filters match "{filterSearchTerm}". Try another search term.
+                                    ? (appTheme === 'dark' ? 'text-cyan-300' : 'text-blue-700')
+                                    : (appTheme === 'dark' ? 'text-slate-200 group-hover:text-cyan-400' : 'text-slate-900 group-hover:text-blue-600')
+                                }`}>
+                                  {pst.name}
+                                </span>
+                                {isCurrentActive && (
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
+                                )}
+                              </div>
+                              <p className={`text-[10px] leading-tight line-clamp-2 ${
+                                appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'
+                              }`}>
+                                {pst.desc}
+                              </p>
                             </div>
-                          )}
+                          </button>
+                        );
+                      })}
+                      {filteredPresets.length === 0 && (
+                        <div className="col-span-2 py-8 text-center text-xs text-slate-400">
+                          No filters match "{filterSearchTerm}". Try another search term.
                         </div>
+                      )}
+                    </div>
 
-                        {/* Quick Fine-Tuning Mini-Sliders under Filters */}
-                        <div className={`p-3.5 rounded-2xl border space-y-3 ${
-                          appTheme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'
+                    {/* Quick Fine-Tuning Mini-Sliders under Filters */}
+                    <div className={`p-3.5 rounded-2xl border space-y-3 ${
+                      appTheme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <span className={`text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${
+                          appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
                         }`}>
-                          <div className="flex items-center justify-between">
-                            <span className={`text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${
-                              appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
-                            }`}>
-                              <Sliders className="w-3 h-3 text-cyan-500" /> Quick Fine-Tune
-                            </span>
-                            <button
-                              onClick={() => setFilterSubView('sliders')}
-                              className="text-[10px] text-cyan-500 hover:underline font-semibold"
-                            >
-                              All Sliders &rarr;
-                            </button>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
-                              <div className={`flex justify-between text-[11px] mb-0.5 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                                <span>Hue Shift</span>
-                                <span className="text-cyan-500 font-mono text-[10px] font-semibold">{adjustments.hue}&deg;</span>
-                              </div>
-                              <input
-                                type="range"
-                                min="0"
-                                max="360"
-                                value={adjustments.hue}
-                                onChange={(e) => setAdjustments({ ...adjustments, hue: Number(e.target.value) })}
-                                className="hue-slider w-full"
-                              />
-                            </div>
-                            <div>
-                              <div className={`flex justify-between text-[11px] mb-0.5 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                                <span>Glow Aura</span>
-                                <span className="text-cyan-500 font-mono text-[10px] font-semibold">{adjustments.shadowBlur}px</span>
-                              </div>
-                              <input
-                                type="range"
-                                min="0"
-                                max="60"
-                                value={adjustments.shadowBlur}
-                                onChange={(e) => setAdjustments({ ...adjustments, shadowBlur: Number(e.target.value) })}
-                                className="theme-slider w-full"
-                              />
-                            </div>
-                          </div>
-                        </div>
+                          <Sliders className="w-3 h-3 text-cyan-500" /> Quick Fine-Tune
+                        </span>
+                        <button
+                          onClick={() => setStudioTab('effects')}
+                          className="text-[10px] text-cyan-500 hover:underline font-semibold"
+                        >
+                          Effects &amp; Sliders &rarr;
+                        </button>
                       </div>
-                    )}
 
-                    {/* SUB-VIEW 2: 29+ 3D MATERIAL & STYLE LOOKS */}
-                    {filterSubView === 'materials' && (
-                      <div className="space-y-3.5">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h4 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
-                              appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
-                            }`}>
-                              <Sparkles className="w-3.5 h-3.5 text-cyan-500" /> Material &amp; Style Visual Looks
-                            </h4>
-                            <p className={`text-[11px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                              29+ Real Styles: Diamond, Velvet, Wood, Lava, Clay, Mercury &amp; more
-                            </p>
-                          </div>
-
-                          <button
-                            onClick={handleResetEffectsPanel}
-                            className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition flex items-center gap-1.5 flex-shrink-0 ${
-                              appTheme === 'dark'
-                                ? 'text-slate-300 hover:text-white bg-slate-900 border-slate-800 hover:border-slate-700'
-                                : 'text-slate-700 hover:text-slate-900 bg-white border-slate-200 hover:bg-slate-50'
-                            }`}
-                            title="Reset all effects to original"
-                          >
-                            <Undo2 className="w-3 h-3 text-cyan-500" />
-                            <span>Reset</span>
-                          </button>
-                        </div>
-
-                        {/* Interactive Search Bar for Effects */}
-                        <div className="relative">
-                          <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
-                          <input
-                            type="text"
-                            placeholder="Search 29+ material effects (e.g., Gold, Glass, Neon, Metal)..."
-                            value={effectSearchTerm}
-                            onChange={(e) => setEffectSearchTerm(e.target.value)}
-                            className={`w-full pl-9 pr-8 py-2 rounded-xl text-xs border focus:outline-none focus:border-cyan-500 transition ${
-                              appTheme === 'dark'
-                                ? 'bg-slate-900 border-slate-800 text-slate-200 placeholder-slate-500'
-                                : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400'
-                            }`}
-                          />
-                          {effectSearchTerm && (
-                            <button
-                              onClick={() => setEffectSearchTerm('')}
-                              className="absolute right-2.5 top-2 text-slate-400 hover:text-white text-xs font-bold w-4 h-4 rounded-full bg-slate-800 flex items-center justify-center"
-                              title="Clear search"
-                            >
-                              &times;
-                            </button>
-                          )}
-                        </div>
-
-                        {/* Style Category Filter Chips */}
-                        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
-                          {['All', 'Glass & Water', '3D & Inflatable', 'Fire & Metal', 'Craft & Texture', 'Cyber & Neon', 'Silhouette & Vector'].map((cat) => {
-                            const isCatActive = effectCategory === cat;
-                            return (
-                              <button
-                                key={cat}
-                                onClick={() => setEffectCategory(cat)}
-                                className={`px-2.5 py-1 rounded-full text-[10px] font-semibold transition whitespace-nowrap ${
-                                  isCatActive
-                                    ? (appTheme === 'dark' ? 'bg-cyan-500 text-slate-950 shadow-sm' : 'bg-blue-600 text-white shadow-sm')
-                                    : (appTheme === 'dark' ? 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800' : 'bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200')
-                                }`}
-                              >
-                                {cat}
-                              </button>
-                            );
-                          })}
-                        </div>
-
-                        {/* 2-Column Material & Style Cards */}
-                        <div className="grid grid-cols-2 gap-2.5 max-h-[480px] overflow-y-auto pr-1">
-                          {filteredStyleModes.map((preset) => {
-                            const isCurrentActive = activeStyleMode === preset.id;
-                            return (
-                              <button
-                                key={preset.id}
-                                onClick={() => handleSelectStyleLook(preset)}
-                                className={`p-2.5 rounded-2xl border text-left transition-all duration-300 ease-out hover:-translate-y-1 flex flex-col justify-between relative overflow-hidden group ${
-                                  isCurrentActive
-                                    ? (appTheme === 'dark'
-                                        ? 'border-cyan-400 bg-cyan-500/10 shadow-[0_0_18px_rgba(6,182,212,0.3)] ring-2 ring-cyan-400'
-                                        : 'border-blue-600 bg-blue-50 shadow-md ring-2 ring-blue-600')
-                                    : (appTheme === 'dark'
-                                        ? 'bg-slate-900/90 border-slate-800 hover:border-slate-700/80 hover:bg-slate-900 shadow-sm hover:shadow-[0_12px_24px_-4px_rgba(255,255,255,0.07)]'
-                                        : 'bg-white border-slate-200 hover:border-slate-300/80 hover:shadow-lg hover:shadow-black/10 shadow-sm')
-                                }`}
-                              >
-                                <EffectCardThumbnail preset={preset} />
-
-                                <div className="w-full">
-                                  <div className="flex items-center justify-between gap-1 mb-1">
-                                    <span className={`text-xs font-bold truncate ${
-                                      isCurrentActive
-                                        ? (appTheme === 'dark' ? 'text-cyan-300' : 'text-blue-700')
-                                        : (appTheme === 'dark' ? 'text-slate-200 group-hover:text-cyan-400' : 'text-slate-900 group-hover:text-blue-600')
-                                    }`}>
-                                      {preset.name}
-                                    </span>
-                                  </div>
-                                  <p className={`text-[10px] leading-tight line-clamp-2 ${
-                                    appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'
-                                  }`}>
-                                    {preset.desc}
-                                  </p>
-                                </div>
-                              </button>
-                            );
-                          })}
-                          {filteredStyleModes.length === 0 && (
-                            <div className="col-span-2 py-8 text-center text-xs text-slate-400">
-                              No effects match "{effectSearchTerm}". Try another search term.
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* SUB-VIEW 3: FINE-TUNING GRANULAR SLIDERS */}
-                    {filterSubView === 'sliders' && (
-                      <div className={`p-4 rounded-2xl border space-y-4 ${
-                        appTheme === 'dark' ? 'bg-[#131b2e]/40 border-slate-800' : 'bg-slate-50 border-slate-200'
-                      }`}>
-                        <div className="flex items-center justify-between">
-                          <h5 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
-                            appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
-                          }`}>
-                            <Sliders className="w-3.5 h-3.5 text-cyan-500" /> Granular Filter Grading Sliders
-                          </h5>
-
-                          <button
-                            onClick={handleResetEffectsPanel}
-                            className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition flex items-center gap-1.5 flex-shrink-0 ${
-                              appTheme === 'dark'
-                                ? 'text-slate-300 hover:text-white bg-slate-900 border-slate-800 hover:border-slate-700'
-                                : 'text-slate-700 hover:text-slate-900 bg-white border-slate-200 hover:bg-slate-50'
-                            }`}
-                            title="Reset all effects & style filters to original"
-                          >
-                            <Undo2 className="w-3 h-3 text-cyan-500" />
-                            <span>Reset</span>
-                          </button>
-                        </div>
-
-                        {/* Hue (Color Shift) */}
+                      <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <div className={`flex justify-between text-xs mb-1 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                            <span>Hue Shift (Color Spectrum)</span>
-                            <span className="text-cyan-500 font-mono font-semibold">{adjustments.hue}&deg;</span>
+                          <div className={`flex justify-between text-[11px] mb-0.5 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                            <span>Hue Shift</span>
+                            <span className="text-cyan-500 font-mono text-[10px] font-semibold">{adjustments.hue}&deg;</span>
                           </div>
                           <input
                             type="range"
@@ -3020,156 +2806,335 @@ export default function App() {
                             className="hue-slider w-full"
                           />
                         </div>
-
-                        {/* Saturation & Contrast Grid */}
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <div className={`flex justify-between text-xs mb-1 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                              <span>Saturation</span>
-                              <span className="text-cyan-500 font-mono font-semibold">{adjustments.saturation}%</span>
-                            </div>
-                            <input
-                              type="range"
-                              min="0"
-                              max="200"
-                              value={adjustments.saturation}
-                              onChange={(e) => setAdjustments({ ...adjustments, saturation: Number(e.target.value) })}
-                              className="theme-slider w-full"
-                            />
-                          </div>
-
-                          <div>
-                            <div className={`flex justify-between text-xs mb-1 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                              <span>Contrast</span>
-                              <span className="text-cyan-500 font-mono font-semibold">{adjustments.contrast}%</span>
-                            </div>
-                            <input
-                              type="range"
-                              min="50"
-                              max="200"
-                              value={adjustments.contrast}
-                              onChange={(e) => setAdjustments({ ...adjustments, contrast: Number(e.target.value) })}
-                              className="theme-slider w-full"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Brightness & Opacity Grid */}
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <div className={`flex justify-between text-xs mb-1 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                              <span>Brightness</span>
-                              <span className="text-cyan-500 font-mono font-semibold">{adjustments.brightness}%</span>
-                            </div>
-                            <input
-                              type="range"
-                              min="50"
-                              max="160"
-                              value={adjustments.brightness}
-                              onChange={(e) => setAdjustments({ ...adjustments, brightness: Number(e.target.value) })}
-                              className="theme-slider w-full"
-                            />
-                          </div>
-
-                          <div>
-                            <div className={`flex justify-between text-xs mb-1 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                              <span>Opacity</span>
-                              <span className="text-cyan-500 font-mono font-semibold">{adjustments.opacity}%</span>
-                            </div>
-                            <input
-                              type="range"
-                              min="10"
-                              max="100"
-                              value={adjustments.opacity}
-                              onChange={(e) => setAdjustments({ ...adjustments, opacity: Number(e.target.value) })}
-                              className="theme-slider w-full"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Sepia & Invert Grid */}
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <div className={`flex justify-between text-xs mb-1 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                              <span>Sepia (Vintage)</span>
-                              <span className="text-cyan-500 font-mono font-semibold">{adjustments.sepia}%</span>
-                            </div>
-                            <input
-                              type="range"
-                              min="0"
-                              max="100"
-                              value={adjustments.sepia}
-                              onChange={(e) => setAdjustments({ ...adjustments, sepia: Number(e.target.value) })}
-                              className="theme-slider w-full"
-                            />
-                          </div>
-
-                          <div>
-                            <div className={`flex justify-between text-xs mb-1 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                              <span>Invert (Negative)</span>
-                              <span className="text-cyan-500 font-mono font-semibold">{adjustments.invert}%</span>
-                            </div>
-                            <input
-                              type="range"
-                              min="0"
-                              max="100"
-                              value={adjustments.invert}
-                              onChange={(e) => setAdjustments({ ...adjustments, invert: Number(e.target.value) })}
-                              className="theme-slider w-full"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Edge-Conforming Glow / Shadow */}
-                        <div className={`p-3.5 rounded-2xl border space-y-2 ${
-                          appTheme === 'dark' ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
-                        }`}>
-                          <div className="flex justify-between text-xs items-center">
-                            <span className={`font-semibold flex items-center gap-1.5 ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-800'}`}>
-                              <Sparkles className="w-3.5 h-3.5 text-cyan-500" /> Vector Edge Glow Aura
-                            </span>
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="color"
-                                value={adjustments.shadowColor}
-                                onChange={(e) => setAdjustments({ ...adjustments, shadowColor: e.target.value })}
-                                className="w-5 h-5 rounded cursor-pointer bg-transparent border-0"
-                                title="Glow Color"
-                              />
-                              <span className="text-cyan-500 font-mono text-xs font-semibold">{adjustments.shadowBlur}px</span>
-                            </div>
+                        <div>
+                          <div className={`flex justify-between text-[11px] mb-0.5 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                            <span>Glow Aura</span>
+                            <span className="text-cyan-500 font-mono text-[10px] font-semibold">{adjustments.shadowBlur}px</span>
                           </div>
                           <input
                             type="range"
                             min="0"
                             max="60"
                             value={adjustments.shadowBlur}
-                            onChange={(e) => setAdjustments({ ...adjustments, shadowColor: adjustments.shadowColor, shadowBlur: Number(e.target.value) })}
-                            className="theme-slider w-full"
-                          />
-                          <p className={`text-[10px] ${appTheme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
-                            Glow directly outlines and radiates around transparent vector contours.
-                          </p>
-                        </div>
-
-                        {/* Soft Blur Slider */}
-                        <div>
-                          <div className={`flex justify-between text-xs mb-1 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                            <span>Soft Blur Effect</span>
-                            <span className="text-cyan-500 font-mono font-semibold">{adjustments.blur}px</span>
-                          </div>
-                          <input
-                            type="range"
-                            min="0"
-                            max="8"
-                            step="0.5"
-                            value={adjustments.blur}
-                            onChange={(e) => setAdjustments({ ...adjustments, blur: Number(e.target.value) })}
+                            onChange={(e) => setAdjustments({ ...adjustments, shadowBlur: Number(e.target.value) })}
                             className="theme-slider w-full"
                           />
                         </div>
                       </div>
-                    )}
+                    </div>
+                  </div>
+                )}
+
+                {/* TAB 3: EFFECTS (29+ 3D MATERIAL STYLES & MANUAL SLIDERS) */}
+                {studioTab === 'effects' && (
+                  <div className="space-y-5">
+                    {/* Header with count and reset */}
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
+                          appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
+                        }`}>
+                          <Sparkles className="w-3.5 h-3.5 text-cyan-500" /> 29+ 3D Material Styles &amp; FX
+                        </h4>
+                        <p className={`text-[11px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                          Diamond, Velvet, Wood, Lava, Clay, Mercury, Origami &amp; more
+                        </p>
+                      </div>
+
+                      <button
+                        onClick={handleResetEffectsPanel}
+                        className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition flex items-center gap-1.5 flex-shrink-0 ${
+                          appTheme === 'dark'
+                            ? 'text-slate-300 hover:text-white bg-slate-900 border-slate-800 hover:border-slate-700'
+                            : 'text-slate-700 hover:text-slate-900 bg-white border-slate-200 hover:bg-slate-50'
+                        }`}
+                        title="Reset all effects to original"
+                      >
+                        <Undo2 className="w-3 h-3 text-cyan-500" />
+                        <span>Reset</span>
+                      </button>
+                    </div>
+
+                    {/* Search Bar for Effects */}
+                    <div className="relative">
+                      <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                      <input
+                        type="text"
+                        placeholder="Search 29+ material effects (e.g. Gold, Glass, Neon, Metal)..."
+                        value={effectSearchTerm}
+                        onChange={(e) => setEffectSearchTerm(e.target.value)}
+                        className={`w-full pl-9 pr-8 py-2 rounded-xl text-xs border focus:outline-none focus:border-cyan-500 transition ${
+                          appTheme === 'dark'
+                            ? 'bg-slate-900 border-slate-800 text-slate-200 placeholder-slate-500'
+                            : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400'
+                        }`}
+                      />
+                      {effectSearchTerm && (
+                        <button
+                          onClick={() => setEffectSearchTerm('')}
+                          className="absolute right-2.5 top-2 text-slate-400 hover:text-white text-xs font-bold w-4 h-4 rounded-full bg-slate-800 flex items-center justify-center"
+                          title="Clear search"
+                        >
+                          &times;
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Style Category Filter Chips */}
+                    <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
+                      {['All', 'Glass & Water', '3D & Inflatable', 'Fire & Metal', 'Craft & Texture', 'Cyber & Neon', 'Silhouette & Vector'].map((cat) => {
+                        const isCatActive = effectCategory === cat;
+                        return (
+                          <button
+                            key={cat}
+                            onClick={() => setEffectCategory(cat)}
+                            className={`px-2.5 py-1 rounded-full text-[10px] font-semibold transition whitespace-nowrap ${
+                              isCatActive
+                                ? (appTheme === 'dark' ? 'bg-cyan-500 text-slate-950 shadow-sm font-bold' : 'bg-blue-600 text-white shadow-sm font-bold')
+                                : (appTheme === 'dark' ? 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800' : 'bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200')
+                            }`}
+                          >
+                            {cat}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* 2-Column Material & Style Cards with Live Visual Preview */}
+                    <div className="grid grid-cols-2 gap-2.5 max-h-[420px] overflow-y-auto pr-1">
+                      {filteredStyleModes.map((preset) => {
+                        const isCurrentActive = activeStyleMode === preset.id;
+                        return (
+                          <button
+                            key={preset.id}
+                            onClick={() => handleSelectStyleLook(preset)}
+                            className={`p-2.5 rounded-2xl border text-left transition-all duration-300 ease-out hover:-translate-y-1 flex flex-col justify-between relative overflow-hidden group ${
+                              isCurrentActive
+                                ? (appTheme === 'dark'
+                                    ? 'border-cyan-400 bg-cyan-500/10 shadow-[0_0_18px_rgba(6,182,212,0.3)] ring-2 ring-cyan-400'
+                                    : 'border-blue-600 bg-blue-50 shadow-md ring-2 ring-blue-600')
+                                : (appTheme === 'dark'
+                                    ? 'bg-slate-900/90 border-slate-800 hover:border-slate-700/80 hover:bg-slate-900 shadow-sm hover:shadow-[0_12px_24px_-4px_rgba(255,255,255,0.07)]'
+                                    : 'bg-white border-slate-200 hover:border-slate-300/80 hover:shadow-lg hover:shadow-black/10 shadow-sm')
+                            }`}
+                          >
+                            <EffectCardThumbnail preset={preset} />
+
+                            <div className="w-full">
+                              <div className="flex items-center justify-between gap-1 mb-1">
+                                <span className={`text-xs font-bold truncate ${
+                                  isCurrentActive
+                                    ? (appTheme === 'dark' ? 'text-cyan-300' : 'text-blue-700')
+                                    : (appTheme === 'dark' ? 'text-slate-200 group-hover:text-cyan-400' : 'text-slate-900 group-hover:text-blue-600')
+                                }`}>
+                                  {preset.name}
+                                </span>
+                              </div>
+                              <p className={`text-[10px] leading-tight line-clamp-2 ${
+                                appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'
+                              }`}>
+                                {preset.desc}
+                              </p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                      {filteredStyleModes.length === 0 && (
+                        <div className="col-span-2 py-8 text-center text-xs text-slate-400">
+                          No effects match "{effectSearchTerm}". Try another search term.
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Fine-Tuning Granular Sliders Section */}
+                    <div className={`p-4 rounded-2xl border space-y-4 ${
+                      appTheme === 'dark' ? 'bg-[#131b2e]/40 border-slate-800' : 'bg-slate-50 border-slate-200'
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <h5 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
+                          appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
+                        }`}>
+                          <Sliders className="w-3.5 h-3.5 text-cyan-500" /> Granular Filter Grading Sliders
+                        </h5>
+
+                        <button
+                          onClick={handleResetEffectsPanel}
+                          className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition flex items-center gap-1.5 flex-shrink-0 ${
+                            appTheme === 'dark'
+                              ? 'text-slate-300 hover:text-white bg-slate-900 border-slate-800 hover:border-slate-700'
+                              : 'text-slate-700 hover:text-slate-900 bg-white border-slate-200 hover:bg-slate-50'
+                          }`}
+                          title="Reset all grading sliders to default"
+                        >
+                          <Undo2 className="w-3 h-3 text-cyan-500" />
+                          <span>Reset</span>
+                        </button>
+                      </div>
+
+                      {/* Hue (Color Shift) */}
+                      <div>
+                        <div className={`flex justify-between text-xs mb-1 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                          <span>Hue Shift (Color Spectrum)</span>
+                          <span className="text-cyan-500 font-mono font-semibold">{adjustments.hue}&deg;</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="360"
+                          value={adjustments.hue}
+                          onChange={(e) => setAdjustments({ ...adjustments, hue: Number(e.target.value) })}
+                          className="hue-slider w-full"
+                        />
+                      </div>
+
+                      {/* Saturation & Contrast Grid */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <div className={`flex justify-between text-xs mb-1 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                            <span>Saturation</span>
+                            <span className="text-cyan-500 font-mono font-semibold">{adjustments.saturation}%</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="0"
+                            max="200"
+                            value={adjustments.saturation}
+                            onChange={(e) => setAdjustments({ ...adjustments, saturation: Number(e.target.value) })}
+                            className="theme-slider w-full"
+                          />
+                        </div>
+
+                        <div>
+                          <div className={`flex justify-between text-xs mb-1 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                            <span>Contrast</span>
+                            <span className="text-cyan-500 font-mono font-semibold">{adjustments.contrast}%</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="50"
+                            max="200"
+                            value={adjustments.contrast}
+                            onChange={(e) => setAdjustments({ ...adjustments, contrast: Number(e.target.value) })}
+                            className="theme-slider w-full"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Brightness & Opacity Grid */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <div className={`flex justify-between text-xs mb-1 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                            <span>Brightness</span>
+                            <span className="text-cyan-500 font-mono font-semibold">{adjustments.brightness}%</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="50"
+                            max="160"
+                            value={adjustments.brightness}
+                            onChange={(e) => setAdjustments({ ...adjustments, brightness: Number(e.target.value) })}
+                            className="theme-slider w-full"
+                          />
+                        </div>
+
+                        <div>
+                          <div className={`flex justify-between text-xs mb-1 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                            <span>Opacity</span>
+                            <span className="text-cyan-500 font-mono font-semibold">{adjustments.opacity}%</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="10"
+                            max="100"
+                            value={adjustments.opacity}
+                            onChange={(e) => setAdjustments({ ...adjustments, opacity: Number(e.target.value) })}
+                            className="theme-slider w-full"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Sepia & Invert Grid */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <div className={`flex justify-between text-xs mb-1 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                            <span>Sepia (Vintage)</span>
+                            <span className="text-cyan-500 font-mono font-semibold">{adjustments.sepia}%</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            value={adjustments.sepia}
+                            onChange={(e) => setAdjustments({ ...adjustments, sepia: Number(e.target.value) })}
+                            className="theme-slider w-full"
+                          />
+                        </div>
+
+                        <div>
+                          <div className={`flex justify-between text-xs mb-1 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                            <span>Invert (Negative)</span>
+                            <span className="text-cyan-500 font-mono font-semibold">{adjustments.invert}%</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            value={adjustments.invert}
+                            onChange={(e) => setAdjustments({ ...adjustments, invert: Number(e.target.value) })}
+                            className="theme-slider w-full"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Edge-Conforming Glow / Shadow */}
+                      <div className={`p-3.5 rounded-2xl border space-y-2 ${
+                        appTheme === 'dark' ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
+                      }`}>
+                        <div className="flex justify-between text-xs items-center">
+                          <span className={`font-semibold flex items-center gap-1.5 ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-800'}`}>
+                            <Sparkles className="w-3.5 h-3.5 text-cyan-500" /> Vector Edge Glow Aura
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="color"
+                              value={adjustments.shadowColor}
+                              onChange={(e) => setAdjustments({ ...adjustments, shadowColor: e.target.value })}
+                              className="w-5 h-5 rounded cursor-pointer bg-transparent border-0"
+                              title="Glow Color"
+                            />
+                            <span className="text-cyan-500 font-mono text-xs font-semibold">{adjustments.shadowBlur}px</span>
+                          </div>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="60"
+                          value={adjustments.shadowBlur}
+                          onChange={(e) => setAdjustments({ ...adjustments, shadowColor: adjustments.shadowColor, shadowBlur: Number(e.target.value) })}
+                          className="theme-slider w-full"
+                        />
+                        <p className={`text-[10px] ${appTheme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                          Glow directly outlines and radiates around transparent vector contours.
+                        </p>
+                      </div>
+
+                      {/* Soft Blur Slider */}
+                      <div>
+                        <div className={`flex justify-between text-xs mb-1 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                          <span>Soft Blur Effect</span>
+                          <span className="text-cyan-500 font-mono font-semibold">{adjustments.blur}px</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="8"
+                          step="0.5"
+                          value={adjustments.blur}
+                          onChange={(e) => setAdjustments({ ...adjustments, blur: Number(e.target.value) })}
+                          className="theme-slider w-full"
+                        />
+                      </div>
+                    </div>
                   </div>
                 )}
 
