@@ -387,15 +387,23 @@ export default function App() {
   const [adjustments, setAdjustments] = useState(DEFAULT_ADJUSTMENTS);
   const [activeStyleMode, setActiveStyleMode] = useState('original');
   const [effectCategory, setEffectCategory] = useState('All');
+  const [effectSearchTerm, setEffectSearchTerm] = useState('');
   const [studioTab, setStudioTab] = useState('colors'); // 'colors' | 'effects' | 'dimensions' | 'transform' | 'export'
   const [activeSelectedColor, setActiveSelectedColor] = useState(null);
   const [isLayersListExpanded, setIsLayersListExpanded] = useState(false);
   const canvasSvgContainerRef = useRef(null);
 
   const filteredStyleModes = useMemo(() => {
-    if (effectCategory === 'All') return STYLE_RENDER_MODES;
-    return STYLE_RENDER_MODES.filter(mode => mode.category === effectCategory);
-  }, [effectCategory]);
+    return STYLE_RENDER_MODES.filter(mode => {
+      const matchesCategory = effectCategory === 'All' || mode.category === effectCategory || mode.id === 'original';
+      const q = effectSearchTerm.trim().toLowerCase();
+      const matchesSearch = !q || 
+        mode.name.toLowerCase().includes(q) || 
+        (mode.desc && mode.desc.toLowerCase().includes(q)) || 
+        (mode.badge && mode.badge.toLowerCase().includes(q));
+      return matchesCategory && matchesSearch;
+    });
+  }, [effectCategory, effectSearchTerm]);
 
   // Icon Dimensions & Aspect Ratio Controls
   const [iconWidth, setIconWidth] = useState(384);
@@ -1953,19 +1961,16 @@ export default function App() {
                 {/* TAB 2: VISUAL EFFECT PRESETS & ADVANCED FILTERS */}
                 {studioTab === 'effects' && (
                   <div className="space-y-6">
-                    {/* Visual Style & Material Looks Gallery */}
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <div>
-                          <h4 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
-                            appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
-                          }`}>
-                            <Sparkles className="w-3.5 h-3.5 text-cyan-500" /> Material &amp; Style Visual Looks
-                          </h4>
-                          <p className={`text-[11px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                            29+ Real Styles: Diamond, Velvet, Wood, Origami, Cloud, Mercury, Aurora, Clay, Chrome, PCB &amp; more
-                          </p>
-                        </div>
+                    {/* Fine-Tuning Granular Sliders Section (NOW ON TOP) */}
+                    <div className={`p-4 rounded-2xl border space-y-4 ${
+                      appTheme === 'dark' ? 'bg-[#131b2e]/40 border-slate-800' : 'bg-slate-50 border-slate-200'
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <h5 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
+                          appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
+                        }`}>
+                          <Sliders className="w-3.5 h-3.5 text-cyan-500" /> Fine-Tune Filter Grading
+                        </h5>
 
                         <button
                           onClick={handleResetEffectsPanel}
@@ -1980,79 +1985,6 @@ export default function App() {
                           <span>Reset Effects</span>
                         </button>
                       </div>
-
-                      {/* Style Category Filter Chips */}
-                      <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
-                        {['All', 'Glass & Water', '3D & Inflatable', 'Fire & Metal', 'Craft & Texture', 'Cyber & Neon', 'Silhouette & Vector'].map((cat) => {
-                          const isCatActive = effectCategory === cat;
-                          return (
-                            <button
-                              key={cat}
-                              onClick={() => setEffectCategory(cat)}
-                              className={`px-2.5 py-1 rounded-full text-[10px] font-semibold transition whitespace-nowrap ${
-                                isCatActive
-                                  ? (appTheme === 'dark' ? 'bg-cyan-500 text-slate-950 shadow-sm' : 'bg-blue-600 text-white shadow-sm')
-                                  : (appTheme === 'dark' ? 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800' : 'bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200')
-                              }`}
-                            >
-                              {cat}
-                            </button>
-                          );
-                        })}
-                      </div>
-
-                      {/* 2-Column Material & Style Cards with Live Visual Preview on Every Button */}
-                      <div className="grid grid-cols-2 gap-2.5 max-h-[480px] overflow-y-auto pr-1">
-                        {filteredStyleModes.map((preset) => {
-                          const isCurrentActive = activeStyleMode === preset.id;
-                          return (
-                            <button
-                              key={preset.id}
-                              onClick={() => handleSelectStyleLook(preset)}
-                              className={`p-2.5 rounded-2xl border text-left transition-all hover:scale-[1.02] flex flex-col justify-between relative overflow-hidden group ${
-                                isCurrentActive
-                                  ? (appTheme === 'dark'
-                                      ? 'border-cyan-400 bg-cyan-500/10 shadow-[0_0_18px_rgba(6,182,212,0.3)] ring-2 ring-cyan-400'
-                                      : 'border-blue-600 bg-blue-50 shadow-md ring-2 ring-blue-600')
-                                  : (appTheme === 'dark'
-                                      ? 'bg-slate-900/90 border-slate-800 hover:border-cyan-500/50 hover:bg-slate-900 shadow-sm'
-                                      : 'bg-white border-slate-200 hover:border-blue-500/50 hover:shadow-md shadow-sm')
-                              }`}
-                            >
-                              {/* Live Visual Material Preview Box on top of the button */}
-                              <EffectCardThumbnail preset={preset} />
-
-                              <div className="w-full">
-                                <div className="flex items-center justify-between gap-1 mb-1">
-                                  <span className={`text-xs font-bold truncate ${
-                                    isCurrentActive
-                                      ? (appTheme === 'dark' ? 'text-cyan-300' : 'text-blue-700')
-                                      : (appTheme === 'dark' ? 'text-slate-200 group-hover:text-cyan-400' : 'text-slate-900 group-hover:text-blue-600')
-                                  }`}>
-                                    {preset.name}
-                                  </span>
-                                </div>
-                                <p className={`text-[10px] leading-tight line-clamp-2 ${
-                                  appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'
-                                }`}>
-                                  {preset.desc}
-                                </p>
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Fine-Tuning Granular Sliders Section */}
-                    <div className={`p-4 rounded-2xl border space-y-4 ${
-                      appTheme === 'dark' ? 'bg-[#131b2e]/40 border-slate-800' : 'bg-slate-50 border-slate-200'
-                    }`}>
-                      <h5 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
-                        appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
-                      }`}>
-                        <Sliders className="w-3.5 h-3.5 text-cyan-500" /> Fine-Tune Filter Grading
-                      </h5>
 
                       {/* Hue (Color Shift) */}
                       <div>
@@ -2216,6 +2148,112 @@ export default function App() {
                           onChange={(e) => setAdjustments({ ...adjustments, blur: Number(e.target.value) })}
                           className="theme-slider w-full"
                         />
+                      </div>
+                    </div>
+
+                    {/* Visual Style & Material Looks Gallery (NOW BELOW) */}
+                    <div className="space-y-3">
+                      <div>
+                        <h4 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
+                          appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
+                        }`}>
+                          <Sparkles className="w-3.5 h-3.5 text-cyan-500" /> Material &amp; Style Visual Looks
+                        </h4>
+                        <p className={`text-[11px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                          29+ Real Styles: Diamond, Velvet, Wood, Origami, Cloud, Mercury, Aurora, Clay, Chrome, PCB &amp; more
+                        </p>
+                      </div>
+
+                      {/* Interactive Search Bar for Effects */}
+                      <div className="relative">
+                        <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                        <input
+                          type="text"
+                          placeholder="Search 29+ material effects (e.g., Gold, Glass, Neon, Metal)..."
+                          value={effectSearchTerm}
+                          onChange={(e) => setEffectSearchTerm(e.target.value)}
+                          className={`w-full pl-9 pr-8 py-2 rounded-xl text-xs border focus:outline-none focus:border-cyan-500 transition ${
+                            appTheme === 'dark'
+                              ? 'bg-slate-900 border-slate-800 text-slate-200 placeholder-slate-500'
+                              : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400'
+                          }`}
+                        />
+                        {effectSearchTerm && (
+                          <button
+                            onClick={() => setEffectSearchTerm('')}
+                            className="absolute right-2.5 top-2 text-slate-400 hover:text-white text-xs font-bold w-4 h-4 rounded-full bg-slate-800 flex items-center justify-center"
+                            title="Clear search"
+                          >
+                            &times;
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Style Category Filter Chips */}
+                      <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
+                        {['All', 'Glass & Water', '3D & Inflatable', 'Fire & Metal', 'Craft & Texture', 'Cyber & Neon', 'Silhouette & Vector'].map((cat) => {
+                          const isCatActive = effectCategory === cat;
+                          return (
+                            <button
+                              key={cat}
+                              onClick={() => setEffectCategory(cat)}
+                              className={`px-2.5 py-1 rounded-full text-[10px] font-semibold transition whitespace-nowrap ${
+                                isCatActive
+                                  ? (appTheme === 'dark' ? 'bg-cyan-500 text-slate-950 shadow-sm' : 'bg-blue-600 text-white shadow-sm')
+                                  : (appTheme === 'dark' ? 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800' : 'bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200')
+                              }`}
+                            >
+                              {cat}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* 2-Column Material & Style Cards with Live Visual Preview on Every Button */}
+                      <div className="grid grid-cols-2 gap-2.5 max-h-[480px] overflow-y-auto pr-1">
+                        {filteredStyleModes.map((preset) => {
+                          const isCurrentActive = activeStyleMode === preset.id;
+                          return (
+                            <button
+                              key={preset.id}
+                              onClick={() => handleSelectStyleLook(preset)}
+                              className={`p-2.5 rounded-2xl border text-left transition-all hover:scale-[1.02] flex flex-col justify-between relative overflow-hidden group ${
+                                isCurrentActive
+                                  ? (appTheme === 'dark'
+                                      ? 'border-cyan-400 bg-cyan-500/10 shadow-[0_0_18px_rgba(6,182,212,0.3)] ring-2 ring-cyan-400'
+                                      : 'border-blue-600 bg-blue-50 shadow-md ring-2 ring-blue-600')
+                                  : (appTheme === 'dark'
+                                      ? 'bg-slate-900/90 border-slate-800 hover:border-cyan-500/50 hover:bg-slate-900 shadow-sm'
+                                      : 'bg-white border-slate-200 hover:border-blue-500/50 hover:shadow-md shadow-sm')
+                              }`}
+                            >
+                              {/* Live Visual Material Preview Box on top of the button */}
+                              <EffectCardThumbnail preset={preset} />
+
+                              <div className="w-full">
+                                <div className="flex items-center justify-between gap-1 mb-1">
+                                  <span className={`text-xs font-bold truncate ${
+                                    isCurrentActive
+                                      ? (appTheme === 'dark' ? 'text-cyan-300' : 'text-blue-700')
+                                      : (appTheme === 'dark' ? 'text-slate-200 group-hover:text-cyan-400' : 'text-slate-900 group-hover:text-blue-600')
+                                  }`}>
+                                    {preset.name}
+                                  </span>
+                                </div>
+                                <p className={`text-[10px] leading-tight line-clamp-2 ${
+                                  appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'
+                                }`}>
+                                  {preset.desc}
+                                </p>
+                              </div>
+                            </button>
+                          );
+                        })}
+                        {filteredStyleModes.length === 0 && (
+                          <div className="col-span-2 py-8 text-center text-xs text-slate-400">
+                            No effects match "{effectSearchTerm}". Try another search term like 'gold', 'glass', or '3d'.
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

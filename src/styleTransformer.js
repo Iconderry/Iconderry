@@ -7,6 +7,18 @@
 // Carved Wood, Origami Paper, Aurora Bubble Glass, Cyber PCB Circuit, Fluffy Cloud, etc.
 
 export const STYLE_RENDER_MODES = [
+  {
+    id: 'original',
+    name: 'Original Default Vector',
+    category: 'All',
+    desc: 'Reset all material style transformations back to clean original vector',
+    icon: '🔄',
+    badge: 'Original',
+    previewBg: 'linear-gradient(135deg, #1e293b, #0f172a)',
+    borderAccent: '#38bdf8',
+    texture: 'none',
+    adjustments: { customColor: '', opacity: 100, blur: 0, shadowBlur: 0, shadowColor: '#38bdf8', brightness: 100, contrast: 100, saturation: 100, hue: 0, sepia: 0, invert: 0 }
+  },
   // 1. New Material Styles from reference
   {
     id: 'splash_water',
