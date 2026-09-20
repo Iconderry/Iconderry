@@ -448,6 +448,227 @@ const EFFECT_PRESETS = [
     colorB: '#a855f7',
     isNew: true,
     adjustments: { hue: 250, saturation: 210, contrast: 140, brightness: 114, sepia: 0, invert: 0, opacity: 100, blur: 0.2, shadowBlur: 28, shadowColor: '#818cf8' }
+  },
+  // --- 20 NEW UNIQUE FILTERS (Thermal, Y2K, Glitch, Kintsugi, Sakura & more) ---
+  {
+    id: 'thermal_infrared',
+    name: 'Infrared Thermal Vision',
+    category: 'Neon & Cyber',
+    badge: 'Thermal Cam',
+    desc: 'False-color thermal spectrum heat map with radiant yellow-magenta gradient',
+    colorA: '#f43f5e',
+    colorB: '#facc15',
+    isNew: true,
+    adjustments: { hue: 330, saturation: 220, contrast: 155, brightness: 112, sepia: 0, invert: 0, opacity: 100, blur: 0.2, shadowBlur: 26, shadowColor: '#f43f5e' }
+  },
+  {
+    id: 'y2k_millennium_chrome',
+    name: 'Y2K Cyber Chrome',
+    category: 'Neon & Cyber',
+    badge: 'Y2K Chrome',
+    desc: 'Futuristic year 2000 liquid metal aesthetic with lilac and baby blue gloss',
+    colorA: '#c084fc',
+    colorB: '#38bdf8',
+    isNew: true,
+    adjustments: { hue: 270, saturation: 160, contrast: 140, brightness: 118, sepia: 0, invert: 0, opacity: 100, blur: 0.2, shadowBlur: 24, shadowColor: '#c084fc' }
+  },
+  {
+    id: 'chromatic_glitch_split',
+    name: 'Chromatic Glitch Spectrum',
+    category: 'Neon & Cyber',
+    badge: 'Glitch Aura',
+    desc: 'High-intensity RGB aberration shift with electric cyan & neon crimson fringe',
+    colorA: '#00f0ff',
+    colorB: '#ff0055',
+    isNew: true,
+    adjustments: { hue: 180, saturation: 210, contrast: 150, brightness: 110, sepia: 0, invert: 0, opacity: 100, blur: 0.3, shadowBlur: 28, shadowColor: '#00f0ff' }
+  },
+  {
+    id: 'kintsugi_gold',
+    name: 'Japanese Kintsugi Gold',
+    category: 'Warm & Golden',
+    badge: 'Kintsugi',
+    desc: 'Lustrous molten 24K gold fracture veins on deep obsidian ceramic glaze',
+    colorA: '#fbbf24',
+    colorB: '#451a03',
+    isNew: true,
+    adjustments: { hue: 42, saturation: 195, contrast: 145, brightness: 108, sepia: 40, invert: 0, opacity: 100, blur: 0, shadowBlur: 22, shadowColor: '#f59e0b' }
+  },
+  {
+    id: 'cyanotype_prussian',
+    name: 'Prussian Blue Cyanotype',
+    category: 'Retro & Vintage',
+    badge: 'Cyanotype',
+    desc: 'Historic sun-exposed botanical blueprint in deep rich Prussian cobalt ink',
+    colorA: '#0284c7',
+    colorB: '#082f49',
+    isNew: true,
+    adjustments: { hue: 205, saturation: 165, contrast: 150, brightness: 98, sepia: 10, invert: 0, opacity: 100, blur: 0.2, shadowBlur: 18, shadowColor: '#0284c7' }
+  },
+  {
+    id: 'bleach_bypass_cinema',
+    name: 'Bleach Bypass Silver',
+    category: 'Cinematic & Moody',
+    badge: 'Bleach Bypass',
+    desc: 'Gritty Hollywood motion-picture silver retention with high dynamic range',
+    colorA: '#94a3b8',
+    colorB: '#1e293b',
+    isNew: true,
+    adjustments: { hue: 210, saturation: 40, contrast: 185, brightness: 95, sepia: 5, invert: 0, opacity: 100, blur: 0, shadowBlur: 16, shadowColor: '#0f172a' }
+  },
+  {
+    id: 'jellyfish_bioluminescence',
+    name: 'Bioluminescent Jellyfish',
+    category: 'Neon & Cyber',
+    badge: 'Deep Jelly',
+    desc: 'Ethereal translucent deep-sea marine organism glowing in magenta and cyan',
+    colorA: '#f43f5e',
+    colorB: '#06b6d4',
+    isNew: true,
+    adjustments: { hue: 320, saturation: 205, contrast: 135, brightness: 115, sepia: 0, invert: 0, opacity: 95, blur: 0.3, shadowBlur: 28, shadowColor: '#f43f5e' }
+  },
+  {
+    id: 'sakura_blossom_pink',
+    name: 'Sakura Cherry Blossom',
+    category: 'Aesthetic & Pastel',
+    badge: 'Sakura Bloom',
+    desc: 'Soft delicate Japanese spring petals with luminous peach and rose halo',
+    colorA: '#fbcfe8',
+    colorB: '#f472b6',
+    isNew: true,
+    adjustments: { hue: 340, saturation: 140, contrast: 110, brightness: 115, sepia: 5, invert: 0, opacity: 98, blur: 0.2, shadowBlur: 20, shadowColor: '#f472b6' }
+  },
+  {
+    id: 'midnight_nebula_galaxy',
+    name: 'Midnight Nebula Stardust',
+    category: 'Cinematic & Moody',
+    badge: 'Nebula Core',
+    desc: 'Interstellar gas cloud illuminated by brilliant ultraviolet star clusters',
+    colorA: '#8b5cf6',
+    colorB: '#1e1b4b',
+    isNew: true,
+    adjustments: { hue: 275, saturation: 190, contrast: 140, brightness: 106, sepia: 0, invert: 0, opacity: 100, blur: 0.2, shadowBlur: 26, shadowColor: '#8b5cf6' }
+  },
+  {
+    id: 'matcha_pistachio_velvet',
+    name: 'Kyoto Matcha Cream',
+    category: 'Aesthetic & Pastel',
+    badge: 'Kyoto Matcha',
+    desc: 'Stone-ground ceremonial Uji matcha green blended with soft ivory cream',
+    colorA: '#84cc16',
+    colorB: '#3f6212',
+    isNew: true,
+    adjustments: { hue: 90, saturation: 135, contrast: 120, brightness: 108, sepia: 15, invert: 0, opacity: 100, blur: 0.2, shadowBlur: 18, shadowColor: '#65a30d' }
+  },
+  {
+    id: 'electric_plasma_arc',
+    name: 'Tesla Coil Electric Arc',
+    category: 'Neon & Cyber',
+    badge: 'Tesla Arc',
+    desc: 'High-voltage atmospheric ionization with crackling violet lightning discharge',
+    colorA: '#a855f7',
+    colorB: '#3b82f6',
+    isNew: true,
+    adjustments: { hue: 260, saturation: 220, contrast: 145, brightness: 116, sepia: 0, invert: 0, opacity: 100, blur: 0.2, shadowBlur: 30, shadowColor: '#c084fc' }
+  },
+  {
+    id: 'autumn_maple_ember',
+    name: 'Autumn Maple Ember',
+    category: 'Warm & Golden',
+    badge: 'Maple Ember',
+    desc: 'Rich New England autumn maple foliage glowing with fire-red & golden amber',
+    colorA: '#ef4444',
+    colorB: '#b45309',
+    isNew: true,
+    adjustments: { hue: 15, saturation: 190, contrast: 130, brightness: 106, sepia: 25, invert: 0, opacity: 100, blur: 0, shadowBlur: 22, shadowColor: '#ea580c' }
+  },
+  {
+    id: 'technicolor_3strip',
+    name: '1950s Technicolor Film',
+    category: 'Retro & Vintage',
+    badge: 'Technicolor',
+    desc: 'Vibrant golden age Hollywood 3-strip color saturation with rich dye density',
+    colorA: '#dc2626',
+    colorB: '#0284c7',
+    isNew: true,
+    adjustments: { hue: 350, saturation: 185, contrast: 140, brightness: 105, sepia: 10, invert: 0, opacity: 100, blur: 0, shadowBlur: 18, shadowColor: '#e11d48' }
+  },
+  {
+    id: 'amethyst_geode_sparkle',
+    name: 'Raw Amethyst Geode',
+    category: 'Aesthetic & Pastel',
+    badge: 'Geode Crystal',
+    desc: 'Crystalline violet gemstone interior with shimmering lavender twilight sheen',
+    colorA: '#c084fc',
+    colorB: '#581c87',
+    isNew: true,
+    adjustments: { hue: 280, saturation: 175, contrast: 135, brightness: 110, sepia: 0, invert: 0, opacity: 100, blur: 0.2, shadowBlur: 24, shadowColor: '#a855f7' }
+  },
+  {
+    id: 'midnight_neon_rain',
+    name: 'Midnight Neon Rain',
+    category: 'Cinematic & Moody',
+    badge: 'Rain City',
+    desc: 'Wet city asphalt reflecting glowing golden amber storefronts in night fog',
+    colorA: '#f59e0b',
+    colorB: '#0f172a',
+    isNew: true,
+    adjustments: { hue: 45, saturation: 170, contrast: 150, brightness: 98, sepia: 20, invert: 0, opacity: 100, blur: 0.3, shadowBlur: 22, shadowColor: '#d97706' }
+  },
+  {
+    id: 'opal_iridescent_pearl',
+    name: 'Milky Opal Iridescence',
+    category: 'Aesthetic & Pastel',
+    badge: 'Opal Pearl',
+    desc: 'Shimmering Australian fire opal with iridescent pearlescent rainbow facets',
+    colorA: '#e0f2fe',
+    colorB: '#fce7f3',
+    isNew: true,
+    adjustments: { hue: 210, saturation: 120, contrast: 115, brightness: 122, sepia: 0, invert: 0, opacity: 98, blur: 0.3, shadowBlur: 22, shadowColor: '#bae6fd' }
+  },
+  {
+    id: 'solar_flare_supernova',
+    name: 'Supernova Solar Flare',
+    category: 'Warm & Golden',
+    badge: 'Supernova',
+    desc: 'Blinding thermonuclear core with intense white-hot center and corona flare',
+    colorA: '#fef08a',
+    colorB: '#ea580c',
+    isNew: true,
+    adjustments: { hue: 45, saturation: 220, contrast: 150, brightness: 125, sepia: 15, invert: 0, opacity: 100, blur: 0.2, shadowBlur: 30, shadowColor: '#f59e0b' }
+  },
+  {
+    id: 'stealth_carbon_graphite',
+    name: 'Stealth Carbon Graphite',
+    category: 'Cinematic & Moody',
+    badge: 'Carbon Stealth',
+    desc: 'Matte composite carbon fiber weave with subtle ice-cyan structural highlight',
+    colorA: '#334155',
+    colorB: '#030712',
+    isNew: true,
+    adjustments: { hue: 200, saturation: 50, contrast: 165, brightness: 90, sepia: 0, invert: 0, opacity: 100, blur: 0, shadowBlur: 14, shadowColor: '#0ea5e9' }
+  },
+  {
+    id: 'synthwave_miami_horizon',
+    name: 'Outrun Miami Horizon',
+    category: 'Retro & Vintage',
+    badge: 'Miami 84',
+    desc: 'Classic 1984 wireframe sunset with blistering orange sun & magenta nightfall',
+    colorA: '#f97316',
+    colorB: '#ec4899',
+    isNew: true,
+    adjustments: { hue: 335, saturation: 200, contrast: 135, brightness: 112, sepia: 0, invert: 0, opacity: 100, blur: 0.2, shadowBlur: 25, shadowColor: '#f43f5e' }
+  },
+  {
+    id: 'tritium_radioactive_green',
+    name: 'Radioactive Tritium Flare',
+    category: 'Neon & Cyber',
+    badge: 'Tritium Core',
+    desc: 'Self-luminous isotopic isotope lime-green glow penetrating pitch darkness',
+    colorA: '#a3e635',
+    colorB: '#052e16',
+    isNew: true,
+    adjustments: { hue: 85, saturation: 230, contrast: 150, brightness: 115, sepia: 0, invert: 0, opacity: 100, blur: 0.2, shadowBlur: 30, shadowColor: '#84cc16' }
   }
 ];
 
