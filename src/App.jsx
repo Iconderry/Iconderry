@@ -5,7 +5,7 @@ import {
   FlipHorizontal, FlipVertical, RefreshCw, Sparkles, Sun, Droplet,
   Paintbrush, Undo2, Redo2, Layers, Check, ArrowLeft, X, ChevronDown, ChevronUp,
   Settings, Moon, RotateCcw, SlidersHorizontal, HardDrive, Monitor,
-  ZoomIn, ZoomOut, Maximize2, Link2, Unlink2, Wand2, Scan,
+  ZoomIn, ZoomOut, Maximize2, Link2, Unlink2, Wand2, Scan, Eye, EyeOff,
   Heart, History, Shapes, MessageSquarePlus, Shield, FileText, Info
 } from 'lucide-react';
 import { INITIAL_ELEMENTS } from './initialData';
@@ -391,6 +391,7 @@ export default function App() {
   const [effectSearchTerm, setEffectSearchTerm] = useState('');
   const [studioTab, setStudioTab] = useState('colors'); // 'colors' | 'effects' | 'dimensions' | 'transform' | 'export'
   const [activeSelectedColor, setActiveSelectedColor] = useState(null);
+  const [showSelectionOutline, setShowSelectionOutline] = useState(false);
   const [isLayersListExpanded, setIsLayersListExpanded] = useState(false);
   const canvasSvgContainerRef = useRef(null);
 
@@ -561,13 +562,13 @@ export default function App() {
     return false;
   };
 
-  // Solid Selection Outline effect on Canvas SVG elements
+  // Selection Outline effect on Canvas SVG elements (Only active when explicitly toggled ON)
   useEffect(() => {
     if (!canvasSvgContainerRef.current) return;
     const container = canvasSvgContainerRef.current;
     container.querySelectorAll('.svg-element-selected').forEach(el => el.classList.remove('svg-element-selected'));
 
-    if (activeSelectedColor) {
+    if (activeSelectedColor && showSelectionOutline) {
       const allEls = container.querySelectorAll('*');
       allEls.forEach(el => {
         if (isElementMatchingColor(el, activeSelectedColor)) {
@@ -575,9 +576,11 @@ export default function App() {
         }
       });
     }
-  }, [activeSelectedColor, currentPreviewSvg]);
+  }, [activeSelectedColor, showSelectionOutline, currentPreviewSvg]);
 
   const handleColorChange = (originalColor, newColor) => {
+    // Keep outline hidden while editing so user sees 100% clean, normal, true preview
+    setShowSelectionOutline(false);
     const origKey = originalColor.toLowerCase();
     const newNorm = normalizeColor(newColor) || newColor;
     const linkedStops = selectedAsset ? getLinkedGradientColors(selectedAsset.svgCode, origKey) : [];
@@ -603,6 +606,7 @@ export default function App() {
   };
 
   const handleResetSingleColor = (originalColor) => {
+    setShowSelectionOutline(false);
     const origKey = originalColor.toLowerCase();
     const linkedStops = selectedAsset ? getLinkedGradientColors(selectedAsset.svgCode, origKey) : [];
 
@@ -633,6 +637,7 @@ export default function App() {
     setBgShapeBorder(0);
     setBgShapeBorderColor('#38bdf8');
     setActiveSelectedColor(null);
+    setShowSelectionOutline(false);
     setIsLayersListExpanded(false);
     setEffectCategory('All');
     setZoomLevel(1);
@@ -650,6 +655,7 @@ export default function App() {
       colorReplacements: {}
     }));
     setActiveSelectedColor(null);
+    setShowSelectionOutline(false);
   };
 
   // Panel 2: Effects Reset
@@ -870,7 +876,22 @@ export default function App() {
 
         const targetOrigColor = match ? match.color : norm;
         setActiveSelectedColor(targetOrigColor);
+        setShowSelectionOutline(false);
         setStudioTab('colors');
+
+        // Provide a quick 0.8s flash for tap confirmation, then returns to 100% normal clean view
+        if (canvasSvgContainerRef.current) {
+          const container = canvasSvgContainerRef.current;
+          const matching = Array.from(container.querySelectorAll('*')).filter(el => isElementMatchingColor(el, targetOrigColor));
+          matching.forEach(el => {
+            el.classList.remove('svg-element-flash');
+            void el.offsetWidth; // trigger reflow
+            el.classList.add('svg-element-flash');
+          });
+          setTimeout(() => {
+            matching.forEach(el => el.classList.remove('svg-element-flash'));
+          }, 800);
+        }
         return;
       }
     }
@@ -2117,18 +2138,35 @@ export default function App() {
                               Active Selected Element
                             </span>
                           </div>
-                          {adjustments.colorReplacements[activeSelectedColor.toLowerCase()] && (
+                          <div className="flex items-center gap-1.5">
                             <button
-                              onClick={() => handleResetSingleColor(activeSelectedColor)}
-                              className={`text-[11px] flex items-center gap-1 px-2.5 py-1 rounded-lg transition border ${
-                                appTheme === 'dark'
-                                  ? 'text-slate-400 hover:text-white bg-slate-800 border-slate-700'
-                                  : 'text-slate-600 hover:text-slate-900 bg-white border-slate-300'
+                              type="button"
+                              onClick={() => setShowSelectionOutline(prev => !prev)}
+                              className={`text-[11px] flex items-center gap-1 px-2.5 py-1 rounded-lg border transition font-medium ${
+                                showSelectionOutline
+                                  ? 'bg-cyan-500 text-slate-950 font-bold border-cyan-400 shadow-sm'
+                                  : appTheme === 'dark'
+                                    ? 'text-slate-400 hover:text-slate-200 bg-slate-800/80 border-slate-700'
+                                    : 'text-slate-600 hover:text-slate-900 bg-white border-slate-300'
                               }`}
+                              title={showSelectionOutline ? "Selection outline is visible" : "Normal Clean View (Original look)"}
                             >
-                              <Undo2 className="w-3 h-3" /> Reset Layer
+                              {showSelectionOutline ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                              <span>{showSelectionOutline ? 'Outline ON' : 'Normal View'}</span>
                             </button>
-                          )}
+                            {adjustments.colorReplacements[activeSelectedColor.toLowerCase()] && (
+                              <button
+                                onClick={() => handleResetSingleColor(activeSelectedColor)}
+                                className={`text-[11px] flex items-center gap-1 px-2.5 py-1 rounded-lg transition border ${
+                                  appTheme === 'dark'
+                                    ? 'text-slate-400 hover:text-white bg-slate-800 border-slate-700'
+                                    : 'text-slate-600 hover:text-slate-900 bg-white border-slate-300'
+                                }`}
+                              >
+                                <Undo2 className="w-3 h-3" /> Reset Layer
+                              </button>
+                            )}
+                          </div>
                         </div>
 
                         {/* Color Preview, Picker & Hex */}

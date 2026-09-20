@@ -197,30 +197,44 @@ input[type="range"].hue-slider::-webkit-slider-thumb:hover {
   touch-action: manipulation;
 }
 
-/* 1. MOUSE HOVER: Zero lift/movement. Crisp negative/contrasting border along element edge */
+/* 1. MOUSE HOVER: Sleek non-destructive cursor & subtle highlight without harsh white borders */
 .interactive-svg-canvas svg *:hover {
   transform: none !important;
-  filter: drop-shadow(1.5px 0 0 #ffffff) 
-          drop-shadow(-1.5px 0 0 #ffffff) 
-          drop-shadow(0 1.5px 0 #ffffff) 
-          drop-shadow(0 -1.5px 0 #ffffff) 
-          drop-shadow(0 0 1px #000000) !important;
-  opacity: 1 !important;
+  cursor: pointer !important;
+  opacity: 0.94 !important;
+  filter: drop-shadow(0 0 3px rgba(6, 182, 212, 0.45)) !important;
   position: relative !important;
   z-index: 30 !important;
+  transition: opacity 0.12s ease, filter 0.12s ease !important;
 }
 
-/* 2. ACTIVE SELECTED: Zero lift/movement. Bold negative/contrasting border along element edge */
+/* 2. INSTANT SELECTION FLASH: Momentary soft glow feedback when clicked, then smoothly returns to 100% normal */
+@keyframes selection-flash-anim {
+  0% {
+    filter: drop-shadow(0 0 4px #06b6d4) drop-shadow(0 0 8px rgba(6, 182, 212, 0.7));
+    opacity: 0.95;
+  }
+  60% {
+    filter: drop-shadow(0 0 2px #06b6d4) drop-shadow(0 0 4px rgba(6, 182, 212, 0.4));
+    opacity: 1;
+  }
+  100% {
+    filter: none;
+    opacity: 1;
+  }
+}
+
+.svg-element-flash {
+  animation: selection-flash-anim 0.8s ease-out forwards !important;
+}
+
+/* 3. OPTIONAL OUTLINE TOGGLE: Clean cyan outline only when user explicitly enables 'Outline ON' */
 .svg-element-selected,
 .interactive-svg-canvas svg .svg-element-selected,
 .interactive-svg-canvas svg .svg-element-selected:hover {
   outline: none !important;
   transform: none !important;
-  filter: drop-shadow(2px 0 0 #ffffff) 
-          drop-shadow(-2px 0 0 #ffffff) 
-          drop-shadow(0 2px 0 #ffffff) 
-          drop-shadow(0 -2px 0 #ffffff) 
-          drop-shadow(0 0 2px #000000) !important;
+  filter: drop-shadow(0 0 3px #06b6d4) drop-shadow(0 0 6px rgba(6, 182, 212, 0.5)) !important;
   opacity: 1 !important;
   position: relative !important;
   z-index: 50 !important;
