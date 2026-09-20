@@ -3,9 +3,10 @@ import {
   Download, PlusCircle, LayoutGrid, Search, Trash2, CheckCircle2, 
   Zap, UploadCloud, Sliders, Palette, RotateCw, 
   FlipHorizontal, FlipVertical, RefreshCw, Sparkles, Sun, Droplet,
-  Paintbrush, Undo2, Layers, Check, ArrowLeft, X, ChevronDown, ChevronUp,
+  Paintbrush, Undo2, Redo2, Layers, Check, ArrowLeft, X, ChevronDown, ChevronUp,
   Settings, Moon, RotateCcw, SlidersHorizontal, HardDrive, Monitor,
-  ZoomIn, ZoomOut, Maximize2, Link2, Unlink2, Wand2, Scan
+  ZoomIn, ZoomOut, Maximize2, Link2, Unlink2, Wand2, Scan,
+  Heart, History, Shapes, MessageSquarePlus, Shield, FileText, Info
 } from 'lucide-react';
 import { INITIAL_ELEMENTS } from './initialData';
 import { downloadAsset } from './converter';
@@ -411,6 +412,42 @@ export default function App() {
   const [lockAspectRatio, setLockAspectRatio] = useState(true);
   const [aspectRatio, setAspectRatio] = useState(1);
 
+  // Outline Stroke Multiplier (Vector line-weight scaling)
+  const [strokeMultiplier, setStrokeMultiplier] = useState(1);
+
+  // App Icon Badge & Container Background Shape
+  const [bgShape, setBgShape] = useState('none'); // 'none' | 'circle' | 'squircle' | 'rounded-square' | 'hexagon'
+  const [bgShapeColor, setBgShapeColor] = useState('#1e293b');
+  const [bgShapePadding, setBgShapePadding] = useState(20);
+  const [bgShapeBorder, setBgShapeBorder] = useState(0);
+  const [bgShapeBorderColor, setBgShapeBorderColor] = useState('#38bdf8');
+
+  // Favorites & Recents Persistent State
+  const [favorites, setFavorites] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('iconderry_favorites')) || [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [recentIds, setRecentIds] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('iconderry_recents')) || [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Undo / Redo History Stacks
+  const [undoStack, setUndoStack] = useState([]);
+  const [redoStack, setRedoStack] = useState([]);
+
+  // Legal, Info & Feedback Modals
+  const [activeLegalModal, setActiveLegalModal] = useState(null); // 'about' | 'license' | 'privacy' | 'terms' | 'feedback'
+  const [feedbackForm, setFeedbackForm] = useState({ name: '', email: '', message: '', type: 'icon_request' });
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+
   // Extract all unique colors from the selected SVG
   const detectedColors = useMemo(() => {
     if (!selectedAsset) return [];
@@ -425,6 +462,16 @@ export default function App() {
     // Apply real visual material/style transformations (1: Silhouette, 2: Glassmorphism, 3: Neon Blue, 4: 3D Inflated, 5: Line Art, 6: Vibrant Mesh, etc.)
     if (activeStyleMode && activeStyleMode !== 'original') {
       colorReplaced = transformSvgStyle(colorReplaced, activeStyleMode);
+    }
+
+    // Apply vector stroke thickness multiplier
+    if (strokeMultiplier && strokeMultiplier !== 1) {
+      colorReplaced = colorReplaced.replace(/stroke-width="([0-9.]+)"/gi, (match, val) => {
+        return `stroke-width="${(parseFloat(val) * strokeMultiplier).toFixed(2)}"`;
+      });
+      colorReplaced = colorReplaced.replace(/stroke-width:\s*([0-9.]+)(px)?/gi, (match, val) => {
+        return `stroke-width:${(parseFloat(val) * strokeMultiplier).toFixed(2)}px`;
+      });
     }
 
     // Ensure viewBox exists for responsive freeform scaling/stretching
@@ -446,7 +493,7 @@ export default function App() {
     }
 
     return scopeSvgIds(colorReplaced, 'pf_studio_');
-  }, [selectedAsset, adjustments.colorReplacements, activeStyleMode]);
+  }, [selectedAsset, adjustments.colorReplacements, activeStyleMode, strokeMultiplier]);
 
   // Count active color overrides
   const modifiedColorCount = Object.keys(adjustments.colorReplacements || {}).length;
@@ -569,12 +616,19 @@ export default function App() {
 
   // Reset Everything back to original upload state
   const handleResetAll = () => {
+    recordUndo();
     setAdjustments(DEFAULT_ADJUSTMENTS);
     setActiveStyleMode('original');
     setIconWidth(384);
     setIconHeight(384);
     setLockAspectRatio(true);
     setAspectRatio(1);
+    setStrokeMultiplier(1);
+    setBgShape('none');
+    setBgShapeColor('#1e293b');
+    setBgShapePadding(20);
+    setBgShapeBorder(0);
+    setBgShapeBorderColor('#38bdf8');
     setActiveSelectedColor(null);
     setIsLayersListExpanded(false);
     setEffectCategory('All');
@@ -586,6 +640,7 @@ export default function App() {
 
   // Panel 1: Colors Reset
   const handleResetColorsPanel = () => {
+    recordUndo();
     setAdjustments(prev => ({
       ...prev,
       customColor: '',
@@ -596,6 +651,7 @@ export default function App() {
 
   // Panel 2: Effects Reset
   const handleResetEffectsPanel = () => {
+    recordUndo();
     setActiveStyleMode('original');
     setAdjustments(prev => ({
       ...prev,
@@ -614,14 +670,22 @@ export default function App() {
 
   // Panel 3: Dimensions Reset
   const handleResetDimensionsPanel = () => {
+    recordUndo();
     setIconWidth(384);
     setIconHeight(384);
     setLockAspectRatio(true);
     setAspectRatio(1);
+    setStrokeMultiplier(1);
+    setBgShape('none');
+    setBgShapeColor('#1e293b');
+    setBgShapePadding(20);
+    setBgShapeBorder(0);
+    setBgShapeBorderColor('#38bdf8');
   };
 
   // Panel 4: Transform Reset
   const handleResetTransformPanel = () => {
+    recordUndo();
     setAdjustments(prev => ({
       ...prev,
       rotation: 0,
@@ -635,6 +699,83 @@ export default function App() {
     setExportFormat('png');
     setExportSize(1024);
     setIsTransparent(true);
+  };
+
+  // Helper to snapshot current Studio state for Undo / Redo
+  const getStudioSnapshot = () => ({
+    adjustments: { ...adjustments },
+    activeStyleMode,
+    iconWidth,
+    iconHeight,
+    strokeMultiplier,
+    bgShape,
+    bgShapeColor,
+    bgShapePadding,
+    bgShapeBorder,
+    bgShapeBorderColor
+  });
+
+  const recordUndo = () => {
+    const snap = getStudioSnapshot();
+    setUndoStack(prev => [...prev.slice(-30), snap]);
+    setRedoStack([]);
+  };
+
+  const handleUndo = () => {
+    if (undoStack.length === 0) return;
+    const currentSnap = getStudioSnapshot();
+    const previous = undoStack[undoStack.length - 1];
+    setUndoStack(prev => prev.slice(0, -1));
+    setRedoStack(prev => [...prev, currentSnap]);
+
+    setAdjustments(previous.adjustments);
+    setActiveStyleMode(previous.activeStyleMode);
+    setIconWidth(previous.iconWidth);
+    setIconHeight(previous.iconHeight);
+    setStrokeMultiplier(previous.strokeMultiplier);
+    setBgShape(previous.bgShape);
+    setBgShapeColor(previous.bgShapeColor);
+    setBgShapePadding(previous.bgShapePadding);
+    setBgShapeBorder(previous.bgShapeBorder);
+    setBgShapeBorderColor(previous.bgShapeBorderColor);
+  };
+
+  const handleRedo = () => {
+    if (redoStack.length === 0) return;
+    const currentSnap = getStudioSnapshot();
+    const next = redoStack[redoStack.length - 1];
+    setRedoStack(prev => prev.slice(0, -1));
+    setUndoStack(prev => [...prev, currentSnap]);
+
+    setAdjustments(next.adjustments);
+    setActiveStyleMode(next.activeStyleMode);
+    setIconWidth(next.iconWidth);
+    setIconHeight(next.iconHeight);
+    setStrokeMultiplier(next.strokeMultiplier);
+    setBgShape(next.bgShape);
+    setBgShapeColor(next.bgShapeColor);
+    setBgShapePadding(next.bgShapePadding);
+    setBgShapeBorder(next.bgShapeBorder);
+    setBgShapeBorderColor(next.bgShapeBorderColor);
+  };
+
+  // Favorites handler
+  const toggleFavorite = (id) => {
+    setFavorites(prev => {
+      const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id];
+      try {
+        localStorage.setItem('iconderry_favorites', JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
+  };
+
+  // Clear recents handler
+  const handleClearRecents = () => {
+    setRecentIds([]);
+    try {
+      localStorage.removeItem('iconderry_recents');
+    } catch (e) {}
   };
 
   // Direct Click/Touch on Image SVG elements
@@ -736,14 +877,24 @@ export default function App() {
     localStorage.setItem('iconderry_assets', JSON.stringify(elements));
   }, [elements]);
 
-  const categories = ['All', ...new Set(elements.map(item => item.category))];
+  const categories = ['All', 'Favorites', ...new Set(elements.map(item => item.category))];
 
   const filteredElements = elements.filter(el => {
     const matchesSearch = el.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           el.tags?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === 'All' || el.category === selectedCategory;
+    const matchesCategory = selectedCategory === 'All'
+      ? true
+      : selectedCategory === 'Favorites'
+        ? favorites.includes(el.id)
+        : el.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
+
+  const recentElements = useMemo(() => {
+    return recentIds
+      .map(id => elements.find(el => el.id === id))
+      .filter(Boolean);
+  }, [recentIds, elements]);
 
   const handleOpenAsset = (item) => {
     setSelectedAsset(item);
@@ -756,11 +907,51 @@ export default function App() {
     setIconHeight(384);
     setLockAspectRatio(true);
     setAspectRatio(1);
+    setStrokeMultiplier(1);
+    setBgShape('none');
+    setBgShapeColor('#1e293b');
+    setBgShapePadding(20);
+    setBgShapeBorder(0);
+    setBgShapeBorderColor('#38bdf8');
     setActiveSelectedColor(null);
     setIsLayersListExpanded(false);
     setStudioTab('colors');
     setZoomLevel(1);
+    setUndoStack([]);
+    setRedoStack([]);
+
+    // Record to recents
+    setRecentIds(prev => {
+      const next = [item.id, ...prev.filter(id => id !== item.id)].slice(0, 8);
+      try {
+        localStorage.setItem('iconderry_recents', JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
   };
+
+  // Keyboard shortcut listener for Ctrl+Z (Undo) and Ctrl+Y / Ctrl+Shift+Z (Redo)
+  useEffect(() => {
+    if (!selectedAsset) return;
+
+    const handleKeyDown = (e) => {
+      if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+      } else if (
+        (e.ctrlKey || e.metaKey) && 
+        (e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))
+      ) {
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedAsset, undoStack, redoStack, adjustments, activeStyleMode, iconWidth, iconHeight, strokeMultiplier, bgShape, bgShapeColor, bgShapePadding, bgShapeBorder, bgShapeBorderColor]);
 
   const handleWidthChange = (val) => {
     const num = Math.max(16, Math.min(4096, Number(val) || 16));
@@ -905,7 +1096,13 @@ export default function App() {
         isTransparent,
         adjustments: {
           ...adjustments,
-          activeStyleMode
+          activeStyleMode,
+          strokeMultiplier,
+          bgShape,
+          bgShapeColor,
+          bgShapePadding,
+          bgShapeBorder,
+          bgShapeBorderColor
         }
       });
 
@@ -1196,6 +1393,57 @@ export default function App() {
         ) : (
           /* Browse Gallery */
           <div>
+            {/* Recently Opened / Edited Icons Strip */}
+            {recentElements.length > 0 && (
+              <div className={`mb-6 p-3 sm:p-4 rounded-2xl border transition ${
+                appTheme === 'dark' ? 'bg-[#131b2e]/60 border-slate-800' : 'bg-white border-slate-200 shadow-sm'
+              }`}>
+                <div className="flex items-center justify-between mb-2.5">
+                  <div className="flex items-center gap-1.5">
+                    <History className="w-3.5 h-3.5 text-cyan-400" />
+                    <span className={`text-xs font-bold uppercase tracking-wider ${
+                      appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
+                    }`}>
+                      Recently Opened Icons
+                    </span>
+                    <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-mono">
+                      {recentElements.length}
+                    </span>
+                  </div>
+                  <button
+                    onClick={handleClearRecents}
+                    className="text-[11px] text-slate-500 hover:text-rose-400 transition"
+                  >
+                    Clear History
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2.5 overflow-x-auto no-scrollbar pb-1">
+                  {recentElements.map((item) => (
+                    <button
+                      key={'recent-' + item.id}
+                      onClick={() => handleOpenAsset(item)}
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-left transition hover:scale-105 flex-shrink-0 group ${
+                        appTheme === 'dark'
+                          ? 'bg-slate-900 border-slate-800 hover:border-cyan-500/50'
+                          : 'bg-slate-50 border-slate-200 hover:border-blue-400 shadow-sm'
+                      }`}
+                    >
+                      <div
+                        className="w-5 h-5 flex items-center justify-center [&>svg]:w-full [&>svg]:h-full"
+                        dangerouslySetInnerHTML={{ __html: item.svgCode }}
+                      />
+                      <span className={`text-xs font-medium truncate max-w-[110px] ${
+                        appTheme === 'dark' ? 'text-slate-300 group-hover:text-white' : 'text-slate-700 group-hover:text-blue-600'
+                      }`}>
+                        {item.title}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="flex flex-col md:flex-row gap-3 md:gap-4 justify-between items-stretch md:items-center mb-6">
               <div className="relative w-full md:w-96">
                 <Search className="absolute left-3.5 top-3 text-slate-400 w-4 h-4" />
@@ -1213,73 +1461,201 @@ export default function App() {
               </div>
 
               <div className="flex gap-2 overflow-x-auto pb-1.5 scrollbar-none w-full md:w-auto flex-nowrap md:flex-wrap">
-                {categories.map((cat) => (
-                  <button
-                    key={cat}
-                    onClick={() => setSelectedCategory(cat)}
-                    className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition flex-shrink-0 ${
-                      selectedCategory === cat
-                        ? 'bg-blue-600 text-white shadow-md'
-                        : appTheme === 'dark'
-                          ? 'bg-[#131b2e] text-slate-400 hover:text-white border border-slate-800'
-                          : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200 shadow-sm'
-                    }`}
-                  >
-                    {cat}
-                  </button>
-                ))}
+                {categories.map((cat) => {
+                  const isFavCat = cat === 'Favorites';
+                  const isSelected = selectedCategory === cat;
+                  return (
+                    <button
+                      key={cat}
+                      onClick={() => setSelectedCategory(cat)}
+                      className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition flex-shrink-0 flex items-center gap-1.5 ${
+                        isSelected
+                          ? (isFavCat ? 'bg-rose-600 text-white shadow-md' : 'bg-blue-600 text-white shadow-md')
+                          : appTheme === 'dark'
+                            ? 'bg-[#131b2e] text-slate-400 hover:text-white border border-slate-800'
+                            : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200 shadow-sm'
+                      }`}
+                    >
+                      {isFavCat ? (
+                        <>
+                          <Heart className={`w-3.5 h-3.5 ${isSelected ? 'fill-white' : 'fill-rose-500 text-rose-500'}`} />
+                          <span>Favorites ({favorites.length})</span>
+                        </>
+                      ) : (
+                        <span>{cat}</span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-6">
-              {filteredElements.map((item) => (
-                <div
-                  key={item.id}
-                  onClick={() => handleOpenAsset(item)}
-                  className={`group border rounded-2xl p-3 sm:p-4 flex flex-col items-center cursor-pointer transition-all duration-300 ease-out hover:-translate-y-1.5 relative ${
-                    appTheme === 'dark'
-                      ? 'bg-[#131b2e] border-slate-800 hover:border-slate-700/80 shadow-sm hover:shadow-[0_16px_32px_-6px_rgba(255,255,255,0.09),0_6px_16px_-4px_rgba(255,255,255,0.05)]'
-                      : 'bg-white border-slate-200 hover:border-slate-300/80 shadow-sm hover:shadow-[0_16px_32px_-6px_rgba(0,0,0,0.15),0_8px_16px_-4px_rgba(0,0,0,0.08)]'
-                  }`}
-                >
+              {filteredElements.map((item) => {
+                const isFav = favorites.includes(item.id);
+                return (
                   <div
-                    className="w-24 h-24 sm:w-32 sm:h-32 flex items-center justify-center p-2 mb-2 sm:mb-3"
-                    dangerouslySetInnerHTML={{ __html: item.svgCode }}
-                  />
-                  <h3 className={`font-medium text-xs sm:text-sm text-center truncate w-full ${appTheme === 'dark' ? 'text-slate-200' : 'text-slate-800'}`}>
-                    {item.title}
-                  </h3>
-                  <div className={`flex items-center justify-between w-full mt-1.5 px-1 text-[10px] sm:text-[11px] ${
-                    appTheme === 'dark' ? 'text-slate-500' : 'text-slate-400'
-                  }`}>
-                    <span>{item.category}</span>
-                    <span>{item.downloads || 0} dl</span>
-                  </div>
-
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDelete(item.id);
-                    }}
-                    title="Delete Element"
-                    className={`absolute top-2.5 right-2.5 p-1.5 rounded-lg opacity-80 sm:opacity-0 sm:group-hover:opacity-100 transition ${
-                      appTheme === 'dark' ? 'bg-slate-900/80 text-slate-400 hover:text-rose-400' : 'bg-slate-100 text-slate-400 hover:text-rose-500 shadow-sm'
+                    key={item.id}
+                    onClick={() => handleOpenAsset(item)}
+                    className={`group border rounded-2xl p-3 sm:p-4 flex flex-col items-center cursor-pointer transition-all duration-300 ease-out hover:-translate-y-1.5 relative ${
+                      appTheme === 'dark'
+                        ? 'bg-[#131b2e] border-slate-800 hover:border-slate-700/80 shadow-sm hover:shadow-[0_16px_32px_-6px_rgba(255,255,255,0.09),0_6px_16px_-4px_rgba(255,255,255,0.05)]'
+                        : 'bg-white border-slate-200 hover:border-slate-300/80 shadow-sm hover:shadow-[0_16px_32px_-6px_rgba(0,0,0,0.15),0_8px_16px_-4px_rgba(0,0,0,0.08)]'
                     }`}
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ))}
+                    {/* Favorite Toggle Button */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleFavorite(item.id);
+                      }}
+                      title={isFav ? "Remove from Favorites" : "Save to Favorites"}
+                      className={`absolute top-2.5 left-2.5 p-1.5 rounded-lg transition-all z-10 ${
+                        isFav
+                          ? 'bg-rose-500/15 text-rose-500 scale-105'
+                          : 'opacity-70 sm:opacity-0 sm:group-hover:opacity-100 hover:bg-slate-500/10 text-slate-400 hover:text-rose-500'
+                      }`}
+                    >
+                      <Heart className={`w-3.5 h-3.5 ${isFav ? 'fill-rose-500 text-rose-500' : ''}`} />
+                    </button>
+
+                    <div
+                      className="w-24 h-24 sm:w-32 sm:h-32 flex items-center justify-center p-2 mb-2 sm:mb-3"
+                      dangerouslySetInnerHTML={{ __html: item.svgCode }}
+                    />
+                    <h3 className={`font-medium text-xs sm:text-sm text-center truncate w-full ${appTheme === 'dark' ? 'text-slate-200' : 'text-slate-800'}`}>
+                      {item.title}
+                    </h3>
+                    <div className={`flex items-center justify-between w-full mt-1.5 px-1 text-[10px] sm:text-[11px] ${
+                      appTheme === 'dark' ? 'text-slate-500' : 'text-slate-400'
+                    }`}>
+                      <span>{item.category}</span>
+                      <span>{item.downloads || 0} dl</span>
+                    </div>
+
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(item.id);
+                      }}
+                      title="Delete Element"
+                      className={`absolute top-2.5 right-2.5 p-1.5 rounded-lg opacity-80 sm:opacity-0 sm:group-hover:opacity-100 transition z-10 ${
+                        appTheme === 'dark' ? 'bg-slate-900/80 text-slate-400 hover:text-rose-400' : 'bg-slate-100 text-slate-400 hover:text-rose-500 shadow-sm'
+                      }`}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                );
+              })}
             </div>
 
             {filteredElements.length === 0 && (
-              <div className="text-center py-16 sm:py-20 text-slate-500 text-xs sm:text-sm">
-                Koi asset nahi mila. Admin Upload par jaakar naya SVG dalein!
+              <div className="text-center py-16 sm:py-20 text-slate-500 text-xs sm:text-sm space-y-2">
+                {selectedCategory === 'Favorites' ? (
+                  <>
+                    <Heart className="w-8 h-8 text-rose-500/40 mx-auto stroke-1" />
+                    <p className="font-semibold text-slate-400">Aapka koi favorite icon nahi hai.</p>
+                    <p className="text-[11px] text-slate-500">Kisi bhi icon card par ❤️ (Heart) click karke yahan save karein!</p>
+                  </>
+                ) : (
+                  <p>Koi asset nahi mila. Admin Upload par jaakar naya SVG dalein!</p>
+                )}
               </div>
             )}
           </div>
         )}
       </main>
+
+      {/* Website Footer */}
+      <footer className={`border-t mt-12 py-10 transition-colors ${
+        appTheme === 'dark' ? 'bg-[#0a0f1d] border-slate-800/80 text-slate-400' : 'bg-white border-slate-200 text-slate-600'
+      }`}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+            {/* Brand Col */}
+            <div className="space-y-3 md:col-span-2">
+              <div className="flex items-center gap-2">
+                <img src="/app-icon.png" alt="Iconderry" className="w-7 h-7 rounded-lg shadow-sm" />
+                <span className={`text-base font-black tracking-tight ${appTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                  Icon<span className="text-cyan-500">derry</span>
+                </span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-bold">
+                  v2.4 PRO
+                </span>
+              </div>
+              <p className="text-xs leading-relaxed max-w-sm text-slate-400">
+                Free open vector graphics library &amp; pro studio. Customize colors, 3D material looks, outline stroke weights, and app icon badges directly in your browser.
+              </p>
+              <div className="flex items-center gap-2 pt-1 text-xs">
+                <span className="inline-flex items-center gap-1 text-emerald-400 font-semibold">
+                  <CheckCircle2 className="w-3.5 h-3.5" /> 100% Free for Commercial Use
+                </span>
+              </div>
+            </div>
+
+            {/* Quick Links / Legal */}
+            <div className="space-y-2">
+              <h4 className={`text-xs font-bold uppercase tracking-wider ${appTheme === 'dark' ? 'text-slate-200' : 'text-slate-800'}`}>
+                Trust &amp; Legal
+              </h4>
+              <ul className="space-y-1.5 text-xs">
+                <li>
+                  <button onClick={() => setActiveLegalModal('license')} className="hover:text-cyan-400 transition">
+                    Commercial License
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => setActiveLegalModal('privacy')} className="hover:text-cyan-400 transition">
+                    Privacy Policy
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => setActiveLegalModal('terms')} className="hover:text-cyan-400 transition">
+                    Terms of Service
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => setActiveLegalModal('about')} className="hover:text-cyan-400 transition">
+                    About Iconderry
+                  </button>
+                </li>
+              </ul>
+            </div>
+
+            {/* Community & Feedback */}
+            <div className="space-y-2">
+              <h4 className={`text-xs font-bold uppercase tracking-wider ${appTheme === 'dark' ? 'text-slate-200' : 'text-slate-800'}`}>
+                Community
+              </h4>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Need a specific icon or feature? Let us know and we'll create it for you!
+              </p>
+              <button
+                onClick={() => {
+                  setFeedbackSubmitted(false);
+                  setActiveLegalModal('feedback');
+                }}
+                className="mt-1 px-3 py-1.5 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 text-xs font-semibold transition flex items-center gap-1.5"
+              >
+                <MessageSquarePlus className="w-3.5 h-3.5" />
+                <span>Request an Icon / Feedback</span>
+              </button>
+            </div>
+          </div>
+
+          <div className={`pt-6 border-t flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] ${
+            appTheme === 'dark' ? 'border-slate-800 text-slate-500' : 'border-slate-100 text-slate-400'
+          }`}>
+            <p>&copy; {new Date().getFullYear()} Iconderry Studio. Crafted for creators &amp; developers.</p>
+            <div className="flex items-center gap-4">
+              <span>Zero tracking cookies</span>
+              <span>&bull;</span>
+              <span>Fast 60fps Vector Engine</span>
+            </div>
+          </div>
+        </div>
+      </footer>
 
       {/* Full-Screen Immersive Studio Workspace */}
       {selectedAsset && (
@@ -1345,7 +1721,50 @@ export default function App() {
             </div>
 
             {/* Right: Quick Actions */}
-            <div className="flex items-center gap-1.5 sm:gap-2.5">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              {/* Undo & Redo History Buttons */}
+              <div className={`flex items-center gap-0.5 p-0.5 rounded-xl border ${
+                appTheme === 'dark' ? 'bg-slate-900/90 border-slate-800' : 'bg-slate-100 border-slate-200'
+              }`}>
+                <button
+                  onClick={handleUndo}
+                  disabled={undoStack.length === 0}
+                  title="Undo edit (Ctrl + Z)"
+                  className={`p-1.5 rounded-lg transition ${
+                    undoStack.length === 0 
+                      ? 'opacity-25 cursor-not-allowed text-slate-500' 
+                      : appTheme === 'dark' ? 'text-slate-300 hover:text-white hover:bg-slate-800' : 'text-slate-700 hover:text-slate-900 hover:bg-white shadow-sm'
+                  }`}
+                >
+                  <Undo2 className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={handleRedo}
+                  disabled={redoStack.length === 0}
+                  title="Redo edit (Ctrl + Y / Ctrl + Shift + Z)"
+                  className={`p-1.5 rounded-lg transition ${
+                    redoStack.length === 0 
+                      ? 'opacity-25 cursor-not-allowed text-slate-500' 
+                      : appTheme === 'dark' ? 'text-slate-300 hover:text-white hover:bg-slate-800' : 'text-slate-700 hover:text-slate-900 hover:bg-white shadow-sm'
+                  }`}
+                >
+                  <Redo2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {/* Favorite Toggle inside Studio */}
+              <button
+                onClick={() => toggleFavorite(selectedAsset.id)}
+                title={favorites.includes(selectedAsset.id) ? "Saved to Favorites" : "Save to Favorites"}
+                className={`p-1.5 sm:p-2 rounded-xl border transition flex items-center justify-center ${
+                  favorites.includes(selectedAsset.id)
+                    ? 'bg-rose-500/20 border-rose-500/40 text-rose-500'
+                    : appTheme === 'dark' ? 'bg-slate-900 border-slate-800 text-slate-400 hover:text-rose-400' : 'bg-slate-100 border-slate-200 text-slate-500 hover:text-rose-500'
+                }`}
+              >
+                <Heart className={`w-3.5 h-3.5 ${favorites.includes(selectedAsset.id) ? 'fill-rose-500 text-rose-500' : ''}`} />
+              </button>
+
               {/* Quick Dark/Light Toggle in Studio Header */}
               <button
                 onClick={() => setAppTheme(prev => prev === 'dark' ? 'light' : 'dark')}
@@ -1499,7 +1918,7 @@ export default function App() {
                 ))}
               </div>
 
-              {/* Clean Floating SVG Icon (No Card/Box background) with Interactive Selection, Custom Dimensions & Smooth Zoom */}
+              {/* Floating SVG Icon or Background Badge Shape with Interactive Selection, Custom Dimensions & Smooth Zoom */}
               <div
                 ref={canvasSvgContainerRef}
                 onClick={(e) => {
@@ -1512,9 +1931,16 @@ export default function App() {
                   transform: `scale(${zoomLevel}) rotate(${adjustments.rotation}deg) scale(${adjustments.flipH ? -1 : 1}, ${adjustments.flipV ? -1 : 1})`,
                   transformOrigin: 'center center',
                   filter: getComputedFilterStyle(),
-                  transition: 'transform 0.08s ease-out, width 0.1s ease, height 0.1s ease'
+                  transition: 'transform 0.08s ease-out, width 0.1s ease, height 0.1s ease',
+                  backgroundColor: bgShape !== 'none' ? bgShapeColor : 'transparent',
+                  padding: bgShape !== 'none' ? `${bgShapePadding * 0.7}%` : '0px',
+                  borderRadius: bgShape === 'circle' ? '9999px' : bgShape === 'squircle' ? '28%' : bgShape === 'rounded-square' ? '1.5rem' : '0px',
+                  clipPath: bgShape === 'hexagon' ? 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)' : 'none',
+                  border: bgShape !== 'none' && bgShapeBorder > 0 ? `${bgShapeBorder}px solid ${bgShapeBorderColor}` : 'none'
                 }}
-                className="flex items-center justify-center interactive-svg-canvas cursor-pointer select-none [&>svg]:w-full [&>svg]:h-full [&>svg]:block"
+                className={`flex items-center justify-center interactive-svg-canvas cursor-pointer select-none [&>svg]:w-full [&>svg]:h-full [&>svg]:block ${
+                  bgShape !== 'none' ? 'shadow-2xl' : ''
+                }`}
                 dangerouslySetInnerHTML={{ __html: currentPreviewSvg }}
               />
 
@@ -2436,6 +2862,199 @@ export default function App() {
                         Make Square (1:1)
                       </button>
                     </div>
+
+                    {/* Outline Stroke Thickness (Vector Line Weight) */}
+                    <div className={`p-4 rounded-2xl border space-y-3 ${
+                      appTheme === 'dark' ? 'bg-[#131b2e]/60 border-slate-800' : 'bg-slate-50 border-slate-200'
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <label className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
+                          appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
+                        }`}>
+                          <SlidersHorizontal className="w-3.5 h-3.5 text-cyan-500" /> Vector Stroke Thickness
+                        </label>
+                        <span className="text-xs font-mono font-bold text-cyan-500">
+                          {strokeMultiplier}x {strokeMultiplier === 1 ? '(Original)' : strokeMultiplier < 1 ? '(Thin)' : '(Thick)'}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
+                        {[
+                          { label: '0.5x Thin', val: 0.5 },
+                          { label: '0.75x', val: 0.75 },
+                          { label: '1x Default', val: 1 },
+                          { label: '1.5x Medium', val: 1.5 },
+                          { label: '2x Bold', val: 2 },
+                          { label: '3x Heavy', val: 3 }
+                        ].map((s) => (
+                          <button
+                            key={s.label}
+                            onClick={() => {
+                              recordUndo();
+                              setStrokeMultiplier(s.val);
+                            }}
+                            className={`px-2.5 py-1 rounded-xl text-[11px] font-semibold whitespace-nowrap transition ${
+                              strokeMultiplier === s.val
+                                ? 'bg-cyan-500 text-slate-950 font-bold shadow-sm'
+                                : appTheme === 'dark'
+                                  ? 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'
+                                  : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900 shadow-sm'
+                            }`}
+                          >
+                            {s.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      <input
+                        type="range"
+                        min="0.2"
+                        max="4"
+                        step="0.1"
+                        value={strokeMultiplier}
+                        onPointerDown={recordUndo}
+                        onChange={(e) => setStrokeMultiplier(Number(e.target.value))}
+                        className="theme-slider w-full"
+                      />
+                    </div>
+
+                    {/* App Icon Badge & Background Container */}
+                    <div className={`p-4 rounded-2xl border space-y-4 ${
+                      appTheme === 'dark' ? 'bg-[#131b2e]/60 border-slate-800' : 'bg-slate-50 border-slate-200'
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <label className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
+                          appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
+                        }`}>
+                          <Shapes className="w-3.5 h-3.5 text-cyan-500" /> App Icon Badge &amp; Tile Shape
+                        </label>
+                        {bgShape !== 'none' && (
+                          <button
+                            onClick={() => {
+                              recordUndo();
+                              setBgShape('none');
+                            }}
+                            className="text-[11px] text-cyan-500 hover:underline font-semibold"
+                          >
+                            Remove Badge
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Shape Selector Buttons */}
+                      <div className="grid grid-cols-5 gap-1.5">
+                        {[
+                          { id: 'none', label: 'None' },
+                          { id: 'squircle', label: 'Squircle' },
+                          { id: 'circle', label: 'Circle' },
+                          { id: 'rounded-square', label: 'Square' },
+                          { id: 'hexagon', label: 'Hexagon' }
+                        ].map((sh) => (
+                          <button
+                            key={sh.id}
+                            onClick={() => {
+                              recordUndo();
+                              setBgShape(sh.id);
+                            }}
+                            className={`py-2 px-1 rounded-xl text-center border text-[11px] font-semibold transition ${
+                              bgShape === sh.id
+                                ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-md font-bold'
+                                : appTheme === 'dark'
+                                  ? 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                                  : 'bg-white border-slate-200 text-slate-700 hover:text-slate-900 shadow-sm'
+                            }`}
+                          >
+                            {sh.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      {bgShape !== 'none' && (
+                        <div className="space-y-3 pt-2 border-t border-slate-800/60">
+                          {/* Background Color Picker & Presets */}
+                          <div>
+                            <div className="flex items-center justify-between text-xs mb-1.5">
+                              <span className={appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}>Badge Color</span>
+                              <span className="font-mono text-cyan-500 text-xs font-bold uppercase">{bgShapeColor}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="color"
+                                value={bgShapeColor}
+                                onPointerDown={recordUndo}
+                                onChange={(e) => setBgShapeColor(e.target.value)}
+                                className="w-8 h-8 rounded-lg cursor-pointer bg-transparent border-0 p-0"
+                              />
+                              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+                                {['#0f172a', '#1e293b', '#2563eb', '#7c3aed', '#db2777', '#ea580c', '#059669', '#ffffff'].map(col => (
+                                  <button
+                                    key={col}
+                                    onClick={() => {
+                                      recordUndo();
+                                      setBgShapeColor(col);
+                                    }}
+                                    className="w-5 h-5 rounded-full border border-white/20 shadow-sm flex-shrink-0 transition hover:scale-110"
+                                    style={{ backgroundColor: col }}
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Inner Margin / Padding Slider */}
+                          <div>
+                            <div className="flex items-center justify-between text-xs mb-1">
+                              <span className={appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}>Icon Margin (Inset)</span>
+                              <span className="font-mono text-cyan-500 font-semibold">{bgShapePadding}%</span>
+                            </div>
+                            <input
+                              type="range"
+                              min="5"
+                              max="35"
+                              value={bgShapePadding}
+                              onPointerDown={recordUndo}
+                              onChange={(e) => setBgShapePadding(Number(e.target.value))}
+                              className="theme-slider w-full"
+                            />
+                          </div>
+
+                          {/* Border Width & Color */}
+                          <div className="grid grid-cols-2 gap-3 items-center">
+                            <div>
+                              <div className="flex items-center justify-between text-xs mb-1">
+                                <span className={appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}>Border</span>
+                                <span className="font-mono text-cyan-500 font-semibold">{bgShapeBorder}px</span>
+                              </div>
+                              <input
+                                type="range"
+                                min="0"
+                                max="8"
+                                value={bgShapeBorder}
+                                onPointerDown={recordUndo}
+                                onChange={(e) => setBgShapeBorder(Number(e.target.value))}
+                                className="theme-slider w-full"
+                              />
+                            </div>
+
+                            {bgShapeBorder > 0 && (
+                              <div>
+                                <span className={`block text-xs mb-1 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Border Color</span>
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="color"
+                                    value={bgShapeBorderColor}
+                                    onPointerDown={recordUndo}
+                                    onChange={(e) => setBgShapeBorderColor(e.target.value)}
+                                    className="w-6 h-6 rounded cursor-pointer bg-transparent border-0"
+                                  />
+                                  <span className="font-mono text-[10px] text-cyan-500 uppercase">{bgShapeBorderColor}</span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -2875,6 +3494,162 @@ export default function App() {
                 className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold transition shadow-lg shadow-blue-600/30"
               >
                 Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Legal & Feedback Modals */}
+      {activeLegalModal && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+          <div className={`border rounded-2xl sm:rounded-3xl p-5 sm:p-7 max-w-lg w-full shadow-2xl relative max-h-[85vh] overflow-y-auto ${
+            appTheme === 'dark' ? 'bg-[#0f172a] border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-900 shadow-2xl'
+          }`}>
+            <button
+              onClick={() => setActiveLegalModal(null)}
+              className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-slate-800/40 text-slate-400 hover:text-white transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Modal Content Based on activeLegalModal */}
+            {activeLegalModal === 'license' && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-emerald-400 font-bold text-base">
+                  <Shield className="w-5 h-5" /> Commercial &amp; Personal License
+                </div>
+                <div className={`p-3 rounded-xl border text-xs leading-relaxed space-y-2 ${
+                  appTheme === 'dark' ? 'bg-slate-900/80 border-slate-800 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
+                }`}>
+                  <p><strong>100% Free &amp; Royalty-Free:</strong> All icons customized or downloaded on Iconderry can be used freely in personal and commercial projects without any license fee.</p>
+                  <p><strong>Allowed:</strong> Websites, web apps, iOS/Android mobile apps, marketing graphics, presentations, social media, printed merchandise, and UI design kits.</p>
+                  <p><strong>Attribution:</strong> Attribution is appreciated but not mandatory.</p>
+                </div>
+              </div>
+            )}
+
+            {activeLegalModal === 'privacy' && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-cyan-400 font-bold text-base">
+                  <Shield className="w-5 h-5" /> Privacy Policy
+                </div>
+                <div className={`p-3 rounded-xl border text-xs leading-relaxed space-y-2 ${
+                  appTheme === 'dark' ? 'bg-slate-900/80 border-slate-800 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
+                }`}>
+                  <p><strong>Zero Tracking:</strong> Iconderry does not sell personal data, inject third-party ad trackers, or log your vector designs.</p>
+                  <p><strong>Local Storage:</strong> Your preferences, recently opened icons, and favorite items are stored securely inside your browser's local storage.</p>
+                  <p><strong>Cloud Assets:</strong> Community assets are served securely via cloud storage for fast global performance.</p>
+                </div>
+              </div>
+            )}
+
+            {activeLegalModal === 'terms' && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-cyan-400 font-bold text-base">
+                  <FileText className="w-5 h-5" /> Terms of Service
+                </div>
+                <div className={`p-3 rounded-xl border text-xs leading-relaxed space-y-2 ${
+                  appTheme === 'dark' ? 'bg-slate-900/80 border-slate-800 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
+                }`}>
+                  <p>Iconderry provides vector icon generation, styling, and export tools "as is".</p>
+                  <p>Users are responsible for ensuring any custom SVG assets uploaded do not violate third-party trademarks or copyrights.</p>
+                </div>
+              </div>
+            )}
+
+            {activeLegalModal === 'about' && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-cyan-400 font-bold text-base">
+                  <Info className="w-5 h-5" /> About Iconderry
+                </div>
+                <div className={`p-3 rounded-xl border text-xs leading-relaxed space-y-2 ${
+                  appTheme === 'dark' ? 'bg-slate-900/80 border-slate-800 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
+                }`}>
+                  <p><strong>Iconderry</strong> is built for creators, software engineers, and product designers who need fast, pixel-perfect, and customizable vector graphics.</p>
+                  <p>Unlike traditional static icon libraries, Iconderry provides a full-featured real-time vector studio with 29+ material shaders, granular filter color grading, custom stroke weights, and app icon squircle badges.</p>
+                </div>
+              </div>
+            )}
+
+            {activeLegalModal === 'feedback' && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-cyan-400 font-bold text-base">
+                  <MessageSquarePlus className="w-5 h-5" /> Request an Icon or Send Feedback
+                </div>
+                {feedbackSubmitted ? (
+                  <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs text-center space-y-1">
+                    <CheckCircle2 className="w-6 h-6 mx-auto mb-1 text-emerald-400" />
+                    <p className="font-bold text-sm">Shukriya!</p>
+                    <p>Aapka icon request / feedback successfully receive ho gaya hai.</p>
+                  </div>
+                ) : (
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      setFeedbackSubmitted(true);
+                      setTimeout(() => {
+                        setActiveLegalModal(null);
+                        setFeedbackSubmitted(false);
+                      }, 2500);
+                    }}
+                    className="space-y-3 text-xs"
+                  >
+                    <div>
+                      <label className="block font-semibold mb-1">Your Name or Handle</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Sahil"
+                        value={feedbackForm.name}
+                        onChange={(e) => setFeedbackForm({ ...feedbackForm, name: e.target.value })}
+                        className={`w-full px-3 py-2 rounded-xl border focus:outline-none focus:border-cyan-500 ${
+                          appTheme === 'dark' ? 'bg-slate-900 border-slate-800 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
+                        }`}
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-semibold mb-1">Email (Optional)</label>
+                      <input
+                        type="email"
+                        placeholder="name@example.com"
+                        value={feedbackForm.email}
+                        onChange={(e) => setFeedbackForm({ ...feedbackForm, email: e.target.value })}
+                        className={`w-full px-3 py-2 rounded-xl border focus:outline-none focus:border-cyan-500 ${
+                          appTheme === 'dark' ? 'bg-slate-900 border-slate-800 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
+                        }`}
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-semibold mb-1">Icon Request or Suggestion</label>
+                      <textarea
+                        rows={3}
+                        required
+                        placeholder="e.g. Please add an e-commerce shopping bag or crypto token icons pack..."
+                        value={feedbackForm.message}
+                        onChange={(e) => setFeedbackForm({ ...feedbackForm, message: e.target.value })}
+                        className={`w-full px-3 py-2 rounded-xl border focus:outline-none focus:border-cyan-500 ${
+                          appTheme === 'dark' ? 'bg-slate-900 border-slate-800 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
+                        }`}
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      className="w-full py-2.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded-xl transition shadow-lg shadow-cyan-500/20"
+                    >
+                      Submit Request
+                    </button>
+                  </form>
+                )}
+              </div>
+            )}
+
+            <div className="mt-5 pt-3 border-t border-slate-800/60 flex justify-end">
+              <button
+                onClick={() => setActiveLegalModal(null)}
+                className="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold transition"
+              >
+                Close
               </button>
             </div>
           </div>
