@@ -283,12 +283,199 @@ const EFFECT_PRESETS = [
     colorA: '#9333ea',
     colorB: '#1e1b4b',
     adjustments: { hue: 180, saturation: 130, contrast: 135, brightness: 100, sepia: 0, invert: 100, opacity: 100, blur: 0, shadowBlur: 16, shadowColor: '#c084fc' }
+  },
+  {
+    id: 'cyber_matrix',
+    name: 'Cyber Matrix Code',
+    category: 'Neon & Cyber',
+    badge: 'Matrix 2.0',
+    desc: 'Bioluminescent green matrix stream with high phosphor contrast',
+    colorA: '#22c55e',
+    colorB: '#052e16',
+    isNew: true,
+    adjustments: { hue: 130, saturation: 220, contrast: 145, brightness: 110, sepia: 0, invert: 0, opacity: 100, blur: 0, shadowBlur: 24, shadowColor: '#22c55e' }
+  },
+  {
+    id: 'holographic_prism',
+    name: 'Holographic Prism Flare',
+    category: 'Neon & Cyber',
+    badge: 'Prism Spectrum',
+    desc: 'Multi-spectral chromatic rainbow glow with iridescent violet highlights',
+    colorA: '#06b6d4',
+    colorB: '#ec4899',
+    isNew: true,
+    adjustments: { hue: 280, saturation: 190, contrast: 130, brightness: 115, sepia: 0, invert: 0, opacity: 100, blur: 0.3, shadowBlur: 26, shadowColor: '#a855f7' }
+  },
+  {
+    id: 'golden_hour_sunset',
+    name: 'Solarium Golden Hour',
+    category: 'Warm & Golden',
+    badge: 'Warm Solarium',
+    desc: 'Golden honey radiance with warm amber twilight backlight',
+    colorA: '#f59e0b',
+    colorB: '#78350f',
+    isNew: true,
+    adjustments: { hue: 38, saturation: 185, contrast: 125, brightness: 108, sepia: 25, invert: 0, opacity: 100, blur: 0, shadowBlur: 22, shadowColor: '#f59e0b' }
+  },
+  {
+    id: 'tokyo_drift_neon',
+    name: 'Tokyo Drift Neon City',
+    category: 'Neon & Cyber',
+    badge: 'Tokyo Drift',
+    desc: 'Electric magenta and cyan neon reflections on rain-slick asphalt',
+    colorA: '#f43f5e',
+    colorB: '#06b6d4',
+    isNew: true,
+    adjustments: { hue: 310, saturation: 200, contrast: 140, brightness: 112, sepia: 0, invert: 0, opacity: 100, blur: 0.2, shadowBlur: 26, shadowColor: '#f43f5e' }
+  },
+  {
+    id: 'manga_screentone',
+    name: 'Japanese Manga Ink',
+    category: 'Cinematic & Moody',
+    badge: 'Manga Ink',
+    desc: 'Deep jet black sumi ink aesthetic with sharp graphic tonal balance',
+    colorA: '#0f172a',
+    colorB: '#334155',
+    isNew: true,
+    adjustments: { hue: 0, saturation: 10, contrast: 175, brightness: 95, sepia: 5, invert: 0, opacity: 100, blur: 0, shadowBlur: 14, shadowColor: '#000000' }
+  },
+  {
+    id: 'pastel_lavender',
+    name: 'Pastel Lavender Dream',
+    category: 'Aesthetic & Pastel',
+    badge: 'Soft Dream',
+    desc: 'Dreamy soft lilacs, pale hydrangeas and gentle luminous mist',
+    colorA: '#c084fc',
+    colorB: '#818cf8',
+    isNew: true,
+    adjustments: { hue: 255, saturation: 125, contrast: 105, brightness: 118, sepia: 0, invert: 0, opacity: 96, blur: 0.3, shadowBlur: 18, shadowColor: '#c084fc' }
+  },
+  {
+    id: 'crimson_eclipse',
+    name: 'Crimson Blood Eclipse',
+    category: 'Cinematic & Moody',
+    badge: 'Blood Moon',
+    desc: 'Super blood moon crimson eclipse with ominous dark vignette',
+    colorA: '#ef4444',
+    colorB: '#450a0a',
+    isNew: true,
+    adjustments: { hue: 355, saturation: 210, contrast: 155, brightness: 98, sepia: 0, invert: 0, opacity: 100, blur: 0, shadowBlur: 28, shadowColor: '#ef4444' }
+  },
+  {
+    id: 'nordic_aurora',
+    name: 'Polar Aurora Borealis',
+    category: 'Neon & Cyber',
+    badge: 'Polar Aurora',
+    desc: 'Deep Arctic night shimmering with undulating emerald and violet curtains',
+    colorA: '#10b981',
+    colorB: '#6366f1',
+    isNew: true,
+    adjustments: { hue: 160, saturation: 185, contrast: 135, brightness: 110, sepia: 0, invert: 0, opacity: 100, blur: 0.3, shadowBlur: 25, shadowColor: '#10b981' }
+  },
+  {
+    id: 'vintage_sepia_1920',
+    name: '1920s Art Deco Copper',
+    category: 'Retro & Vintage',
+    badge: '1920s Deco',
+    desc: 'Opulent vintage copper bronze with velvety aged patina warmth',
+    colorA: '#b45309',
+    colorB: '#451a03',
+    isNew: true,
+    adjustments: { hue: 28, saturation: 130, contrast: 135, brightness: 102, sepia: 75, invert: 0, opacity: 100, blur: 0.2, shadowBlur: 16, shadowColor: '#b45309' }
+  },
+  {
+    id: 'vaporwave_sunset',
+    name: '80s Miami Vaporwave',
+    category: 'Retro & Vintage',
+    badge: 'Outrun Wave',
+    desc: 'Nostalgic sunset pastel gradient with hot pink and tropical aqua sunset',
+    colorA: '#ec4899',
+    colorB: '#06b6d4',
+    isNew: true,
+    adjustments: { hue: 320, saturation: 185, contrast: 125, brightness: 112, sepia: 5, invert: 0, opacity: 100, blur: 0.2, shadowBlur: 24, shadowColor: '#ec4899' }
+  },
+  {
+    id: 'cyberpunk_hazard',
+    name: 'Cyber Hazard Acid',
+    category: 'Neon & Cyber',
+    badge: 'Biohazard',
+    desc: 'High-voltage radioactive toxic yellow glow on obsidian carbon',
+    colorA: '#facc15',
+    colorB: '#84cc16',
+    isNew: true,
+    adjustments: { hue: 65, saturation: 220, contrast: 150, brightness: 115, sepia: 0, invert: 0, opacity: 100, blur: 0, shadowBlur: 26, shadowColor: '#facc15' }
+  },
+  {
+    id: 'deep_ocean_bioluminescence',
+    name: 'Abyssal Bioluminescence',
+    category: 'Cinematic & Moody',
+    badge: 'Deep Trench',
+    desc: 'Midnight oceanic trench with glowing electric sapphire marine organisms',
+    colorA: '#0284c7',
+    colorB: '#030712',
+    isNew: true,
+    adjustments: { hue: 200, saturation: 175, contrast: 145, brightness: 100, sepia: 0, invert: 0, opacity: 100, blur: 0.3, shadowBlur: 24, shadowColor: '#0284c7' }
+  },
+  {
+    id: 'emerald_luxury',
+    name: 'Imperial Emerald Crown',
+    category: 'Warm & Golden',
+    badge: 'Imperial Gem',
+    desc: 'Deep royal gem-cut emerald green with polished yellow gold leaf highlights',
+    colorA: '#059669',
+    colorB: '#ca8a04',
+    isNew: true,
+    adjustments: { hue: 145, saturation: 170, contrast: 135, brightness: 106, sepia: 15, invert: 0, opacity: 100, blur: 0, shadowBlur: 22, shadowColor: '#10b981' }
+  },
+  {
+    id: 'desert_dune_sand',
+    name: 'Sahara Terracotta Dune',
+    category: 'Warm & Golden',
+    badge: 'Desert Sun',
+    desc: 'Warm sunbaked terracotta clay, desert sands, and earthy canyon glow',
+    colorA: '#ea580c',
+    colorB: '#7c2d12',
+    isNew: true,
+    adjustments: { hue: 20, saturation: 160, contrast: 120, brightness: 105, sepia: 30, invert: 0, opacity: 100, blur: 0, shadowBlur: 18, shadowColor: '#ea580c' }
+  },
+  {
+    id: 'neon_ultraviolet',
+    name: 'Hyperdrive Ultraviolet',
+    category: 'Neon & Cyber',
+    badge: 'UV Plasma',
+    desc: 'Deep indigo & ultraviolet blacklight strobe glow',
+    colorA: '#6366f1',
+    colorB: '#a855f7',
+    isNew: true,
+    adjustments: { hue: 250, saturation: 210, contrast: 140, brightness: 114, sepia: 0, invert: 0, opacity: 100, blur: 0.2, shadowBlur: 28, shadowColor: '#818cf8' }
   }
 ];
 
+// Set of newly introduced 3D Material Effect IDs
+const NEW_EFFECT_IDS = new Set([
+  'splash_water',
+  'foil_balloon',
+  'frosted_ice',
+  'molten_lava',
+  'knitted_wool',
+  'lego_bricks',
+  'carrara_marble',
+  'neon_tube_glass',
+  'gummy_bear_jelly',
+  'diamond_crystal',
+  'velvet_leather',
+  'molten_mercury',
+  'aurora_wireframe',
+  'carved_wood',
+  'origami_paper',
+  'aurora_bubble_glass',
+  'cyber_circuit_pcb',
+  'fluffy_cloud'
+]);
+
 // Renders an authentic live visual preview thumbnail showing the look of each filter preset
 function FilterCardThumbnail({ preset }) {
-  const { colorA, colorB, adjustments, badge } = preset;
+  const { colorA, colorB, adjustments, badge, isNew, id } = preset;
   const glowColor = adjustments?.shadowColor || colorA || '#38bdf8';
   const hasGlow = (adjustments?.shadowBlur || 0) > 0;
 
@@ -319,8 +506,19 @@ function FilterCardThumbnail({ preset }) {
         <Sparkles className="w-3.5 h-3.5 text-white drop-shadow" />
       </div>
 
+      {/* New or Classic status badge */}
+      {isNew ? (
+        <span className="absolute top-1 left-1 text-[7.5px] font-black px-1.5 py-0.5 rounded-md bg-gradient-to-r from-amber-400 to-pink-500 text-slate-950 shadow flex items-center gap-0.5 z-10">
+          ✨ NEW
+        </span>
+      ) : id !== 'original' ? (
+        <span className="absolute top-1 left-1 text-[7.5px] font-semibold px-1.5 py-0.5 rounded-md bg-slate-900/80 text-slate-400 border border-white/10 z-10">
+          CLASSIC
+        </span>
+      ) : null}
+
       {/* Filter Category / Tag Badge */}
-      <span className="absolute top-1 right-1 text-[8px] font-bold px-1.5 py-0.5 rounded bg-black/65 backdrop-blur-sm text-white/90 border border-white/10">
+      <span className="absolute top-1 right-1 text-[8px] font-bold px-1.5 py-0.5 rounded bg-black/65 backdrop-blur-sm text-white/90 border border-white/10 z-10">
         {badge || 'Filter'}
       </span>
     </div>
@@ -469,6 +667,17 @@ function EffectCardThumbnail({ preset }) {
         <span className="text-sm drop-shadow">{icon}</span>
         <span className="text-[10px] font-bold text-white tracking-wide uppercase font-mono">{preset.badge}</span>
       </div>
+
+      {/* New or Classic status badge */}
+      {(preset.isNew || NEW_EFFECT_IDS.has(preset.id)) ? (
+        <span className="absolute top-1.5 left-1.5 text-[7.5px] font-black px-1.5 py-0.5 rounded-md bg-gradient-to-r from-amber-400 to-pink-500 text-slate-950 shadow flex items-center gap-0.5 z-20">
+          ✨ NEW
+        </span>
+      ) : preset.id !== 'original' ? (
+        <span className="absolute top-1.5 left-1.5 text-[7.5px] font-semibold px-1.5 py-0.5 rounded-md bg-slate-900/80 text-slate-400 border border-white/10 z-20">
+          CLASSIC
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -585,11 +794,13 @@ export default function App() {
   const [activeStyleMode, setActiveStyleMode] = useState('original');
   const [effectCategory, setEffectCategory] = useState('All');
   const [effectSearchTerm, setEffectSearchTerm] = useState('');
+  const [effectVersionFilter, setEffectVersionFilter] = useState('all'); // 'all' | 'new' | 'old'
   const [studioTab, setStudioTab] = useState('colors'); // 'colors' | 'filters' | 'effects' | 'dimensions' | 'transform' | 'export'
   const [effectSubTab, setEffectSubTab] = useState('effects'); // 'effects' | 'adjustment'
   const [filterSubView, setFilterSubView] = useState('presets'); // 'presets' | 'materials' | 'sliders'
   const [filterCategory, setFilterCategory] = useState('All');
   const [filterSearchTerm, setFilterSearchTerm] = useState('');
+  const [filterVersionFilter, setFilterVersionFilter] = useState('all'); // 'all' | 'new' | 'old'
   const [activeFilterPreset, setActiveFilterPreset] = useState('original');
   const [activeSelectedColor, setActiveSelectedColor] = useState(null);
   const [isSelectionOutlineVisible, setIsSelectionOutlineVisible] = useState(true);
@@ -598,6 +809,10 @@ export default function App() {
 
   const filteredPresets = useMemo(() => {
     return EFFECT_PRESETS.filter(preset => {
+      // Filter by version (All / New / Old)
+      if (filterVersionFilter === 'new' && !preset.isNew) return false;
+      if (filterVersionFilter === 'old' && (preset.isNew || preset.id === 'original')) return false;
+
       const matchesCategory = filterCategory === 'All' || preset.category === filterCategory || preset.id === 'original';
       const q = filterSearchTerm.trim().toLowerCase();
       const matchesSearch = !q || 
@@ -606,10 +821,15 @@ export default function App() {
         (preset.badge && preset.badge.toLowerCase().includes(q));
       return matchesCategory && matchesSearch;
     });
-  }, [filterCategory, filterSearchTerm]);
+  }, [filterCategory, filterSearchTerm, filterVersionFilter]);
 
   const filteredStyleModes = useMemo(() => {
     return STYLE_RENDER_MODES.filter(mode => {
+      const isNew = mode.isNew || NEW_EFFECT_IDS.has(mode.id);
+      // Filter by version (All / New / Old)
+      if (effectVersionFilter === 'new' && !isNew) return false;
+      if (effectVersionFilter === 'old' && (isNew || mode.id === 'original')) return false;
+
       const matchesCategory = effectCategory === 'All' || mode.category === effectCategory || mode.id === 'original';
       const q = effectSearchTerm.trim().toLowerCase();
       const matchesSearch = !q || 
@@ -618,7 +838,7 @@ export default function App() {
         (mode.badge && mode.badge.toLowerCase().includes(q));
       return matchesCategory && matchesSearch;
     });
-  }, [effectCategory, effectSearchTerm]);
+  }, [effectCategory, effectSearchTerm, effectVersionFilter]);
 
   // Icon Dimensions & Aspect Ratio Controls
   const [iconWidth, setIconWidth] = useState(384);
@@ -2658,7 +2878,7 @@ export default function App() {
                         <h4 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
                           appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
                         }`}>
-                          <Wand2 className="w-3.5 h-3.5 text-cyan-500" /> 25+ Visual Color Filters
+                          <Wand2 className="w-3.5 h-3.5 text-cyan-500" /> {EFFECT_PRESETS.length}+ Visual Color Filters
                         </h4>
                         <p className={`text-[11px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
                           Click any card to apply instant gradient tone &amp; aura glow
@@ -2679,12 +2899,50 @@ export default function App() {
                       </button>
                     </div>
 
+                    {/* New vs Classic / Old Version Toggle Bar */}
+                    <div className={`p-1 rounded-xl border flex items-center gap-1 ${
+                      appTheme === 'dark' ? 'bg-slate-900/90 border-slate-800' : 'bg-slate-100 border-slate-200'
+                    }`}>
+                      <button
+                        onClick={() => setFilterVersionFilter('all')}
+                        className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-semibold transition flex items-center justify-center gap-1 ${
+                          filterVersionFilter === 'all'
+                            ? (appTheme === 'dark' ? 'bg-cyan-500 text-slate-950 shadow-sm font-bold' : 'bg-blue-600 text-white shadow-sm font-bold')
+                            : (appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900')
+                        }`}
+                      >
+                        <span>All ({EFFECT_PRESETS.length})</span>
+                      </button>
+
+                      <button
+                        onClick={() => setFilterVersionFilter('new')}
+                        className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-semibold transition flex items-center justify-center gap-1 ${
+                          filterVersionFilter === 'new'
+                            ? 'bg-gradient-to-r from-amber-400 via-rose-400 to-pink-500 text-slate-950 shadow-md font-bold'
+                            : (appTheme === 'dark' ? 'text-amber-300 hover:text-white' : 'text-amber-700 hover:text-slate-900')
+                        }`}
+                      >
+                        <span>✨ New ({EFFECT_PRESETS.filter(p => p.isNew).length})</span>
+                      </button>
+
+                      <button
+                        onClick={() => setFilterVersionFilter('old')}
+                        className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-semibold transition flex items-center justify-center gap-1 ${
+                          filterVersionFilter === 'old'
+                            ? (appTheme === 'dark' ? 'bg-slate-800 text-slate-200 border border-slate-700 shadow-sm font-bold' : 'bg-white text-slate-900 border border-slate-300 shadow-sm font-bold')
+                            : (appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900')
+                        }`}
+                      >
+                        <span>📦 Classic</span>
+                      </button>
+                    </div>
+
                     {/* Search Bar for Filters */}
                     <div className="relative">
                       <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
                       <input
                         type="text"
-                        placeholder="Search 25+ filters (e.g. Cyber, Neon, Vintage, Gold, Sunset)..."
+                        placeholder="Search filters (e.g. Matrix, Sunset, Prism, Vintage, Gold)..."
                         value={filterSearchTerm}
                         onChange={(e) => setFilterSearchTerm(e.target.value)}
                         className={`w-full pl-9 pr-8 py-2 rounded-xl text-xs border focus:outline-none focus:border-cyan-500 transition ${
@@ -2747,13 +3005,20 @@ export default function App() {
 
                             <div className="w-full">
                               <div className="flex items-center justify-between gap-1 mb-1">
-                                <span className={`text-xs font-bold truncate ${
-                                  isCurrentActive
-                                    ? (appTheme === 'dark' ? 'text-cyan-300' : 'text-blue-700')
-                                    : (appTheme === 'dark' ? 'text-slate-200 group-hover:text-cyan-400' : 'text-slate-900 group-hover:text-blue-600')
-                                }`}>
-                                  {pst.name}
-                                </span>
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <span className={`text-xs font-bold truncate ${
+                                    isCurrentActive
+                                      ? (appTheme === 'dark' ? 'text-cyan-300' : 'text-blue-700')
+                                      : (appTheme === 'dark' ? 'text-slate-200 group-hover:text-cyan-400' : 'text-slate-900 group-hover:text-blue-600')
+                                  }`}>
+                                    {pst.name}
+                                  </span>
+                                  {pst.isNew && (
+                                    <span className="text-[7.5px] font-black px-1 py-0.5 rounded bg-amber-400/20 text-amber-300 border border-amber-400/30 flex-shrink-0">
+                                      NEW
+                                    </span>
+                                  )}
+                                </div>
                                 {isCurrentActive && (
                                   <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
                                 )}
@@ -2867,7 +3132,7 @@ export default function App() {
                             <h4 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
                               appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
                             }`}>
-                              <Sparkles className="w-3.5 h-3.5 text-cyan-500" /> 29+ 3D Material Styles &amp; FX
+                              <Sparkles className="w-3.5 h-3.5 text-cyan-500" /> {STYLE_RENDER_MODES.length}+ 3D Material Styles &amp; FX
                             </h4>
                             <p className={`text-[11px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
                               Diamond, Velvet, Wood, Lava, Clay, Mercury, Origami &amp; more
@@ -2888,12 +3153,50 @@ export default function App() {
                           </button>
                         </div>
 
+                        {/* New vs Classic / Old Version Toggle Bar for Effects */}
+                        <div className={`p-1 rounded-xl border flex items-center gap-1 ${
+                          appTheme === 'dark' ? 'bg-slate-900/90 border-slate-800' : 'bg-slate-100 border-slate-200'
+                        }`}>
+                          <button
+                            onClick={() => setEffectVersionFilter('all')}
+                            className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-semibold transition flex items-center justify-center gap-1 ${
+                              effectVersionFilter === 'all'
+                                ? (appTheme === 'dark' ? 'bg-cyan-500 text-slate-950 shadow-sm font-bold' : 'bg-blue-600 text-white shadow-sm font-bold')
+                                : (appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900')
+                            }`}
+                          >
+                            <span>All ({STYLE_RENDER_MODES.length})</span>
+                          </button>
+
+                          <button
+                            onClick={() => setEffectVersionFilter('new')}
+                            className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-semibold transition flex items-center justify-center gap-1 ${
+                              effectVersionFilter === 'new'
+                                ? 'bg-gradient-to-r from-amber-400 via-rose-400 to-pink-500 text-slate-950 shadow-md font-bold'
+                                : (appTheme === 'dark' ? 'text-amber-300 hover:text-white' : 'text-amber-700 hover:text-slate-900')
+                            }`}
+                          >
+                            <span>✨ New ({STYLE_RENDER_MODES.filter(m => m.isNew || NEW_EFFECT_IDS.has(m.id)).length})</span>
+                          </button>
+
+                          <button
+                            onClick={() => setEffectVersionFilter('old')}
+                            className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-semibold transition flex items-center justify-center gap-1 ${
+                              effectVersionFilter === 'old'
+                                ? (appTheme === 'dark' ? 'bg-slate-800 text-slate-200 border border-slate-700 shadow-sm font-bold' : 'bg-white text-slate-900 border border-slate-300 shadow-sm font-bold')
+                                : (appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900')
+                            }`}
+                          >
+                            <span>📦 Classic</span>
+                          </button>
+                        </div>
+
                         {/* Search Bar for Effects */}
                         <div className="relative">
                           <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
                           <input
                             type="text"
-                            placeholder="Search 29+ material effects (e.g. Gold, Glass, Neon, Metal)..."
+                            placeholder="Search material effects (e.g. Gold, Glass, Neon, Metal)..."
                             value={effectSearchTerm}
                             onChange={(e) => setEffectSearchTerm(e.target.value)}
                             className={`w-full pl-9 pr-8 py-2 rounded-xl text-xs border focus:outline-none focus:border-cyan-500 transition ${
@@ -2937,6 +3240,7 @@ export default function App() {
                         <div className="grid grid-cols-2 gap-2.5 max-h-[500px] overflow-y-auto pr-1">
                           {filteredStyleModes.map((preset) => {
                             const isCurrentActive = activeStyleMode === preset.id;
+                            const isNew = preset.isNew || NEW_EFFECT_IDS.has(preset.id);
                             return (
                               <button
                                 key={preset.id}
@@ -2955,13 +3259,23 @@ export default function App() {
 
                                 <div className="w-full">
                                   <div className="flex items-center justify-between gap-1 mb-1">
-                                    <span className={`text-xs font-bold truncate ${
-                                      isCurrentActive
-                                        ? (appTheme === 'dark' ? 'text-cyan-300' : 'text-blue-700')
-                                        : (appTheme === 'dark' ? 'text-slate-200 group-hover:text-cyan-400' : 'text-slate-900 group-hover:text-blue-600')
-                                    }`}>
-                                      {preset.name}
-                                    </span>
+                                    <div className="flex items-center gap-1.5 min-w-0">
+                                      <span className={`text-xs font-bold truncate ${
+                                        isCurrentActive
+                                          ? (appTheme === 'dark' ? 'text-cyan-300' : 'text-blue-700')
+                                          : (appTheme === 'dark' ? 'text-slate-200 group-hover:text-cyan-400' : 'text-slate-900 group-hover:text-blue-600')
+                                      }`}>
+                                        {preset.name}
+                                      </span>
+                                      {isNew && (
+                                        <span className="text-[7.5px] font-black px-1 py-0.5 rounded bg-amber-400/20 text-amber-300 border border-amber-400/30 flex-shrink-0">
+                                          NEW
+                                        </span>
+                                      )}
+                                    </div>
+                                    {isCurrentActive && (
+                                      <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
+                                    )}
                                   </div>
                                   <p className={`text-[10px] leading-tight line-clamp-2 ${
                                     appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'
