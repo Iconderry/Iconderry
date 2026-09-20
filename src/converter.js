@@ -49,7 +49,7 @@ export async function downloadAsset({
 
   // DIRECT PURE VECTOR SVG EXPORT
   if (format === 'svg') {
-    let preparedSvg = prepareSvgWithAdjustments(svgCode, adjustments, targetWidth, targetHeight);
+    let preparedSvg = prepareSvgWithAdjustments(svgCode, adjustments, targetWidth, targetHeight, true);
 
     // If background badge shape is active, embed container shape into SVG
     if (adjustments.bgShape && adjustments.bgShape !== 'none') {
@@ -63,7 +63,8 @@ export async function downloadAsset({
 
   return new Promise((resolve, reject) => {
     // Pass targetWidth and targetHeight so SVG root element has native resolution attributes
-    let preparedSvg = prepareSvgWithAdjustments(svgCode, adjustments, targetWidth, targetHeight);
+    // forVectorSvgExport is false so raster image has clean, untransformed vector paths
+    let preparedSvg = prepareSvgWithAdjustments(svgCode, adjustments, targetWidth, targetHeight, false);
 
     const blob = new Blob([preparedSvg], { type: 'image/svg+xml;charset=utf-8' });
     const URL = window.URL || window.webkitURL || window;
@@ -119,8 +120,6 @@ export async function downloadAsset({
           : ''
       ].filter(Boolean).join(' ');
 
-      ctx.filter = filterRules || 'none';
-
       // 4. Transformations (Rotation, Scale, 3D Perspective & Skew)
       const rotX = adjustments.rotateX || 0;
       const rotY = adjustments.rotateY || 0;
@@ -136,28 +135,71 @@ export async function downloadAsset({
         paddingRatio = Math.max(0.2, (1 - shapePad * 1.5));
       }
       if (has3D) {
-        paddingRatio *= 0.88;
+        paddingRatio *= 0.86; // Margin so 3D perspective tilted corners don't get clipped
       }
 
       const drawWidth = targetWidth * paddingRatio;
       const drawHeight = targetHeight * paddingRatio;
 
-      // 3D Depth / Elevation Shadow
-      if ((adjustments.depth3D || 0) > 0) {
-        draw3DDepthShadow(ctx, img, drawWidth, drawHeight, adjustments, targetWidth);
-      }
-
-      ctx.save();
-      ctx.translate(targetWidth / 2, targetHeight / 2);
-
       if (!has3D) {
+        // Fast 2D Vector Path: zero 3D matrix needed
+        ctx.save();
+        ctx.filter = filterRules || 'none';
+        ctx.translate(targetWidth / 2, targetHeight / 2);
         ctx.rotate((rotZ * Math.PI) / 180);
         ctx.scale(adjustments.flipH ? -1 : 1, adjustments.flipV ? -1 : 1);
         ctx.drawImage(img, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+        ctx.restore();
       } else {
-        render3DPerspectiveImage(ctx, img, drawWidth, drawHeight, adjustments, targetWidth);
+        // True 3D Hardware Perspective Path:
+        // 1. Render filtered 2D source onto an offscreen canvas
+        const offCanvas = document.createElement('canvas');
+        offCanvas.width = drawWidth;
+        offCanvas.height = drawHeight;
+        const offCtx = offCanvas.getContext('2d');
+        if (offCtx) {
+          offCtx.imageSmoothingEnabled = true;
+          offCtx.imageSmoothingQuality = 'high';
+          offCtx.filter = filterRules || 'none';
+          offCtx.drawImage(img, 0, 0, drawWidth, drawHeight);
+        }
+
+        // 2. Render 3D perspective quad via WebGL with zero slicing
+        const webglCanvas = render3DWithWebGL(offCtx ? offCanvas : img, targetWidth, targetHeight, adjustments, drawWidth, drawHeight);
+
+        if (webglCanvas) {
+          // 3. Optional 3D elevation shadow (single-pass continuous blur, zero streaks)
+          if ((adjustments.depth3D || 0) > 0) {
+            const depth = (adjustments.depth3D || 0) * (targetWidth / 384);
+            const radX = (rotX * Math.PI) / 180;
+            const radY = (rotY * Math.PI) / 180;
+            const offX = -Math.sin(radY) * depth * 1.5;
+            const offY = Math.sin(radX) * depth * 1.5 + (depth * 0.8);
+            const sColor = adjustments.depth3DColor || 'rgba(0,0,0,0.55)';
+
+            ctx.save();
+            ctx.filter = `blur(${Math.max(2, Math.round(depth * 0.5))}px) drop-shadow(0 0 ${Math.round(depth * 0.4)}px ${sColor})`;
+            ctx.globalAlpha = 0.55;
+            ctx.drawImage(webglCanvas, offX, offY);
+            ctx.restore();
+          }
+
+          // 4. Draw pristine 3D icon
+          ctx.drawImage(webglCanvas, 0, 0);
+        } else {
+          // Fallback if WebGL unavailable: 2D affine perspective (zero slices)
+          ctx.save();
+          ctx.filter = filterRules || 'none';
+          ctx.translate(targetWidth / 2, targetHeight / 2);
+          const cosY = Math.cos((rotY * Math.PI) / 180);
+          const cosX = Math.cos((rotX * Math.PI) / 180);
+          ctx.rotate((rotZ * Math.PI) / 180);
+          ctx.scale(adjustments.flipH ? -cosY : cosY, adjustments.flipV ? -cosX : cosX);
+          ctx.transform(1, Math.tan((skY * Math.PI) / 180), Math.tan((skX * Math.PI) / 180), 1, 0, 0);
+          ctx.drawImage(img, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
+          ctx.restore();
+        }
       }
-      ctx.restore();
 
       const mimeType = format === 'jpeg' ? 'image/jpeg' : format === 'webp' ? 'image/webp' : 'image/png';
 
@@ -260,7 +302,7 @@ function embedSvgBgShape(svgCode, adjustments, width, height) {
 </svg>`;
 }
 
-function prepareSvgWithAdjustments(svgCode, adjustments = {}, targetWidth, targetHeight) {
+function prepareSvgWithAdjustments(svgCode, adjustments = {}, targetWidth, targetHeight, forVectorSvgExport = false) {
   let res = svgCode;
   if (!res.includes('xmlns=')) {
     res = res.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
@@ -301,11 +343,7 @@ function prepareSvgWithAdjustments(svgCode, adjustments = {}, targetWidth, targe
     res = res.replace('<svg', '<svg preserveAspectRatio="none"');
   }
 
-  // CRITICAL FOR ULTRA HD & 8K VECTOR PURITY:
-  // When an SVG is loaded into an Image for canvas rendering, browser engines rasterize
-  // the vector paths at the SVG's declared width & height attributes.
-  // Setting width and height to match the target canvas resolution ensures the browser
-  // rasterizes the vector paths directly at full 4K/8K resolution with zero scaling artifacts!
+  // Set explicit width and height on SVG element
   if (targetWidth && targetHeight) {
     if (/\bwidth="[^"]*"/i.test(res)) {
       res = res.replace(/\bwidth="[^"]*"/i, `width="${targetWidth}"`);
@@ -325,134 +363,240 @@ function prepareSvgWithAdjustments(svgCode, adjustments = {}, targetWidth, targe
     res = res.replace(/stroke="((?!none|url)[^"]+)"/gi, `stroke="${adjustments.customColor}"`);
   }
 
-  // 3D & 2D Vector Transform Embedding for Direct SVG Export
-  const rotX = adjustments.rotateX || 0;
-  const rotY = adjustments.rotateY || 0;
-  const rotZ = adjustments.rotation || 0;
-  const skX = adjustments.skewX || 0;
-  const skY = adjustments.skewY || 0;
-  const persp = adjustments.perspective || 800;
-  const flipH = adjustments.flipH ? -1 : 1;
-  const flipV = adjustments.flipV ? -1 : 1;
+  // 3D & 2D Vector Transform Embedding ONLY for Direct SVG Export
+  if (forVectorSvgExport) {
+    const rotX = adjustments.rotateX || 0;
+    const rotY = adjustments.rotateY || 0;
+    const rotZ = adjustments.rotation || 0;
+    const skX = adjustments.skewX || 0;
+    const skY = adjustments.skewY || 0;
+    const persp = adjustments.perspective || 800;
+    const flipH = adjustments.flipH ? -1 : 1;
+    const flipV = adjustments.flipV ? -1 : 1;
 
-  if (rotX !== 0 || rotY !== 0 || rotZ !== 0 || skX !== 0 || skY !== 0 || flipH !== 1 || flipV !== 1) {
-    const inner = res.replace(/<svg[^>]*>|<\/svg>/gi, '');
-    const svgOpenMatch = res.match(/<svg[^>]*>/i);
-    const svgOpen = svgOpenMatch ? svgOpenMatch[0] : '<svg>';
-    res = `${svgOpen}
+    if (rotX !== 0 || rotY !== 0 || rotZ !== 0 || skX !== 0 || skY !== 0 || flipH !== 1 || flipV !== 1) {
+      const inner = res.replace(/<svg[^>]*>|<\/svg>/gi, '');
+      const svgOpenMatch = res.match(/<svg[^>]*>/i);
+      const svgOpen = svgOpenMatch ? svgOpenMatch[0] : '<svg>';
+      res = `${svgOpen}
   <g style="transform-box: fill-box; transform-origin: center; transform: perspective(${persp}px) rotateX(${rotX}deg) rotateY(${rotY}deg) rotate(${rotZ}deg) skew(${skX}deg, ${skY}deg) scale(${flipH}, ${flipV});">
     ${inner}
   </g>
 </svg>`;
+    }
   }
 
   return res;
 }
 
-// 3D Perspective Projection for HTML5 Canvas Export
-function projectPoint3D(x, y, radX, radY, radZ, tanSkX, tanSkY, scaleX, scaleY, persp) {
-  const x0 = x * scaleX;
-  const y0 = y * scaleY;
-  const x1 = x0 + y0 * tanSkX;
-  const y1 = y0 + x0 * tanSkY;
-  const y2 = y1 * Math.cos(radX);
-  const z2 = y1 * Math.sin(radX);
-  const x3 = x1 * Math.cos(radY) + z2 * Math.sin(radY);
-  const z3 = -x1 * Math.sin(radY) + z2 * Math.cos(radY);
-  const x4 = x3 * Math.cos(radZ) - y2 * Math.sin(radZ);
-  const y4 = x3 * Math.sin(radZ) + y2 * Math.cos(radZ);
-  const fov = persp / Math.max(1, (persp + z3));
-  return { x: x4 * fov, y: y4 * fov, z: z3 };
+// Hardware GPU 3D Perspective Texture Mapping via WebGL (zero slicing, zero lines, anti-aliased)
+function mat4Multiply(out, a, b) {
+  const a00 = a[0], a01 = a[1], a02 = a[2], a03 = a[3];
+  const a10 = a[4], a11 = a[5], a12 = a[6], a13 = a[7];
+  const a20 = a[8], a21 = a[9], a22 = a[10], a23 = a[11];
+  const a30 = a[12], a31 = a[13], a32 = a[14], a33 = a[15];
+
+  let b0 = b[0], b1 = b[1], b2 = b[2], b3 = b[3];
+  out[0] = b0 * a00 + b1 * a10 + b2 * a20 + b3 * a30;
+  out[1] = b0 * a01 + b1 * a11 + b2 * a21 + b3 * a31;
+  out[2] = b0 * a02 + b1 * a12 + b2 * a22 + b3 * a32;
+  out[3] = b0 * a03 + b1 * a13 + b2 * a23 + b3 * a33;
+
+  b0 = b[4]; b1 = b[5]; b2 = b[6]; b3 = b[7];
+  out[4] = b0 * a00 + b1 * a10 + b2 * a20 + b3 * a30;
+  out[5] = b0 * a01 + b1 * a11 + b2 * a21 + b3 * a31;
+  out[6] = b0 * a02 + b1 * a12 + b2 * a22 + b3 * a32;
+  out[7] = b0 * a03 + b1 * a13 + b2 * a23 + b3 * a33;
+
+  b0 = b[8]; b1 = b[9]; b2 = b[10]; b3 = b[11];
+  out[8] = b0 * a00 + b1 * a10 + b2 * a20 + b3 * a30;
+  out[9] = b0 * a01 + b1 * a11 + b2 * a21 + b3 * a31;
+  out[10] = b0 * a02 + b1 * a12 + b2 * a22 + b3 * a32;
+  out[11] = b0 * a03 + b1 * a13 + b2 * a23 + b3 * a33;
+
+  b0 = b[12]; b1 = b[13]; b2 = b[14]; b3 = b[15];
+  out[12] = b0 * a00 + b1 * a10 + b2 * a20 + b3 * a30;
+  out[13] = b0 * a01 + b1 * a11 + b2 * a21 + b3 * a31;
+  out[14] = b0 * a02 + b1 * a12 + b2 * a22 + b3 * a32;
+  out[15] = b0 * a03 + b1 * a13 + b2 * a23 + b3 * a33;
+  return out;
 }
 
-function getAffineTransform(u0, v0, u1, v1, u2, v2, x0, y0, x1, y1, x2, y2) {
-  const D = u0 * (v1 - v2) + u1 * (v2 - v0) + u2 * (v0 - v1);
-  if (Math.abs(D) < 1e-6) return null;
-  return {
-    a: (x0 * (v1 - v2) + x1 * (v2 - v0) + x2 * (v0 - v1)) / D,
-    c: (x0 * (u2 - u1) + x1 * (u0 - u2) + x2 * (u1 - u0)) / D,
-    e: (x0 * (u1 * v2 - u2 * v1) + x1 * (u2 * v0 - u0 * v2) + x2 * (u0 * v1 - u1 * v0)) / D,
-    b: (y0 * (v1 - v2) + y1 * (v2 - v0) + y2 * (v0 - v1)) / D,
-    d: (y0 * (u2 - u1) + y1 * (u0 - u2) + y2 * (u1 - u0)) / D,
-    f: (y0 * (u1 * v2 - u2 * v1) + y1 * (u2 * v0 - u0 * v2) + y2 * (u0 * v1 - u1 * v0)) / D
-  };
-}
+function render3DWithWebGL(imageSource, targetWidth, targetHeight, adjustments, drawWidth, drawHeight) {
+  const canvas = document.createElement('canvas');
+  canvas.width = targetWidth;
+  canvas.height = targetHeight;
+  const gl = canvas.getContext('webgl', { 
+    antialias: true, 
+    alpha: true, 
+    premultipliedAlpha: false,
+    preserveDrawingBuffer: true 
+  });
+  if (!gl) return null;
 
-function render3DPerspectiveImage(ctx, img, drawWidth, drawHeight, adjustments, canvasWidth) {
-  const radX = ((adjustments.rotateX || 0) * Math.PI) / 180;
-  const radY = ((adjustments.rotateY || 0) * Math.PI) / 180;
-  const radZ = ((adjustments.rotation || 0) * Math.PI) / 180;
+  gl.viewport(0, 0, targetWidth, targetHeight);
+  gl.clearColor(0, 0, 0, 0);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+
+  const vsSource = `
+    attribute vec2 a_position;
+    attribute vec2 a_texCoord;
+    uniform mat4 u_matrix;
+    varying vec2 v_texCoord;
+    void main() {
+      gl_Position = u_matrix * vec4(a_position, 0.0, 1.0);
+      v_texCoord = a_texCoord;
+    }
+  `;
+
+  const fsSource = `
+    precision mediump float;
+    uniform sampler2D u_texture;
+    varying vec2 v_texCoord;
+    void main() {
+      gl_FragColor = texture2D(u_texture, v_texCoord);
+    }
+  `;
+
+  function createShader(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    return s;
+  }
+
+  const vs = createShader(gl.VERTEX_SHADER, vsSource);
+  const fs = createShader(gl.FRAGMENT_SHADER, fsSource);
+  const program = gl.createProgram();
+  gl.attachShader(program, vs);
+  gl.attachShader(program, fs);
+  gl.linkProgram(program);
+  gl.useProgram(program);
+
+  // Quad geometry (2 triangles)
+  const hw = drawWidth / 2;
+  const hh = drawHeight / 2;
+
+  const positions = new Float32Array([
+    -hw, -hh,
+     hw, -hh,
+    -hw,  hh,
+    -hw,  hh,
+     hw, -hh,
+     hw,  hh
+  ]);
+
+  const posBuf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
+  const aPos = gl.getAttribLocation(program, 'a_position');
+  gl.enableVertexAttribArray(aPos);
+  gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+  const texCoords = new Float32Array([
+    0, 0,
+    1, 0,
+    0, 1,
+    0, 1,
+    1, 0,
+    1, 1
+  ]);
+
+  const texBuf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, texBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, texCoords, gl.STATIC_DRAW);
+  const aTex = gl.getAttribLocation(program, 'a_texCoord');
+  gl.enableVertexAttribArray(aTex);
+  gl.vertexAttribPointer(aTex, 2, gl.FLOAT, false, 0, 0);
+
+  // Texture
+  const texture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, imageSource);
+
+  // Compute CSS 3D compatible matrix
+  const rx = ((adjustments.rotateX || 0) * Math.PI) / 180;
+  const ry = ((adjustments.rotateY || 0) * Math.PI) / 180;
+  const rz = ((adjustments.rotation || 0) * Math.PI) / 180;
   const tanSkX = Math.tan(((adjustments.skewX || 0) * Math.PI) / 180);
   const tanSkY = Math.tan(((adjustments.skewY || 0) * Math.PI) / 180);
   const scaleX = adjustments.flipH ? -1 : 1;
   const scaleY = adjustments.flipV ? -1 : 1;
-  const persp = (adjustments.perspective || 800) * (canvasWidth / 384);
+  const persp = (adjustments.perspective || 800) * (targetWidth / 384);
 
-  const N = 32; // 32 vertical slices for smooth perspective
-  const W = drawWidth;
-  const H = drawHeight;
-  const imgW = img.width || W;
-  const imgH = img.height || H;
+  // Flip
+  const Sflip = new Float32Array([
+    scaleX, 0, 0, 0,
+    0, scaleY, 0, 0,
+    0, 0, 1, 0,
+    0, 0, 0, 1
+  ]);
 
-  for (let i = 0; i < N; i++) {
-    const u0 = -W / 2 + (i / N) * W;
-    const u1 = -W / 2 + ((i + 1) / N) * W;
-    const su0 = (i / N) * imgW;
-    const su1 = Math.min(imgW, ((i + 1) / N) * imgW + 0.6); // slight overlap avoids seams
+  // Skew
+  const Mskew = new Float32Array([
+    1, tanSkY, 0, 0,
+    tanSkX, 1, 0, 0,
+    0, 0, 1, 0,
+    0, 0, 0, 1
+  ]);
 
-    const pTL = projectPoint3D(u0, -H / 2, radX, radY, radZ, tanSkX, tanSkY, scaleX, scaleY, persp);
-    const pTR = projectPoint3D(u1, -H / 2, radX, radY, radZ, tanSkX, tanSkY, scaleX, scaleY, persp);
-    const pBR = projectPoint3D(u1, H / 2, radX, radY, radZ, tanSkX, tanSkY, scaleX, scaleY, persp);
-    const pBL = projectPoint3D(u0, H / 2, radX, radY, radZ, tanSkX, tanSkY, scaleX, scaleY, persp);
+  // Rotate Z
+  const Rz = new Float32Array([
+    Math.cos(rz), Math.sin(rz), 0, 0,
+    -Math.sin(rz), Math.cos(rz), 0, 0,
+    0, 0, 1, 0,
+    0, 0, 0, 1
+  ]);
 
-    // Triangle 1: TL, TR, BL
-    const m1 = getAffineTransform(su0, 0, su1, 0, su0, imgH, pTL.x, pTL.y, pTR.x, pTR.y, pBL.x, pBL.y);
-    if (m1) {
-      ctx.save();
-      ctx.beginPath();
-      ctx.moveTo(pTL.x, pTL.y);
-      ctx.lineTo(pTR.x, pTR.y);
-      ctx.lineTo(pBL.x, pBL.y);
-      ctx.closePath();
-      ctx.clip();
-      ctx.transform(m1.a, m1.b, m1.c, m1.d, m1.e, m1.f);
-      ctx.drawImage(img, 0, 0, imgW, imgH);
-      ctx.restore();
-    }
+  // Rotate X
+  const Rx = new Float32Array([
+    1, 0, 0, 0,
+    0, Math.cos(rx), Math.sin(rx), 0,
+    0, -Math.sin(rx), Math.cos(rx), 0,
+    0, 0, 0, 1
+  ]);
 
-    // Triangle 2: TR, BR, BL
-    const m2 = getAffineTransform(su1, 0, su1, imgH, su0, imgH, pTR.x, pTR.y, pBR.x, pBR.y, pBL.x, pBL.y);
-    if (m2) {
-      ctx.save();
-      ctx.beginPath();
-      ctx.moveTo(pTR.x, pTR.y);
-      ctx.lineTo(pBR.x, pBR.y);
-      ctx.lineTo(pBL.x, pBL.y);
-      ctx.closePath();
-      ctx.clip();
-      ctx.transform(m2.a, m2.b, m2.c, m2.d, m2.e, m2.f);
-      ctx.drawImage(img, 0, 0, imgW, imgH);
-      ctx.restore();
-    }
-  }
-}
+  // Rotate Y
+  const Ry = new Float32Array([
+    Math.cos(ry), 0, -Math.sin(ry), 0,
+    0, 1, 0, 0,
+    Math.sin(ry), 0, Math.cos(ry), 0,
+    0, 0, 0, 1
+  ]);
 
-function draw3DDepthShadow(ctx, img, drawWidth, drawHeight, adjustments, canvasWidth) {
-  const depth = (adjustments.depth3D || 0) * (canvasWidth / 384);
-  if (depth <= 0) return;
+  // Perspective & NDC projection (maps to [-1, 1] device coordinates)
+  const P = new Float32Array([
+    2 / targetWidth, 0, 0, 0,
+    0, -2 / targetHeight, 0, 0,
+    0, 0, 1 / persp, -1 / persp,
+    0, 0, 0, 1
+  ]);
 
-  const radX = ((adjustments.rotateX || 0) * Math.PI) / 180;
-  const radY = ((adjustments.rotateY || 0) * Math.PI) / 180;
-  const offX = -Math.sin(radY) * depth * 1.5;
-  const offY = Math.sin(radX) * depth * 1.5 + (depth * 0.8);
-  const color = adjustments.depth3DColor || 'rgba(0,0,0,0.55)';
+  const m1 = new Float32Array(16);
+  mat4Multiply(m1, Mskew, Sflip);
 
-  ctx.save();
-  ctx.translate(canvasWidth / 2 + offX, (canvasWidth / 2) + offY);
-  ctx.filter = `blur(${Math.max(2, Math.round(depth * 0.4))}px) drop-shadow(0 0 ${Math.round(depth * 0.5)}px ${color})`;
-  ctx.globalAlpha = 0.5;
-  render3DPerspectiveImage(ctx, img, drawWidth, drawHeight, adjustments, canvasWidth);
-  ctx.restore();
+  const m2 = new Float32Array(16);
+  mat4Multiply(m2, Rz, m1);
+
+  const m3 = new Float32Array(16);
+  mat4Multiply(m3, Rx, m2);
+
+  const m4 = new Float32Array(16);
+  mat4Multiply(m4, Ry, m3);
+
+  const M = new Float32Array(16);
+  mat4Multiply(M, P, m4);
+
+  const uMatrix = gl.getUniformLocation(program, 'u_matrix');
+  gl.uniformMatrix4fv(uMatrix, false, M);
+
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+  return canvas;
 }
 
 function triggerDownload(blob, fullFilename) {
