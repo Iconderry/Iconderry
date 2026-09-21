@@ -7,7 +7,7 @@ import {
   Settings, Moon, RotateCcw, SlidersHorizontal, HardDrive, Monitor,
   ZoomIn, ZoomOut, Maximize2, Link2, Unlink2, Wand2, Scan,
   Heart, History, Shapes, MessageSquarePlus, Shield, FileText, Info,
-  Eye, EyeOff, Box, Compass, Move3d, Film, Play, Activity
+  Eye, EyeOff, Box, Compass, Move3d, Film, Play, Activity, GripVertical
 } from 'lucide-react';
 import { INITIAL_ELEMENTS } from './initialData';
 import { downloadAsset } from './converter';
@@ -1126,6 +1126,63 @@ export default function App() {
   const [previewBg, setPreviewBg] = useState(() => localStorage.getItem('iconderry_default_bg') || 'dark');
   const [zoomLevel, setZoomLevel] = useState(1);
   const canvasWorkspaceRef = useRef(null);
+
+  // Studio Resizable Right Sidebar Width (VS Code style)
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('iconderry_studio_sidebar_width');
+      if (saved) {
+        const num = Number(saved);
+        if (!isNaN(num) && num >= 320 && num <= 900) return num;
+      }
+    }
+    return 480;
+  });
+  const [isResizingSidebar, setIsResizingSidebar] = useState(false);
+  const [isDesktopScreen, setIsDesktopScreen] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth >= 1024 : true
+  );
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsDesktopScreen(window.innerWidth >= 1024);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const handleStartResizeSidebar = (e) => {
+    e.preventDefault();
+    setIsResizingSidebar(true);
+
+    const startX = e.clientX;
+    const startWidth = sidebarWidth;
+
+    const onPointerMove = (moveEvt) => {
+      const zoom = window.innerWidth >= 1024 ? 1.1 : 1;
+      const deltaX = (startX - moveEvt.clientX) / zoom;
+      const newWidth = Math.round(startWidth + deltaX);
+
+      const maxAllowed = Math.max(480, Math.floor((window.innerWidth / zoom) - 340));
+      const clamped = Math.min(Math.max(340, newWidth), maxAllowed);
+      setSidebarWidth(clamped);
+    };
+
+    const onPointerUp = () => {
+      setIsResizingSidebar(false);
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+      setSidebarWidth((finalWidth) => {
+        try {
+          localStorage.setItem('iconderry_studio_sidebar_width', String(finalWidth));
+        } catch {}
+        return finalWidth;
+      });
+    };
+
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+  };
 
   // Wheel listener for Ctrl + Scroll (or Trackpad pinch zoom)
   useEffect(() => {
@@ -2554,7 +2611,9 @@ export default function App() {
 
       {/* Full-Screen Immersive Studio Workspace */}
       {selectedAsset && (
-        <div className={`fixed inset-0 z-50 flex flex-col h-screen w-screen overflow-hidden font-sans transition-colors duration-200 ${
+        <div className={`fixed inset-0 z-50 flex flex-col w-full h-full max-w-full max-h-full overflow-hidden font-sans transition-colors duration-200 ${
+          isResizingSidebar ? 'select-none' : ''
+        } ${
           appTheme === 'dark' ? 'bg-[#060a12] text-slate-100' : 'bg-slate-100 text-slate-900'
         }`}>
           {/* Top Navigation Bar */}
@@ -2699,7 +2758,7 @@ export default function App() {
           </header>
 
           {/* Main Full-Screen Body */}
-          <div className="flex-1 flex flex-col lg:flex-row h-[calc(100vh-56px)] sm:h-[calc(100vh-64px)] overflow-hidden">
+          <div className="flex-1 min-h-0 min-w-0 w-full flex flex-col lg:flex-row overflow-hidden relative">
             {/* Left/Center: Large Canvas Workspace */}
             <div
               ref={canvasWorkspaceRef}
@@ -2707,7 +2766,7 @@ export default function App() {
                 setActiveSelectedColor(null);
                 setIsSelectionOutlineVisible(true);
               }}
-              className={`h-[38vh] sm:h-[45vh] lg:h-full lg:flex-1 relative flex flex-col items-center justify-center p-3 sm:p-6 select-none overflow-hidden transition-colors border-b lg:border-b-0 lg:border-r flex-shrink-0 ${
+              className={`h-[38vh] sm:h-[45vh] lg:h-full lg:flex-1 min-w-0 relative flex flex-col items-center justify-center p-3 sm:p-6 select-none overflow-hidden transition-colors border-b lg:border-b-0 ${
                 appTheme === 'dark' ? 'bg-[#060a12]' : 'bg-slate-100/90'
               }`}
             >
@@ -2877,10 +2936,49 @@ export default function App() {
               </div>
             </div>
 
+            {/* Draggable Sidebar Resizer Handle (VS Code style - Desktop only) */}
+            <div
+              onPointerDown={handleStartResizeSidebar}
+              onDoubleClick={() => {
+                setSidebarWidth(480);
+                try { localStorage.setItem('iconderry_studio_sidebar_width', '480'); } catch {}
+              }}
+              className={`hidden lg:flex items-center justify-center relative select-none cursor-col-resize z-30 transition-all duration-150 group flex-shrink-0 border-l ${
+                isResizingSidebar
+                  ? 'w-2 bg-cyan-500 border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.8)]'
+                  : appTheme === 'dark'
+                  ? 'w-2 bg-[#0b0f19] border-slate-800 hover:bg-cyan-500/20 hover:border-cyan-500/60'
+                  : 'w-2 bg-slate-100 border-slate-200 hover:bg-cyan-500/20 hover:border-cyan-500/60'
+              }`}
+              title="Drag left/right to resize panel width • Double-click to reset (480px)"
+            >
+              {/* Center visual grip pill */}
+              <div
+                className={`w-1 rounded-full transition-all duration-150 ${
+                  isResizingSidebar
+                    ? 'h-16 bg-white shadow-md'
+                    : appTheme === 'dark'
+                    ? 'h-8 bg-slate-600 group-hover:h-12 group-hover:bg-cyan-400'
+                    : 'h-8 bg-slate-400 group-hover:h-12 group-hover:bg-cyan-500'
+                }`}
+              />
+            </div>
+
+            {/* Invisible overlay while resizing to prevent mouse event loss */}
+            {isResizingSidebar && (
+              <div
+                onPointerDown={(e) => e.preventDefault()}
+                className="fixed inset-0 z-50 cursor-col-resize select-none"
+              />
+            )}
+
             {/* Right: Studio Tools & Control Sidebar */}
-            <div className={`flex-1 lg:flex-none lg:h-full w-full lg:w-[480px] border-t lg:border-t-0 lg:border-l flex flex-col flex-shrink-0 shadow-2xl z-20 overflow-hidden transition-colors ${
-              appTheme === 'dark' ? 'bg-[#0d1424] border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-900'
-            }`}>
+            <div
+              style={isDesktopScreen ? { width: `${sidebarWidth}px`, maxWidth: 'calc(100% - 320px)', minWidth: '340px' } : undefined}
+              className={`flex-1 lg:flex-none lg:h-full w-full border-t lg:border-t-0 flex flex-col flex-shrink-0 shadow-2xl z-20 overflow-hidden transition-[background-color,border-color] duration-200 ${
+                appTheme === 'dark' ? 'bg-[#0d1424] border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-900'
+              }`}
+            >
               {/* Studio Segmented Navigation Tabs */}
               <div className={`p-2 sm:p-4 border-b flex-shrink-0 ${
                 appTheme === 'dark' ? 'border-slate-800 bg-[#0b0f19]' : 'border-slate-200 bg-slate-50'
