@@ -12,6 +12,13 @@ body {
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 
+/* Default 110% Browser Zoom for the Entire Website on PC / Desktop */
+@media (min-width: 1024px) {
+  body {
+    zoom: 1.1;
+  }
+}
+
 html.light body {
   background-color: #f8fafc;
   color: #0f172a;

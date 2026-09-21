@@ -1124,8 +1124,7 @@ export default function App() {
   const [isTransparent, setIsTransparent] = useState(true);
   const [downloading, setDownloading] = useState(false);
   const [previewBg, setPreviewBg] = useState(() => localStorage.getItem('iconderry_default_bg') || 'dark');
-  const getDefaultZoom = () => (typeof window !== 'undefined' && window.innerWidth >= 768 ? 1.1 : 1);
-  const [zoomLevel, setZoomLevel] = useState(() => getDefaultZoom());
+  const [zoomLevel, setZoomLevel] = useState(1);
   const canvasWorkspaceRef = useRef(null);
 
   // Wheel listener for Ctrl + Scroll (or Trackpad pinch zoom)
@@ -1437,7 +1436,7 @@ export default function App() {
     setActiveSelectedColor(null);
     setIsLayersListExpanded(false);
     setEffectCategory('All');
-    setZoomLevel(getDefaultZoom());
+    setZoomLevel(1);
     setExportFormat('png');
     setExportSize(1024);
     setIsTransparent(true);
@@ -1735,7 +1734,7 @@ export default function App() {
     setActiveSelectedColor(null);
     setIsLayersListExpanded(false);
     setStudioTab('colors');
-    setZoomLevel(getDefaultZoom());
+    setZoomLevel(1);
     setUndoStack([]);
     setRedoStack([]);
 
@@ -2759,11 +2758,11 @@ export default function App() {
                     <ZoomOut className="w-3.5 h-3.5" />
                   </button>
                   <button
-                    onClick={() => setZoomLevel(getDefaultZoom())}
+                    onClick={() => setZoomLevel(1)}
                     className={`px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs font-mono font-bold rounded-md transition ${
                       appTheme === 'dark' ? 'hover:bg-slate-800 text-cyan-400' : 'hover:bg-slate-100 text-cyan-600'
                     }`}
-                    title={`Click to Reset Zoom (${Math.round(getDefaultZoom() * 100)}%)`}
+                    title="Click to Reset Zoom (100%)"
                   >
                     {Math.round(zoomLevel * 100)}%
                   </button>
