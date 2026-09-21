@@ -198,34 +198,24 @@ input[type="range"].hue-slider::-webkit-slider-thumb:hover {
 
 .interactive-svg-canvas svg * {
   cursor: pointer !important;
-  transition: filter 0.15s ease, opacity 0.15s ease !important;
   pointer-events: all !important;
   touch-action: manipulation;
 }
 
-/* 1. MOUSE HOVER: Zero lift/movement. Crisp, thin contrasting border along element edge (constant physical thickness) */
+/* 1. MOUSE HOVER: Crisp, subtle outline highlight (zero GPU ghosting/glitch) */
 .interactive-svg-canvas svg *:hover {
-  filter: drop-shadow(var(--hover-w, 0.75px) 0 0 #ffffff) 
-          drop-shadow(calc(var(--hover-w, 0.75px) * -1) 0 0 #ffffff) 
-          drop-shadow(0 var(--hover-w, 0.75px) 0 #ffffff) 
-          drop-shadow(0 calc(var(--hover-w, 0.75px) * -1) 0 #ffffff) !important;
+  outline: 1.5px dashed #38bdf8 !important;
+  outline-offset: 2px !important;
   opacity: 1 !important;
-  position: relative !important;
-  z-index: 30 !important;
 }
 
-/* 2. ACTIVE SELECTED: Refined, elegant thin border that maintains constant physical thickness at any zoom level */
+/* 2. ACTIVE SELECTED: Clean, professional Figma-style solid cyan selection outline */
 .svg-element-selected,
 .interactive-svg-canvas svg .svg-element-selected,
 .interactive-svg-canvas svg .svg-element-selected:hover {
-  outline: none !important;
-  filter: drop-shadow(var(--sel-w, 0.9px) 0 0 #ffffff) 
-          drop-shadow(calc(var(--sel-w, 0.9px) * -1) 0 0 #ffffff) 
-          drop-shadow(0 var(--sel-w, 0.9px) 0 #ffffff) 
-          drop-shadow(0 calc(var(--sel-w, 0.9px) * -1) 0 #ffffff) !important;
+  outline: 2px solid #38bdf8 !important;
+  outline-offset: 2px !important;
   opacity: 1 !important;
-  position: relative !important;
-  z-index: 50 !important;
 }
 
 /* Universal Mobile & Tablet Touch Ergonomics */

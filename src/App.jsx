@@ -1448,6 +1448,14 @@ export default function App() {
       }
 
       // Case B: Clicked on empty canvas background -> Light Blue Marquee Selection Box
+      // On mobile/touch screens, touching empty canvas should simply deselect without starting heavy 60fps marquee loops and getBoundingClientRect reflows
+      if (e.pointerType === 'touch' || !isDesktopScreen) {
+        setSelectedLayerIds([]);
+        setSelectedLayerId(null);
+        setActiveSelectedColor(null);
+        return;
+      }
+
       const wsEl = canvasWorkspaceRef.current;
       if (wsEl) {
         const wsRect = wsEl.getBoundingClientRect();
@@ -3530,13 +3538,21 @@ export default function App() {
                           { size: 1024, label: '1K' },
                           { size: 2048, label: '2K' },
                           { size: 4096, label: '4K' },
-                          { size: 8192, label: '8K' }
+                          { size: 8192, label: !isDesktopScreen ? '8K (PC)' : '8K' }
                         ].map(({ size, label }) => {
                           const isSelected = exportSize === size;
                           return (
                             <button
                               key={size}
-                              onClick={() => setExportSize(size)}
+                              onClick={() => {
+                                if (!isDesktopScreen && size === 8192) {
+                                  setExportSize(4096);
+                                  setSettingsToast('8K requires PC GPU memory. Auto-set to 4K Ultra-HD for mobile stability.');
+                                  setTimeout(() => setSettingsToast(''), 3500);
+                                  return;
+                                }
+                                setExportSize(size);
+                              }}
                               className={`py-1.5 px-1 rounded-xl text-xs font-bold transition border text-center flex flex-col items-center justify-center ${isSelected
                                 ? 'bg-blue-600 text-white border-blue-400 shadow-md ring-2 ring-blue-500/40 scale-[1.02]'
                                 : appTheme === 'dark'
@@ -6660,20 +6676,32 @@ export default function App() {
                         Export Resolution ({exportSize >= 1024 ? `${exportSize / 1024}K Ultra HD` : `${exportSize}px Standard`})
                       </label>
                       <div className="grid grid-cols-4 gap-2">
-                        {[128, 256, 512, 1024, 2048, 4096, 8192].map((sz) => (
-                          <button
-                            key={sz}
-                            onClick={() => setExportSize(sz)}
-                            className={`py-2 rounded-xl text-xs font-semibold transition border text-center ${exportSize === sz
-                              ? 'bg-blue-600 text-white border-blue-500 shadow-md'
-                              : appTheme === 'dark'
-                                ? 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700'
-                                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                              }`}
-                          >
-                            {sz >= 1024 ? `${sz / 1024}K` : `${sz}px`}
-                          </button>
-                        ))}
+                        {[128, 256, 512, 1024, 2048, 4096, 8192].map((sz) => {
+                          const isMobile = !isDesktopScreen;
+                          const is8K = sz === 8192;
+                          return (
+                            <button
+                              key={sz}
+                              onClick={() => {
+                                if (isMobile && is8K) {
+                                  setExportSize(4096);
+                                  setSettingsToast('8K requires PC GPU memory. Auto-set to 4K Ultra-HD for mobile stability.');
+                                  setTimeout(() => setSettingsToast(''), 3500);
+                                  return;
+                                }
+                                setExportSize(sz);
+                              }}
+                              className={`py-2 rounded-xl text-xs font-semibold transition border text-center ${exportSize === sz
+                                ? 'bg-blue-600 text-white border-blue-500 shadow-md ring-2 ring-blue-500/40'
+                                : appTheme === 'dark'
+                                  ? 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-white'
+                                  : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                                }`}
+                            >
+                              {sz >= 1024 ? (is8K && isMobile ? '8K (PC)' : `${sz / 1024}K`) : `${sz}px`}
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
 

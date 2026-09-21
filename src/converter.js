@@ -55,8 +55,18 @@ export async function downloadAsset({
     .replace(/\s+/g, '-')
     .replace(/[^a-z0-9-_]/g, '');
   const safeFilename = cleanName || 'icon';
-  const targetWidth = width || size;
-  const targetHeight = height || size;
+
+  // Mobile Hardware Safety Clamp:
+  // Mobile browsers (iOS Safari & Android Chrome) have hard hardware limits on canvas memory (4096 max texture size & 16MP canvas area).
+  // Creating an 8192x8192 canvas (268MB raw uncompressed GPU RAM per canvas) crashes mobile tabs immediately with OOM.
+  // We clamp mobile exports to 4096 (4K Ultra-HD), ensuring rock-solid stability and zero mobile tab crashes.
+  const isMobile = typeof window !== 'undefined' && (
+    /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+    (window.innerWidth < 768 && 'ontouchstart' in window)
+  );
+  const maxSafeDim = isMobile ? 4096 : 8192;
+  const targetWidth = Math.min(width || size, maxSafeDim);
+  const targetHeight = Math.min(height || size, maxSafeDim);
   const baseFilename = autoTagDimensions ? `${safeFilename}-${targetWidth}x${targetHeight}` : safeFilename;
 
   // DIRECT PURE VECTOR SVG EXPORT
@@ -187,13 +197,13 @@ export async function downloadAsset({
       const has3D = rotX !== 0 || rotY !== 0 || skX !== 0 || skY !== 0;
 
       // Icon Padding / Inset
-      let paddingRatio = adjustments.shadowBlur > 0 ? 0.82 : 0.9;
+      let paddingRatio = adjustments.shadowBlur > 0 ? 0.76 : 0.86;
       if (adjustments.bgShape && adjustments.bgShape !== 'none') {
         const shapePad = Number(adjustments.bgShapePadding || 20) / 100;
         paddingRatio = Math.max(0.2, (1 - shapePad * 1.5));
       }
       if (has3D) {
-        paddingRatio *= 0.86; // Margin so 3D perspective tilted corners don't get clipped
+        paddingRatio *= 0.82; // Margin so 3D perspective tilted corners and glow don't get clipped by canvas bounds
       }
 
       const drawWidth = targetWidth * paddingRatio;
@@ -210,20 +220,25 @@ export async function downloadAsset({
         ctx.restore();
       } else {
         // True 3D Hardware Perspective Path:
-        // 1. Render filtered 2D source onto an offscreen canvas
+        // Provide generous glowPad margin (30% of dimension) around img in offCanvas so diffuse glow fades completely to 0 alpha before reaching texture edges.
+        // This eliminates the square card / clipped bounding box artifact in 3D exports.
+        const glowPad = Math.round(Math.max(drawWidth, drawHeight) * 0.32);
+        const texW = Math.round(drawWidth + glowPad * 2);
+        const texH = Math.round(drawHeight + glowPad * 2);
+
         const offCanvas = document.createElement('canvas');
-        offCanvas.width = drawWidth;
-        offCanvas.height = drawHeight;
+        offCanvas.width = texW;
+        offCanvas.height = texH;
         const offCtx = offCanvas.getContext('2d');
         if (offCtx) {
           offCtx.imageSmoothingEnabled = true;
           offCtx.imageSmoothingQuality = 'high';
           offCtx.filter = filterRules || 'none';
-          offCtx.drawImage(img, 0, 0, drawWidth, drawHeight);
+          offCtx.drawImage(img, glowPad, glowPad, drawWidth, drawHeight);
         }
 
-        // 2. Render 3D perspective quad via WebGL with zero slicing
-        const webglCanvas = render3DWithWebGL(offCtx ? offCanvas : img, targetWidth, targetHeight, adjustments, drawWidth, drawHeight);
+        // Render 3D perspective quad via WebGL with zero slicing and seamless borderless glow
+        const webglCanvas = render3DWithWebGL(offCtx ? offCanvas : img, targetWidth, targetHeight, adjustments, texW, texH);
 
         if (webglCanvas) {
           // 3. Optional 3D elevation shadow (single-pass continuous blur, zero streaks)
@@ -408,6 +423,39 @@ function prepareSvgWithAdjustments(svgCode, adjustments = {}, targetWidth, targe
   } else {
     res = res.replace('<svg', '<svg preserveAspectRatio="none"');
   }
+
+  // Ensure overflow: visible so native SVG filters and glows don't get clipped by the viewBox boundary
+  if (res.includes('overflow=')) {
+    res = res.replace(/overflow="[^"]*"/gi, 'overflow="visible"');
+  } else {
+    res = res.replace('<svg', '<svg overflow="visible"');
+  }
+
+  // Expand native SVG filter boundaries so diffuse blur/glow effects never clip against tight filter bounds
+  res = res.replace(/<filter\b([^>]*)>/gi, (match, attrs) => {
+    let updated = attrs;
+    if (/x="[^"]*"/i.test(updated)) {
+      updated = updated.replace(/x="[^"]*"/i, 'x="-60%"');
+    } else {
+      updated += ' x="-60%"';
+    }
+    if (/y="[^"]*"/i.test(updated)) {
+      updated = updated.replace(/y="[^"]*"/i, 'y="-60%"');
+    } else {
+      updated += ' y="-60%"';
+    }
+    if (/width="[^"]*"/i.test(updated)) {
+      updated = updated.replace(/width="[^"]*"/i, 'width="220%"');
+    } else {
+      updated += ' width="220%"';
+    }
+    if (/height="[^"]*"/i.test(updated)) {
+      updated = updated.replace(/height="[^"]*"/i, 'height="220%"');
+    } else {
+      updated += ' height="220%"';
+    }
+    return `<filter${updated}>`;
+  });
 
   // Set explicit width and height on SVG element
   if (targetWidth && targetHeight) {
