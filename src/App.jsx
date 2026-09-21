@@ -7,12 +7,14 @@ import {
   Settings, Moon, RotateCcw, SlidersHorizontal, HardDrive, Monitor,
   ZoomIn, ZoomOut, Maximize2, Link2, Unlink2, Wand2, Scan,
   Heart, History, Shapes, MessageSquarePlus, Shield, FileText, Info,
-  Eye, EyeOff, Box, Compass, Move3d, Film, Play, Activity, GripVertical
+  Eye, EyeOff, Box, Compass, Move3d, Film, Play, Activity, GripVertical,
+  Move, ArrowUp, ArrowDown, ChevronsUp, ChevronsDown
 } from 'lucide-react';
 import { INITIAL_ELEMENTS } from './initialData';
 import { downloadAsset } from './converter';
 import { extractSvgColors, replaceSvgColors, scopeSvgIds, normalizeColor, getLinkedGradientColors, adjustColorBrightness, applyUniversalStroke } from './colorUtils';
 import { STYLE_RENDER_MODES, transformSvgStyle } from './styleTransformer';
+import { extractSvgLayers, applyLayerTransforms } from './layerUtils';
 import { supabase } from './supabaseClient';
 
 const DEFAULT_ADJUSTMENTS = {
@@ -1125,16 +1127,630 @@ export default function App() {
   const [downloading, setDownloading] = useState(false);
   const [previewBg, setPreviewBg] = useState(() => localStorage.getItem('iconderry_default_bg') || 'dark');
   const [zoomLevel, setZoomLevel] = useState(1);
-  const canvasWorkspaceRef = useRef(null);
+  const zoomLevelRef = useRef(zoomLevel);
+  zoomLevelRef.current = zoomLevel;
+  const targetZoomRef = useRef(1);
+  const currentZoomRef = useRef(1);
+  const [canvasPan, setCanvasPan] = useState({ x: 0, y: 0 });
+  const canvasPanRef = useRef({ x: 0, y: 0 });
+  canvasPanRef.current = canvasPan;
+  const targetPanRef = useRef({ x: 0, y: 0 });
+  const animFrameIdRef = useRef(null);
 
-  // Studio Resizable Right Sidebar Width (VS Code style)
+  const [isPanning, setIsPanning] = useState(false);
+  const [isCtrlShiftDown, setIsCtrlShiftDown] = useState(false);
+  const canvasWorkspaceRef = useRef(null);
+  const isDraggingPanRef = useRef(false);
+  const startPanPosRef = useRef({ x: 0, y: 0 });
+  const startPanOffsetRef = useRef({ x: 0, y: 0 });
+  const justFinishedPanRef = useRef(false);
+
+  // Vector Layers & Part Transforms & Multi-Selection & Layer Styles
+  const [selectedLayerId, setSelectedLayerId] = useState(null);
+  const [selectedLayerIds, setSelectedLayerIds] = useState([]);
+  const [layerTransforms, setLayerTransforms] = useState({});
+  const layerTransformsRef = useRef({});
+  layerTransformsRef.current = layerTransforms;
+  const [layerStyles, setLayerStyles] = useState({});
+  const layerStylesRef = useRef({});
+  layerStylesRef.current = layerStyles;
+  const [layerOrder, setLayerOrder] = useState([]);
+  const layerOrderRef = useRef([]);
+  layerOrderRef.current = layerOrder;
+  const [svgLayers, setSvgLayers] = useState([]);
+  const [layerListViewMode, setLayerListViewMode] = useState('layers'); // 'layers' | 'colors'
+  const [draggedLayerIdx, setDraggedLayerIdx] = useState(null);
+  const [dragOverLayerIdx, setDragOverLayerIdx] = useState(null);
+
+  // Canvas Vector Part Dragging & Marquee Selection Refs
+  const isDraggingLayerRef = useRef(false);
+  const layerDragStartPosRef = useRef({ x: 0, y: 0 });
+  const layerDragInitialTransformsRef = useRef({});
+  const justFinishedLayerDragRef = useRef(false);
+  const recordUndoRef = useRef(null);
+  const getStudioSnapshotRef = useRef(null);
+  const dragInitialSnapshotRef = useRef(null);
+  const handleUndoRef = useRef(null);
+  const handleRedoRef = useRef(null);
+
+  // Marquee Selection Box State (Click & Drag over Canvas)
+  const [marqueeBox, setMarqueeBox] = useState(null);
+
+  // Sync refs when zoomLevel is updated externally
+  useEffect(() => {
+    if (!animFrameIdRef.current) {
+      currentZoomRef.current = zoomLevel;
+    }
+  }, [zoomLevel]);
+
+  // Butter-smooth inertial LERP animation loop (absorbs physical mouse wheel notches into continuous silky gliding)
+  const startSmoothZoomLoop = () => {
+    if (animFrameIdRef.current) return;
+
+    const tick = () => {
+      const curZ = currentZoomRef.current;
+      const tgtZ = targetZoomRef.current;
+      const diffZ = tgtZ - curZ;
+
+      const curPan = canvasPanRef.current;
+      const tgtPan = targetPanRef.current;
+      const diffPanX = tgtPan.x - curPan.x;
+      const diffPanY = tgtPan.y - curPan.y;
+
+      const isZoomDone = Math.abs(diffZ) < 0.0008;
+      const isPanDone = Math.abs(diffPanX) < 0.4 && Math.abs(diffPanY) < 0.4;
+
+      if (isZoomDone && isPanDone) {
+        currentZoomRef.current = tgtZ;
+        setZoomLevel(Number(tgtZ.toFixed(3)));
+        if (tgtZ <= 1.05) {
+          setCanvasPan({ x: 0, y: 0 });
+          targetPanRef.current = { x: 0, y: 0 };
+        } else {
+          setCanvasPan(tgtPan);
+        }
+        animFrameIdRef.current = null;
+        return;
+      }
+
+      // Easing factor 0.16 produces a fluid, luxurious ease-out deceleration curve
+      const ease = 0.16;
+      const nextZ = curZ + diffZ * ease;
+      currentZoomRef.current = nextZ;
+      setZoomLevel(Number(nextZ.toFixed(3)));
+
+      const nextPanX = curPan.x + diffPanX * ease;
+      const nextPanY = curPan.y + diffPanY * ease;
+      setCanvasPan({
+        x: Math.round(nextPanX),
+        y: Math.round(nextPanY)
+      });
+
+      animFrameIdRef.current = requestAnimationFrame(tick);
+    };
+
+    animFrameIdRef.current = requestAnimationFrame(tick);
+  };
+
+  // Direct mouse scroll wheel zoom handler (pure wheel - no Ctrl or Shift needed!)
+  const handleWheel = (e) => {
+    // Prevent document page scroll
+    e.preventDefault();
+    if (e.stopPropagation) e.stopPropagation();
+
+    const delta = e.deltaY;
+    // Standard notch normalization
+    const clampedDelta = Math.max(-120, Math.min(120, delta));
+    // Multiplicative scale factor: ~18% smooth magnification per tick
+    const zoomIntensity = 0.0018;
+    const factor = Math.exp(-clampedDelta * zoomIntensity);
+
+    const prevTarget = targetZoomRef.current;
+    const nextTarget = Math.min(5, Math.max(0.1, prevTarget * factor));
+    targetZoomRef.current = nextTarget;
+
+    // Smooth auto-centering towards default center (0, 0) as user zooms out
+    if (nextTarget <= 1.05) {
+      targetPanRef.current = { x: 0, y: 0 };
+    } else if (nextTarget < prevTarget) {
+      const ratio = Math.max(0, (nextTarget - 1) / Math.max(0.01, prevTarget - 1));
+      targetPanRef.current = {
+        x: Math.round(targetPanRef.current.x * ratio),
+        y: Math.round(targetPanRef.current.y * ratio)
+      };
+    }
+
+    startSmoothZoomLoop();
+  };
+
+  // Track Ctrl + Shift keyboard state for canvas pan mode
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.ctrlKey && e.shiftKey) {
+        setIsCtrlShiftDown(true);
+      }
+    };
+    const handleKeyUp = (e) => {
+      if (!e.ctrlKey || !e.shiftKey) {
+        setIsCtrlShiftDown(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
+
+  // Pointer down handler to initiate canvas pan (Ctrl+Shift / Middle click) or Vector Part Drag-to-Move (Left click)
+  const handleCanvasPointerDown = (e) => {
+    // 1. Canvas Viewport Pan mode: Ctrl + Shift or Middle mouse button
+    if ((e.ctrlKey && e.shiftKey) || e.button === 1) {
+      e.preventDefault();
+      e.stopPropagation();
+      isDraggingPanRef.current = true;
+      startPanPosRef.current = { x: e.clientX, y: e.clientY };
+      startPanOffsetRef.current = { ...canvasPanRef.current };
+      setIsPanning(true);
+
+      const handlePointerMove = (moveEvt) => {
+        if (!isDraggingPanRef.current) return;
+        moveEvt.preventDefault();
+        const dx = moveEvt.clientX - startPanPosRef.current.x;
+        const dy = moveEvt.clientY - startPanPosRef.current.y;
+
+        const el = canvasWorkspaceRef.current;
+        let maxPanX = Infinity;
+        let maxPanY = Infinity;
+        const currentZoom = zoomLevelRef.current || 1;
+        if (el && currentZoom > 1.05) {
+          const rect = el.getBoundingClientRect();
+          // Keep element bounded inside workspace so it can never be lost outside screen
+          maxPanX = Math.max(60, (rect.width * (currentZoom - 0.85)) / 2);
+          maxPanY = Math.max(60, (rect.height * (currentZoom - 0.85)) / 2);
+        } else if (currentZoom <= 1.05) {
+          maxPanX = 0;
+          maxPanY = 0;
+        }
+
+        const rawX = startPanOffsetRef.current.x + dx;
+        const rawY = startPanOffsetRef.current.y + dy;
+        const nextX = Math.round(Math.max(-maxPanX, Math.min(maxPanX, rawX)));
+        const nextY = Math.round(Math.max(-maxPanY, Math.min(maxPanY, rawY)));
+
+        targetPanRef.current = { x: nextX, y: nextY };
+        setCanvasPan({ x: nextX, y: nextY });
+      };
+
+      const handlePointerUp = () => {
+        if (isDraggingPanRef.current) {
+          isDraggingPanRef.current = false;
+          setIsPanning(false);
+          justFinishedPanRef.current = true;
+          setTimeout(() => {
+            justFinishedPanRef.current = false;
+          }, 80);
+        }
+        window.removeEventListener('pointermove', handlePointerMove);
+        window.removeEventListener('pointerup', handlePointerUp);
+        window.removeEventListener('pointercancel', handlePointerUp);
+      };
+
+      window.addEventListener('pointermove', handlePointerMove);
+      window.addEventListener('pointerup', handlePointerUp);
+      window.addEventListener('pointercancel', handlePointerUp);
+      return;
+    }
+
+    // 2. Direct Left Click on Canvas: Vector Part Drag OR Marquee Drag-to-Select
+    if (e.button === 0) {
+      const targetLayerEl = e.target.closest('[data-layer-id]');
+
+      // Case A: Clicked directly on a Vector Shape / Part
+      if (targetLayerEl) {
+        const rawLayerId = targetLayerEl.getAttribute('data-layer-id');
+        const layerId = rawLayerId ? rawLayerId.replace(/^pf_studio_/i, '') : null;
+        if (layerId) {
+          e.preventDefault();
+          e.stopPropagation();
+
+          let activeIds;
+          if (e.shiftKey) {
+            // Shift + Click: Toggle element in/out of multi-selection
+            activeIds = selectedLayerIds.includes(layerId)
+              ? selectedLayerIds.filter(id => id !== layerId)
+              : [...selectedLayerIds, layerId];
+            setSelectedLayerIds(activeIds);
+            setSelectedLayerId(layerId);
+          } else {
+            // Normal Click: If already part of multi-select, keep group; otherwise select only this element
+            if (selectedLayerIds.includes(layerId) && selectedLayerIds.length > 1) {
+              activeIds = selectedLayerIds;
+            } else {
+              activeIds = [layerId];
+              setSelectedLayerIds([layerId]);
+            }
+            setSelectedLayerId(layerId);
+          }
+          setIsSelectionOutlineVisible(true);
+
+          isDraggingLayerRef.current = true;
+          layerDragStartPosRef.current = { x: e.clientX, y: e.clientY };
+          dragInitialSnapshotRef.current = getStudioSnapshotRef.current ? getStudioSnapshotRef.current() : null;
+
+          // Store initial transforms for all active layers so they move together in sync
+          const initialTransforms = {};
+          activeIds.forEach(id => {
+            initialTransforms[id] = layerTransformsRef.current[id] || { x: 0, y: 0, rotate: 0 };
+          });
+          layerDragInitialTransformsRef.current = initialTransforms;
+
+          const svgEl = canvasSvgContainerRef.current?.querySelector('svg');
+          const vb = svgEl?.viewBox?.baseVal;
+          const svgRect = svgEl?.getBoundingClientRect();
+          const vbWidth = (vb && vb.width > 0) ? vb.width : (svgRect?.width || 100);
+          const vbHeight = (vb && vb.height > 0) ? vb.height : (svgRect?.height || 100);
+          const scaleX = (svgRect && svgRect.width > 0) ? (vbWidth / svgRect.width) : 1;
+          const scaleY = (svgRect && svgRect.height > 0) ? (vbHeight / svgRect.height) : 1;
+
+          let hasActuallyMoved = false;
+          const DRAG_THRESHOLD = 5; // px: require distinct drag motion before mutating transforms so plain clicks/selections never modify rotation or coordinates
+
+          const handleLayerMove = (moveEvt) => {
+            if (!isDraggingLayerRef.current) return;
+            const rawDx = moveEvt.clientX - layerDragStartPosRef.current.x;
+            const rawDy = moveEvt.clientY - layerDragStartPosRef.current.y;
+
+            if (!hasActuallyMoved) {
+              if (Math.hypot(rawDx, rawDy) < DRAG_THRESHOLD) {
+                return; // Plain click or tap to select: do NOT touch transforms!
+              }
+              hasActuallyMoved = true;
+            }
+
+            moveEvt.preventDefault();
+            const svgDx = Math.round(rawDx * scaleX);
+            const svgDy = Math.round(rawDy * scaleY);
+
+            setLayerTransforms(prev => {
+              const updated = { ...prev };
+              activeIds.forEach(id => {
+                const init = initialTransforms[id] || { x: 0, y: 0, rotate: 0 };
+                updated[id] = {
+                  ...(prev[id] || { rotate: 0 }),
+                  x: init.x + svgDx,
+                  y: init.y + svgDy
+                };
+              });
+              return updated;
+            });
+          };
+
+          const handleLayerUp = () => {
+            if (isDraggingLayerRef.current) {
+              isDraggingLayerRef.current = false;
+              if (hasActuallyMoved && dragInitialSnapshotRef.current) {
+                // Record undo using the snapshot from BEFORE the movement started
+                setUndoStack(prev => [...prev.slice(-30), dragInitialSnapshotRef.current]);
+                setRedoStack([]);
+                justFinishedLayerDragRef.current = true;
+                setTimeout(() => {
+                  justFinishedLayerDragRef.current = false;
+                }, 80);
+              }
+            }
+            window.removeEventListener('pointermove', handleLayerMove);
+            window.removeEventListener('pointerup', handleLayerUp);
+            window.removeEventListener('pointercancel', handleLayerUp);
+          };
+
+          window.addEventListener('pointermove', handleLayerMove);
+          window.addEventListener('pointerup', handleLayerUp);
+          window.addEventListener('pointercancel', handleLayerUp);
+          return;
+        }
+      }
+
+      // Case B: Clicked on empty canvas background -> Light Blue Marquee Selection Box
+      const wsEl = canvasWorkspaceRef.current;
+      if (wsEl) {
+        const wsRect = wsEl.getBoundingClientRect();
+        const startClientX = e.clientX;
+        const startClientY = e.clientY;
+        const startRelX = e.clientX - wsRect.left;
+        const startRelY = e.clientY - wsRect.top;
+
+        let isMarquee = false;
+        let hitLayerIds = [];
+
+        const handleMarqueeMove = (moveEvt) => {
+          const curClientX = moveEvt.clientX;
+          const curClientY = moveEvt.clientY;
+          const dist = Math.hypot(curClientX - startClientX, curClientY - startClientY);
+
+          if (dist > 4) {
+            isMarquee = true;
+            moveEvt.preventDefault();
+            const curRelX = curClientX - wsRect.left;
+            const curRelY = curClientY - wsRect.top;
+            setMarqueeBox({
+              startX: startRelX,
+              startY: startRelY,
+              currentX: curRelX,
+              currentY: curRelY
+            });
+
+            // Find all SVG shape layers intersecting with the marquee rectangle
+            const boxLeft = Math.min(startClientX, curClientX);
+            const boxRight = Math.max(startClientX, curClientX);
+            const boxTop = Math.min(startClientY, curClientY);
+            const boxBottom = Math.max(startClientY, curClientY);
+
+            const svgContainer = canvasSvgContainerRef.current;
+            if (svgContainer) {
+              const layerNodes = Array.from(svgContainer.querySelectorAll('[data-layer-id]'));
+              const currentHits = [];
+              layerNodes.forEach(node => {
+                const rect = node.getBoundingClientRect();
+                const intersects = !(rect.right < boxLeft || rect.left > boxRight || rect.bottom < boxTop || rect.top > boxBottom);
+                if (intersects) {
+                  const rawId = node.getAttribute('data-layer-id');
+                  const cleanId = rawId ? rawId.replace(/^pf_studio_/i, '') : null;
+                  if (cleanId && !currentHits.includes(cleanId)) currentHits.push(cleanId);
+                }
+              });
+              hitLayerIds = currentHits;
+              setSelectedLayerIds(currentHits);
+              setSelectedLayerId(currentHits[0] || null);
+              setIsSelectionOutlineVisible(true);
+            }
+          }
+        };
+
+        const handleMarqueeUp = () => {
+          setMarqueeBox(null);
+          window.removeEventListener('pointermove', handleMarqueeMove);
+          window.removeEventListener('pointerup', handleMarqueeUp);
+          window.removeEventListener('pointercancel', handleMarqueeUp);
+
+          if (isMarquee) {
+            justFinishedLayerDragRef.current = true;
+            setTimeout(() => { justFinishedLayerDragRef.current = false; }, 80);
+            if (hitLayerIds.length > 0) {
+              setSelectedLayerIds(hitLayerIds);
+              setSelectedLayerId(hitLayerIds[0]);
+              setIsSelectionOutlineVisible(true);
+              setStudioTab('colors');
+            }
+          } else {
+            // Simple click without drag on canvas background: deselect
+            setSelectedLayerIds([]);
+            setSelectedLayerId(null);
+            setActiveSelectedColor(null);
+          }
+        };
+
+        window.addEventListener('pointermove', handleMarqueeMove);
+        window.addEventListener('pointerup', handleMarqueeUp);
+        window.addEventListener('pointercancel', handleMarqueeUp);
+      }
+    }
+  };
+
+  // Layer hierarchy and transform helpers
+  const handleBringToFront = (layerId) => {
+    if (!layerId) return;
+    recordUndoRef.current?.();
+    setLayerOrder(prev => {
+      const filtered = prev.filter(id => id !== layerId);
+      return [...filtered, layerId];
+    });
+  };
+
+  const handleSendToBack = (layerId) => {
+    if (!layerId) return;
+    recordUndoRef.current?.();
+    setLayerOrder(prev => {
+      const filtered = prev.filter(id => id !== layerId);
+      return [layerId, ...filtered];
+    });
+  };
+
+  const handleBringForward = (layerId) => {
+    if (!layerId) return;
+    recordUndoRef.current?.();
+    setLayerOrder(prev => {
+      const idx = prev.indexOf(layerId);
+      if (idx === -1 || idx === prev.length - 1) return prev;
+      const next = [...prev];
+      const temp = next[idx];
+      next[idx] = next[idx + 1];
+      next[idx + 1] = temp;
+      return next;
+    });
+  };
+
+  const handleSendBackward = (layerId) => {
+    if (!layerId) return;
+    recordUndoRef.current?.();
+    setLayerOrder(prev => {
+      const idx = prev.indexOf(layerId);
+      if (idx <= 0) return prev;
+      const next = [...prev];
+      const temp = next[idx];
+      next[idx] = next[idx - 1];
+      next[idx - 1] = temp;
+      return next;
+    });
+  };
+
+  const handleReorderLayers = (fromDisplayIdx, toDisplayIdx) => {
+    if (fromDisplayIdx === null || toDisplayIdx === null || fromDisplayIdx === toDisplayIdx) return;
+    recordUndoRef.current?.();
+    setLayerOrder(prev => {
+      // displayOrder is [...prev].reverse()
+      // displayIdx 0 is Top (Front), displayIdx (length - 1) is Bottom (Back)
+      const currentDisplay = [...prev].reverse();
+      const [movedItem] = currentDisplay.splice(fromDisplayIdx, 1);
+      currentDisplay.splice(toDisplayIdx, 0, movedItem);
+      return [...currentDisplay].reverse();
+    });
+  };
+
+  const handleResetLayerTransform = (targetIds) => {
+    const ids = Array.isArray(targetIds) ? targetIds : [targetIds];
+    if (ids.length === 0) return;
+    recordUndoRef.current?.();
+    setLayerTransforms(prev => {
+      const updated = { ...prev };
+      ids.forEach(id => {
+        const cleanId = String(id).replace(/^pf_studio_/i, '');
+        delete updated[cleanId];
+      });
+      return updated;
+    });
+  };
+
+  const handleLayerPositionChange = (targetIds, axis, value) => {
+    const ids = Array.isArray(targetIds) ? targetIds : [targetIds];
+    if (ids.length === 0) return;
+    recordUndoRef.current?.();
+    setLayerTransforms(prev => {
+      const updated = { ...prev };
+      ids.forEach(id => {
+        const cleanId = String(id).replace(/^pf_studio_/i, '');
+        const cur = updated[cleanId] || { x: 0, y: 0, rotate: 0 };
+        updated[cleanId] = { ...cur, [axis]: Number(value) };
+      });
+      return updated;
+    });
+  };
+
+  const handleLayerRotationChange = (targetIds, rotateVal) => {
+    const ids = Array.isArray(targetIds) ? targetIds : [targetIds];
+    if (ids.length === 0) return;
+    recordUndoRef.current?.();
+    setLayerTransforms(prev => {
+      const updated = { ...prev };
+      ids.forEach(id => {
+        const cleanId = String(id).replace(/^pf_studio_/i, '');
+        const cur = updated[cleanId] || { x: 0, y: 0, rotate: 0 };
+        updated[cleanId] = { ...cur, rotate: Number(rotateVal) };
+      });
+      return updated;
+    });
+  };
+
+  // Layer per-element color & effect styling helpers
+  const handleLayerColorChange = (targetIds, color) => {
+    const ids = Array.isArray(targetIds) ? targetIds : [targetIds];
+    if (ids.length === 0) return;
+    recordUndoRef.current?.();
+    setLayerStyles(prev => {
+      const updated = { ...prev };
+      ids.forEach(id => {
+        const cleanId = String(id).replace(/^pf_studio_/i, '');
+        updated[cleanId] = {
+          ...(updated[cleanId] || {}),
+          fill: color,
+          stroke: color
+        };
+      });
+      return updated;
+    });
+  };
+
+  const handleResetLayerColor = (targetIds) => {
+    const ids = Array.isArray(targetIds) ? targetIds : [targetIds];
+    if (ids.length === 0) return;
+    recordUndoRef.current?.();
+    setLayerStyles(prev => {
+      const updated = { ...prev };
+      ids.forEach(id => {
+        const cleanId = String(id).replace(/^pf_studio_/i, '');
+        if (updated[cleanId]) {
+          delete updated[cleanId].fill;
+          delete updated[cleanId].stroke;
+          delete updated[cleanId].strokeWidth;
+          if (Object.keys(updated[cleanId]).length === 0) delete updated[cleanId];
+        }
+      });
+      return updated;
+    });
+  };
+
+  const handleLayerEffectChange = (targetIds, key, val) => {
+    const ids = Array.isArray(targetIds) ? targetIds : [targetIds];
+    if (ids.length === 0) return;
+    setLayerStyles(prev => {
+      const updated = { ...prev };
+      ids.forEach(id => {
+        const cleanId = String(id).replace(/^pf_studio_/i, '');
+        const cur = updated[cleanId] || {};
+        if (key === 'glow') {
+          updated[cleanId] = {
+            ...cur,
+            glow: { ...(cur.glow || { color: '#38bdf8', radius: 12 }), ...val }
+          };
+        } else {
+          updated[cleanId] = {
+            ...cur,
+            [key]: val
+          };
+        }
+      });
+      return updated;
+    });
+  };
+
+  const handleResetLayerEffects = (targetIds) => {
+    const ids = Array.isArray(targetIds) ? targetIds : [targetIds];
+    if (ids.length === 0) return;
+    recordUndoRef.current?.();
+    setLayerStyles(prev => {
+      const updated = { ...prev };
+      ids.forEach(id => {
+        const cleanId = String(id).replace(/^pf_studio_/i, '');
+        if (updated[cleanId]) {
+          delete updated[cleanId].glow;
+          delete updated[cleanId].blur;
+          delete updated[cleanId].opacity;
+          delete updated[cleanId].brightness;
+          delete updated[cleanId].contrast;
+          delete updated[cleanId].customFilter;
+          if (Object.keys(updated[cleanId]).length === 0) delete updated[cleanId];
+        }
+      });
+      return updated;
+    });
+  };
+
+  const handleSelectAllLayers = () => {
+    const allIds = svgLayers.map(l => l.id);
+    setSelectedLayerIds(allIds);
+    if (allIds.length > 0) setSelectedLayerId(allIds[0]);
+    setIsSelectionOutlineVisible(true);
+    setStudioTab('colors');
+  };
+
+  const handleDeselectAllLayers = () => {
+    setSelectedLayerIds([]);
+    setSelectedLayerId(null);
+    setActiveSelectedColor(null);
+  };
+
+  // Studio Resizable Right Sidebar Width (VS Code style - Max 50% screen)
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     if (typeof window !== 'undefined') {
+      const zoom = window.innerWidth >= 1024 ? 1.1 : 1;
+      const halfScreen = Math.floor((window.innerWidth / zoom) * 0.5);
       const saved = localStorage.getItem('iconderry_studio_sidebar_width');
       if (saved) {
         const num = Number(saved);
-        if (!isNaN(num) && num >= 320 && num <= 900) return num;
+        if (!isNaN(num) && num >= 320) return Math.min(num, halfScreen);
       }
+      return Math.min(480, halfScreen);
     }
     return 480;
   });
@@ -1145,7 +1761,13 @@ export default function App() {
 
   useEffect(() => {
     const handleResize = () => {
-      setIsDesktopScreen(window.innerWidth >= 1024);
+      const isDesk = window.innerWidth >= 1024;
+      setIsDesktopScreen(isDesk);
+      if (isDesk) {
+        const zoom = 1.1;
+        const halfScreen = Math.floor((window.innerWidth / zoom) * 0.5);
+        setSidebarWidth(prev => Math.min(prev, halfScreen));
+      }
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
@@ -1163,8 +1785,9 @@ export default function App() {
       const deltaX = (startX - moveEvt.clientX) / zoom;
       const newWidth = Math.round(startWidth + deltaX);
 
-      const maxAllowed = Math.max(480, Math.floor((window.innerWidth / zoom) - 340));
-      const clamped = Math.min(Math.max(340, newWidth), maxAllowed);
+      // Max allowed: strictly HALF of screen width (50%)!
+      const halfScreenWidth = Math.floor((window.innerWidth / zoom) * 0.5);
+      const clamped = Math.min(Math.max(340, newWidth), halfScreenWidth);
       setSidebarWidth(clamped);
     };
 
@@ -1184,22 +1807,47 @@ export default function App() {
     window.addEventListener('pointerup', onPointerUp);
   };
 
-  // Wheel listener for Ctrl + Scroll (or Trackpad pinch zoom)
+  // Top Right Export Dropdown Menu State
+  const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
+  const exportDropdownRef = useRef(null);
+
+  useEffect(() => {
+    if (!isExportDropdownOpen) return;
+    const handleClickOutside = (e) => {
+      if (exportDropdownRef.current && !exportDropdownRef.current.contains(e.target)) {
+        setIsExportDropdownOpen(false);
+      }
+    };
+    document.addEventListener('pointerdown', handleClickOutside);
+    return () => document.removeEventListener('pointerdown', handleClickOutside);
+  }, [isExportDropdownOpen]);
+
+  // Advanced Export Settings States (Solid/Gradient BG, Custom Filename, Quality Compression)
+  const [isAdvancedExportOpen, setIsAdvancedExportOpen] = useState(false);
+  const [exportCustomFilename, setExportCustomFilename] = useState('');
+  const [exportAutoTagDimensions, setExportAutoTagDimensions] = useState(true);
+  const [exportQuality, setExportQuality] = useState(92);
+  const [exportBgType, setExportBgType] = useState('solid'); // 'solid' | 'gradient'
+  const [exportBgSolidColor, setExportBgSolidColor] = useState('#0b0f19');
+  const [exportBgGradient, setExportBgGradient] = useState({
+    preset: 'cyber',
+    from: '#060a12',
+    to: '#1e293b',
+    angle: 135
+  });
+
+  // Native wheel listener for pure scroll wheel zoom (no Ctrl/Shift required, smooth continuous LERP)
   useEffect(() => {
     const el = canvasWorkspaceRef.current;
     if (!el || !selectedAsset) return;
 
-    const onWheel = (e) => {
-      if (e.ctrlKey || e.metaKey) {
-        e.preventDefault();
-        const delta = e.deltaY < 0 ? 0.12 : -0.12;
-        setZoomLevel((prev) => Math.min(5, Math.max(0.2, Number((prev + delta).toFixed(2)))));
-      }
-    };
-
-    el.addEventListener('wheel', onWheel, { passive: false });
+    el.addEventListener('wheel', handleWheel, { passive: false });
     return () => {
-      el.removeEventListener('wheel', onWheel);
+      el.removeEventListener('wheel', handleWheel);
+      if (animFrameIdRef.current) {
+        cancelAnimationFrame(animFrameIdRef.current);
+        animFrameIdRef.current = null;
+      }
     };
   }, [selectedAsset]);
 
@@ -1309,41 +1957,72 @@ export default function App() {
     return extractSvgColors(selectedAsset.svgCode);
   }, [selectedAsset]);
 
-  // Compute live SVG markup with all active color replacements, material style transformations, and uniquely scoped IDs
+  // Extract all visual shape layers on selectedAsset change
+  useEffect(() => {
+    if (!selectedAsset || !selectedAsset.svgCode) {
+      setSvgLayers([]);
+      setLayerOrder([]);
+      setSelectedLayerId(null);
+      setSelectedLayerIds([]);
+      setLayerTransforms({});
+      setLayerStyles({});
+      return;
+    }
+    const { layers } = extractSvgLayers(selectedAsset.svgCode);
+    setSvgLayers(layers);
+    setLayerOrder(layers.map(l => l.id));
+    setSelectedLayerId(layers.length > 0 ? layers[0].id : null);
+    setSelectedLayerIds(layers.length > 0 ? [layers[0].id] : []);
+    setLayerTransforms({});
+    setLayerStyles({});
+  }, [selectedAsset]);
+
+  // Check if any 3D transformation is active to optimize 2D rendering performance
+  const has3D = Boolean(
+    (adjustments.rotateX && adjustments.rotateX !== 0) ||
+    (adjustments.rotateY && adjustments.rotateY !== 0) ||
+    (adjustments.depth3D && adjustments.depth3D > 0) ||
+    adjustments.is3DFloating
+  );
+
+  // Compute live SVG markup with all active layer transforms, per-layer custom styles & colors, material transformations, and uniquely scoped IDs
   const currentPreviewSvg = useMemo(() => {
     if (!selectedAsset) return '';
+
+    // 1. Global color replacements
     let colorReplaced = replaceSvgColors(selectedAsset.svgCode, adjustments.colorReplacements);
 
-    // Apply real visual material/style transformations (1: Silhouette, 2: Glassmorphism, 3: Neon Blue, 4: 3D Inflated, 5: Line Art, 6: Vibrant Mesh, etc.)
+    // 2. Visual material/style transformations (Silhouette, Glassmorphism, Neon Blue, 3D Inflated, Line Art, Vibrant Mesh, etc.)
     if (activeStyleMode && activeStyleMode !== 'original') {
       colorReplaced = transformSvgStyle(colorReplaced, activeStyleMode);
     }
 
-    // Apply vector stroke thickness (works universally for stroke & filled icons)
+    // 3. Vector stroke thickness (works universally for stroke & filled icons)
     if (strokeMultiplier && strokeMultiplier !== 1) {
       colorReplaced = applyUniversalStroke(colorReplaced, strokeMultiplier, strokeColorMode, customStrokeColor);
     }
 
+    // 4. Per-layer position offsets, rotations, DOM ordering, and per-layer custom styling (fill, stroke, opacity, glow, blur)
+    let transformedSvg = applyLayerTransforms(colorReplaced, layerTransforms, layerOrder, true, layerStyles);
+
     // Ensure viewBox exists for responsive freeform scaling/stretching
-    if (!colorReplaced.includes('viewBox=') && !colorReplaced.includes('viewbox=')) {
-      const wMatch = colorReplaced.match(/width="([0-9.]+)(?:px)?"/i);
-      const hMatch = colorReplaced.match(/height="([0-9.]+)(?:px)?"/i);
+    if (!transformedSvg.includes('viewBox=') && !transformedSvg.includes('viewbox=')) {
+      const wMatch = transformedSvg.match(/width="([0-9.]+)(?:px)?"/i);
+      const hMatch = transformedSvg.match(/height="([0-9.]+)(?:px)?"/i);
       if (wMatch && hMatch) {
-        const w = wMatch[1];
-        const h = hMatch[1];
-        colorReplaced = colorReplaced.replace('<svg', `<svg viewBox="0 0 ${w} ${h}"`);
+        transformedSvg = transformedSvg.replace('<svg', `<svg viewBox="0 0 ${wMatch[1]} ${hMatch[1]}"`);
       }
     }
 
     // Force preserveAspectRatio="none" so height and width stretch independently
-    if (colorReplaced.includes('preserveAspectRatio=')) {
-      colorReplaced = colorReplaced.replace(/preserveAspectRatio="[^"]*"/gi, 'preserveAspectRatio="none"');
+    if (transformedSvg.includes('preserveAspectRatio=')) {
+      transformedSvg = transformedSvg.replace(/preserveAspectRatio="[^"]*"/gi, 'preserveAspectRatio="none"');
     } else {
-      colorReplaced = colorReplaced.replace('<svg', '<svg preserveAspectRatio="none"');
+      transformedSvg = transformedSvg.replace('<svg', '<svg preserveAspectRatio="none"');
     }
 
-    return scopeSvgIds(colorReplaced, 'pf_studio_');
-  }, [selectedAsset, adjustments.colorReplacements, activeStyleMode, strokeMultiplier, strokeColorMode, customStrokeColor]);
+    return scopeSvgIds(transformedSvg, 'pf_studio_');
+  }, [selectedAsset, layerTransforms, layerStyles, layerOrder, adjustments.colorReplacements, activeStyleMode, strokeMultiplier, strokeColorMode, customStrokeColor]);
 
   // Detect whether currently selected icon is a stroke-based or filled vector
   const isStrokeIcon = useMemo(() => {
@@ -1422,7 +2101,28 @@ export default function App() {
     const container = canvasSvgContainerRef.current;
     container.querySelectorAll('.svg-element-selected').forEach(el => el.classList.remove('svg-element-selected'));
 
-    if (activeSelectedColor && isSelectionOutlineVisible) {
+    if (!isSelectionOutlineVisible) return;
+
+    // Multi-selection / single-selection outline on all selected vector parts
+    const activeIds = selectedLayerIds && selectedLayerIds.length > 0
+      ? selectedLayerIds
+      : (selectedLayerId ? [selectedLayerId] : []);
+
+    if (activeIds.length > 0) {
+      activeIds.forEach(id => {
+        const cleanId = String(id).replace(/^pf_studio_/i, '');
+        const numOnly = cleanId.replace(/\D/g, '');
+        const targetEl = container.querySelector(`[data-layer-id="${id}"]`) ||
+                         container.querySelector(`[data-layer-id="${cleanId}"]`) ||
+                         (numOnly ? container.querySelector(`[data-layer-id="layer_${numOnly}"]`) : null);
+        if (targetEl) {
+          targetEl.classList.add('svg-element-selected');
+        }
+      });
+      return;
+    }
+
+    if (activeSelectedColor) {
       const allEls = container.querySelectorAll('*');
       allEls.forEach(el => {
         if (isElementMatchingColor(el, activeSelectedColor)) {
@@ -1430,9 +2130,11 @@ export default function App() {
         }
       });
     }
-  }, [activeSelectedColor, currentPreviewSvg, isSelectionOutlineVisible]);
+  }, [selectedLayerId, selectedLayerIds, activeSelectedColor, currentPreviewSvg, isSelectionOutlineVisible]);
 
   const handleColorChange = (originalColor, newColor) => {
+    // Record undo state before color replacement
+    recordUndo();
     // Hide selection outline while editing so user can see clean preview of the element
     setIsSelectionOutlineVisible(false);
     const origKey = originalColor.toLowerCase();
@@ -1460,6 +2162,7 @@ export default function App() {
   };
 
   const handleResetSingleColor = (originalColor) => {
+    recordUndo();
     setIsSelectionOutlineVisible(false);
     const origKey = originalColor.toLowerCase();
     const linkedStops = selectedAsset ? getLinkedGradientColors(selectedAsset.svgCode, origKey) : [];
@@ -1478,13 +2181,24 @@ export default function App() {
   // Reset Everything back to original upload state
   const handleResetAll = () => {
     recordUndo();
-    setAdjustments(DEFAULT_ADJUSTMENTS);
+    setAdjustments({
+      ...DEFAULT_ADJUSTMENTS,
+      colorReplacements: {}
+    });
     setActiveStyleMode('original');
+    setLayerTransforms({});
+    setLayerStyles({});
+    setLayerOrder(svgLayers.map(l => l.id));
+    setSelectedLayerId(svgLayers.length > 0 ? svgLayers[0].id : null);
+    setSelectedLayerIds(svgLayers.length > 0 ? [svgLayers[0].id] : []);
+    setIsSelectionOutlineVisible(false);
     setIconWidth(384);
     setIconHeight(384);
     setLockAspectRatio(true);
     setAspectRatio(1);
     setStrokeMultiplier(1);
+    setStrokeColorMode('auto');
+    setCustomStrokeColor('#38bdf8');
     setBgShape('none');
     setBgShapeColor('#1e293b');
     setBgShapePadding(20);
@@ -1493,7 +2207,15 @@ export default function App() {
     setActiveSelectedColor(null);
     setIsLayersListExpanded(false);
     setEffectCategory('All');
+    targetZoomRef.current = 1;
+    currentZoomRef.current = 1;
+    targetPanRef.current = { x: 0, y: 0 };
+    if (animFrameIdRef.current) {
+      cancelAnimationFrame(animFrameIdRef.current);
+      animFrameIdRef.current = null;
+    }
     setZoomLevel(1);
+    setCanvasPan({ x: 0, y: 0 });
     setExportFormat('png');
     setExportSize(1024);
     setIsTransparent(true);
@@ -1572,21 +2294,36 @@ export default function App() {
     setExportFormat('png');
     setExportSize(1024);
     setIsTransparent(true);
+    setExportCustomFilename('');
+    setExportAutoTagDimensions(true);
+    setExportQuality(92);
+    setExportBgType('solid');
+    setExportBgSolidColor('#0b0f19');
+    setExportBgGradient({ preset: 'cyber', from: '#060a12', to: '#1e293b', angle: 135 });
+    setIsAdvancedExportOpen(false);
   };
 
-  // Helper to snapshot current Studio state for Undo / Redo
+  // Helper to snapshot current Studio state for Undo / Redo (deep cloned to prevent reference mutation)
   const getStudioSnapshot = () => ({
-    adjustments: { ...adjustments },
+    adjustments: JSON.parse(JSON.stringify(adjustments)),
+    layerTransforms: JSON.parse(JSON.stringify(layerTransforms)),
+    layerStyles: JSON.parse(JSON.stringify(layerStyles)),
+    layerOrder: [...layerOrder],
+    selectedLayerId,
+    selectedLayerIds: [...selectedLayerIds],
     activeStyleMode,
     iconWidth,
     iconHeight,
     strokeMultiplier,
+    strokeColorMode,
+    customStrokeColor,
     bgShape,
     bgShapeColor,
     bgShapePadding,
     bgShapeBorder,
     bgShapeBorderColor
   });
+  getStudioSnapshotRef.current = getStudioSnapshot;
 
   const recordUndo = () => {
     setIsSelectionOutlineVisible(false);
@@ -1594,6 +2331,7 @@ export default function App() {
     setUndoStack(prev => [...prev.slice(-30), snap]);
     setRedoStack([]);
   };
+  recordUndoRef.current = recordUndo;
 
   const handleUndo = () => {
     if (undoStack.length === 0) return;
@@ -1602,17 +2340,25 @@ export default function App() {
     setUndoStack(prev => prev.slice(0, -1));
     setRedoStack(prev => [...prev, currentSnap]);
 
-    setAdjustments(previous.adjustments);
-    setActiveStyleMode(previous.activeStyleMode);
-    setIconWidth(previous.iconWidth);
-    setIconHeight(previous.iconHeight);
-    setStrokeMultiplier(previous.strokeMultiplier);
-    setBgShape(previous.bgShape);
-    setBgShapeColor(previous.bgShapeColor);
-    setBgShapePadding(previous.bgShapePadding);
-    setBgShapeBorder(previous.bgShapeBorder);
-    setBgShapeBorderColor(previous.bgShapeBorderColor);
+    if (previous.adjustments) setAdjustments(previous.adjustments);
+    if (previous.layerTransforms) setLayerTransforms(previous.layerTransforms);
+    if (previous.layerStyles) setLayerStyles(previous.layerStyles);
+    if (previous.layerOrder) setLayerOrder(previous.layerOrder);
+    if (previous.selectedLayerId !== undefined) setSelectedLayerId(previous.selectedLayerId);
+    if (previous.selectedLayerIds) setSelectedLayerIds(previous.selectedLayerIds);
+    if (previous.activeStyleMode) setActiveStyleMode(previous.activeStyleMode);
+    if (previous.iconWidth) setIconWidth(previous.iconWidth);
+    if (previous.iconHeight) setIconHeight(previous.iconHeight);
+    if (previous.strokeMultiplier !== undefined) setStrokeMultiplier(previous.strokeMultiplier);
+    if (previous.strokeColorMode) setStrokeColorMode(previous.strokeColorMode);
+    if (previous.customStrokeColor) setCustomStrokeColor(previous.customStrokeColor);
+    if (previous.bgShape) setBgShape(previous.bgShape);
+    if (previous.bgShapeColor) setBgShapeColor(previous.bgShapeColor);
+    if (previous.bgShapePadding !== undefined) setBgShapePadding(previous.bgShapePadding);
+    if (previous.bgShapeBorder !== undefined) setBgShapeBorder(previous.bgShapeBorder);
+    if (previous.bgShapeBorderColor) setBgShapeBorderColor(previous.bgShapeBorderColor);
   };
+  handleUndoRef.current = handleUndo;
 
   const handleRedo = () => {
     if (redoStack.length === 0) return;
@@ -1621,17 +2367,25 @@ export default function App() {
     setRedoStack(prev => prev.slice(0, -1));
     setUndoStack(prev => [...prev, currentSnap]);
 
-    setAdjustments(next.adjustments);
-    setActiveStyleMode(next.activeStyleMode);
-    setIconWidth(next.iconWidth);
-    setIconHeight(next.iconHeight);
-    setStrokeMultiplier(next.strokeMultiplier);
-    setBgShape(next.bgShape);
-    setBgShapeColor(next.bgShapeColor);
-    setBgShapePadding(next.bgShapePadding);
-    setBgShapeBorder(next.bgShapeBorder);
-    setBgShapeBorderColor(next.bgShapeBorderColor);
+    if (next.adjustments) setAdjustments(next.adjustments);
+    if (next.layerTransforms) setLayerTransforms(next.layerTransforms);
+    if (next.layerStyles) setLayerStyles(next.layerStyles);
+    if (next.layerOrder) setLayerOrder(next.layerOrder);
+    if (next.selectedLayerId !== undefined) setSelectedLayerId(next.selectedLayerId);
+    if (next.selectedLayerIds) setSelectedLayerIds(next.selectedLayerIds);
+    if (next.activeStyleMode) setActiveStyleMode(next.activeStyleMode);
+    if (next.iconWidth) setIconWidth(next.iconWidth);
+    if (next.iconHeight) setIconHeight(next.iconHeight);
+    if (next.strokeMultiplier !== undefined) setStrokeMultiplier(next.strokeMultiplier);
+    if (next.strokeColorMode) setStrokeColorMode(next.strokeColorMode);
+    if (next.customStrokeColor) setCustomStrokeColor(next.customStrokeColor);
+    if (next.bgShape) setBgShape(next.bgShape);
+    if (next.bgShapeColor) setBgShapeColor(next.bgShapeColor);
+    if (next.bgShapePadding !== undefined) setBgShapePadding(next.bgShapePadding);
+    if (next.bgShapeBorder !== undefined) setBgShapeBorder(next.bgShapeBorder);
+    if (next.bgShapeBorderColor) setBgShapeBorderColor(next.bgShapeBorderColor);
   };
+  handleRedoRef.current = handleRedo;
 
   // Favorites handler
   const toggleFavorite = (id) => {
@@ -1654,9 +2408,18 @@ export default function App() {
 
   // Direct Click/Touch on Image SVG elements
   const handleCanvasElementClick = (e) => {
+    if (justFinishedLayerDragRef.current) return;
     let target = e.target;
     if (!target || !(target instanceof SVGElement) || target.tagName.toLowerCase() === 'svg') {
       return;
+    }
+
+    const rawLayerId = target.getAttribute('data-layer-id') || target.closest('[data-layer-id]')?.getAttribute('data-layer-id');
+    const layerId = rawLayerId ? rawLayerId.replace(/^pf_studio_/, '') : null;
+    if (layerId) {
+      setSelectedLayerId(layerId);
+      setIsSelectionOutlineVisible(true);
+      setStudioTab('colors');
     }
 
     let foundRawColors = [];
@@ -1774,6 +2537,9 @@ export default function App() {
   const handleOpenAsset = (item) => {
     setSelectedAsset(item);
     setActiveStyleMode('original');
+    setLayerTransforms({});
+    setLayerOrder([]);
+    setSelectedLayerId(null);
     setAdjustments({
       ...DEFAULT_ADJUSTMENTS,
       colorReplacements: {}
@@ -1791,7 +2557,15 @@ export default function App() {
     setActiveSelectedColor(null);
     setIsLayersListExpanded(false);
     setStudioTab('colors');
+    targetZoomRef.current = 1;
+    currentZoomRef.current = 1;
+    targetPanRef.current = { x: 0, y: 0 };
+    if (animFrameIdRef.current) {
+      cancelAnimationFrame(animFrameIdRef.current);
+      animFrameIdRef.current = null;
+    }
     setZoomLevel(1);
+    setCanvasPan({ x: 0, y: 0 });
     setUndoStack([]);
     setRedoStack([]);
 
@@ -1807,26 +2581,33 @@ export default function App() {
 
   // Keyboard shortcut listener for Ctrl+Z (Undo) and Ctrl+Y / Ctrl+Shift+Z (Redo)
   useEffect(() => {
-    if (!selectedAsset) return;
-
     const handleKeyDown = (e) => {
-      if (['INPUT', 'TEXTAREA'].includes(e.target.tagName)) return;
+      // Ignore shortcut when user is focused inside text input or textarea
+      if (e.target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
+      if (e.target && e.target.isContentEditable) return;
 
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+      const isMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform);
+      const isCmdOrCtrl = isMac ? e.metaKey : e.ctrlKey;
+
+      if (!isCmdOrCtrl) return;
+
+      if (e.key.toLowerCase() === 'z' && !e.shiftKey) {
         e.preventDefault();
-        handleUndo();
+        e.stopPropagation();
+        handleUndoRef.current?.();
       } else if (
-        (e.ctrlKey || e.metaKey) && 
-        (e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))
+        e.key.toLowerCase() === 'y' ||
+        (e.key.toLowerCase() === 'z' && e.shiftKey)
       ) {
         e.preventDefault();
-        handleRedo();
+        e.stopPropagation();
+        handleRedoRef.current?.();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedAsset, undoStack, redoStack, adjustments, activeStyleMode, iconWidth, iconHeight, strokeMultiplier, bgShape, bgShapeColor, bgShapePadding, bgShapeBorder, bgShapeBorderColor]);
+  }, []);
 
   const handleWidthChange = (val) => {
     const num = Math.max(16, Math.min(4096, Number(val) || 16));
@@ -1976,14 +2757,25 @@ export default function App() {
 
       await downloadAsset({
         svgCode: selectedAsset.svgCode,
-        filename: selectedAsset.title,
+        filename: exportCustomFilename.trim() || selectedAsset.title,
+        customFilename: exportCustomFilename.trim(),
+        autoTagDimensions: exportAutoTagDimensions,
         format: exportFormat,
         size: exportSize,
         width: finalWidth,
         height: finalHeight,
         isTransparent,
+        quality: exportQuality / 100,
+        customBg: {
+          type: exportBgType,
+          solidColor: exportBgSolidColor,
+          gradient: exportBgGradient
+        },
         adjustments: {
           ...adjustments,
+          layerTransforms,
+          layerOrder,
+          layerStyles,
           activeStyleMode,
           strokeMultiplier,
           strokeColorMode,
@@ -2032,6 +2824,9 @@ export default function App() {
         isTransparent,
         adjustments: {
           ...adjustments,
+          layerTransforms,
+          layerOrder,
+          layerStyles,
           activeStyleMode,
           strokeMultiplier,
           strokeColorMode,
@@ -2058,10 +2853,16 @@ export default function App() {
     recordUndo();
     setActiveFilterPreset(preset.id || preset.name);
     if (preset.adjustments) {
-      setAdjustments(prev => ({
-        ...prev,
-        ...preset.adjustments
-      }));
+      setAdjustments(prev => {
+        // Exclude shadowBlur and shadowColor so user's glow aura setting is preserved
+        const { shadowBlur, shadowColor, ...cleanAdj } = preset.adjustments;
+        return {
+          ...prev,
+          ...cleanAdj,
+          shadowBlur: prev.shadowBlur,
+          shadowColor: prev.shadowColor
+        };
+      });
     } else {
       setAdjustments(prev => ({
         ...prev,
@@ -2077,11 +2878,17 @@ export default function App() {
   const handleSelectStyleLook = (preset) => {
     setActiveStyleMode(preset.id || 'original');
     if (preset.adjustments) {
-      setAdjustments(prev => ({
-        ...prev,
-        ...preset.adjustments,
-        colorReplacements: preset.id === 'original' ? {} : prev.colorReplacements
-      }));
+      setAdjustments(prev => {
+        // Exclude shadowBlur and shadowColor so user's glow aura setting is preserved
+        const { shadowBlur, shadowColor, ...cleanAdj } = preset.adjustments;
+        return {
+          ...prev,
+          ...cleanAdj,
+          shadowBlur: prev.shadowBlur,
+          shadowColor: prev.shadowColor,
+          colorReplacements: preset.id === 'original' ? {} : prev.colorReplacements
+        };
+      });
     }
   };
 
@@ -2611,9 +3418,7 @@ export default function App() {
 
       {/* Full-Screen Immersive Studio Workspace */}
       {selectedAsset && (
-        <div className={`fixed inset-0 z-50 flex flex-col w-full h-full max-w-full max-h-full overflow-hidden font-sans transition-colors duration-200 ${
-          isResizingSidebar ? 'select-none' : ''
-        } ${
+        <div className={`fixed inset-0 z-50 flex flex-col w-full h-full max-w-full max-h-full overflow-hidden font-sans studio-workspace select-none transition-colors duration-200 ${
           appTheme === 'dark' ? 'bg-[#060a12] text-slate-100' : 'bg-slate-100 text-slate-900'
         }`}>
           {/* Top Navigation Bar */}
@@ -2722,14 +3527,126 @@ export default function App() {
                 <span className="hidden sm:inline font-semibold">Reset All</span>
               </button>
 
-              <button
-                onClick={handleDownload}
-                disabled={downloading}
-                className="bg-emerald-600 hover:bg-emerald-500 px-2.5 sm:px-4 py-1.5 rounded-xl font-semibold text-xs transition flex items-center gap-1.5 shadow-lg shadow-emerald-600/20 text-white disabled:opacity-50"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>{downloading ? '...' : `Export .${exportFormat.toUpperCase()}`}</span>
-              </button>
+              {/* Export Button with Quality & Resolution Dropdown */}
+              <div className="relative" ref={exportDropdownRef}>
+                <button
+                  onClick={() => setIsExportDropdownOpen(prev => !prev)}
+                  disabled={downloading}
+                  className={`bg-emerald-600 hover:bg-emerald-500 px-2.5 sm:px-4 py-1.5 rounded-xl font-semibold text-xs transition flex items-center gap-1.5 shadow-lg shadow-emerald-600/20 text-white disabled:opacity-50 ${
+                    isExportDropdownOpen ? 'ring-2 ring-emerald-400 bg-emerald-500' : ''
+                  }`}
+                  title="Export Quality & Options"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>{downloading ? 'Exporting...' : `Export .${exportFormat.toUpperCase()}`}</span>
+                  <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isExportDropdownOpen ? 'rotate-180 text-emerald-200' : 'text-white/70'}`} />
+                </button>
+
+                {isExportDropdownOpen && (
+                  <div className={`absolute right-0 top-full mt-2 w-72 sm:w-80 rounded-2xl shadow-2xl border p-3.5 z-50 animate-in fade-in zoom-in-95 duration-150 backdrop-blur-xl ${
+                    appTheme === 'dark'
+                      ? 'bg-[#0d1527]/98 border-slate-700/80 text-slate-100 shadow-black/80'
+                      : 'bg-white/98 border-slate-200 text-slate-900 shadow-slate-300'
+                  }`}>
+                    {/* Header */}
+                    <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-slate-700/30">
+                      <div>
+                        <h4 className="text-xs font-bold flex items-center gap-1.5">
+                          <Download className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Select Export Quality</span>
+                        </h4>
+                        <p className={`text-[10px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                          Choose resolution from 128px to 8K
+                        </p>
+                      </div>
+                      <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                        {exportSize >= 1024 ? `${exportSize / 1024}K Ultra HD` : `${exportSize}px`}
+                      </span>
+                    </div>
+
+                    {/* Format Selector Pills */}
+                    <div className="mb-3">
+                      <label className={`block text-[10px] font-semibold uppercase tracking-wider mb-1.5 ${
+                        appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'
+                      }`}>
+                        Format
+                      </label>
+                      <div className="grid grid-cols-5 gap-1">
+                        {['png', 'svg', 'webp', 'jpeg', 'gif'].map((fmt) => (
+                          <button
+                            key={fmt}
+                            onClick={() => setExportFormat(fmt)}
+                            className={`py-1 text-[10px] font-mono font-bold uppercase rounded-lg border transition ${
+                              exportFormat === fmt
+                                ? 'bg-emerald-600 border-emerald-500 text-white shadow'
+                                : appTheme === 'dark'
+                                ? 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
+                                : 'bg-slate-100 border-slate-200 text-slate-600 hover:text-slate-900'
+                            }`}
+                          >
+                            .{fmt}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Resolution Options Grid (128px to 8K) */}
+                    <div>
+                      <label className={`block text-[10px] font-semibold uppercase tracking-wider mb-1.5 ${
+                        appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'
+                      }`}>
+                        Resolution ({exportSize >= 1024 ? `${exportSize / 1024}K Ultra HD` : `${exportSize}px Standard`})
+                      </label>
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {[
+                          { size: 128, label: '128px' },
+                          { size: 256, label: '256px' },
+                          { size: 512, label: '512px' },
+                          { size: 1024, label: '1K' },
+                          { size: 2048, label: '2K' },
+                          { size: 4096, label: '4K' },
+                          { size: 8192, label: '8K' }
+                        ].map(({ size, label }) => {
+                          const isSelected = exportSize === size;
+                          return (
+                            <button
+                              key={size}
+                              onClick={() => setExportSize(size)}
+                              className={`py-1.5 px-1 rounded-xl text-xs font-bold transition border text-center flex flex-col items-center justify-center ${
+                                isSelected
+                                  ? 'bg-blue-600 text-white border-blue-400 shadow-md ring-2 ring-blue-500/40 scale-[1.02]'
+                                  : appTheme === 'dark'
+                                  ? 'bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700 hover:text-white'
+                                  : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200 hover:text-slate-900'
+                              } ${size === 8192 ? 'col-span-2 bg-gradient-to-r from-cyan-900/40 to-blue-900/40 border-cyan-700/50' : ''}`}
+                            >
+                              <span className={size === 8192 && !isSelected ? 'text-cyan-300' : ''}>{label}</span>
+                              <span className="text-[9px] opacity-70 font-normal">{size}px</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Prominent Action Button for the Selected Quality */}
+                    <button
+                      onClick={() => {
+                        setIsExportDropdownOpen(false);
+                        handleDownload();
+                      }}
+                      disabled={downloading}
+                      className="w-full mt-3.5 py-2.5 px-4 rounded-xl font-bold text-xs bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-white shadow-lg shadow-emerald-600/25 flex items-center justify-center gap-2 transition disabled:opacity-50"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>
+                        {downloading
+                          ? 'Rendering & Downloading...'
+                          : `Export ${exportSize >= 1024 ? `${exportSize / 1024}K` : `${exportSize}px`} (.${exportFormat.toUpperCase()})`}
+                      </span>
+                    </button>
+                  </div>
+                )}
+              </div>
 
               <button
                 onClick={() => setIsSettingsOpen(true)}
@@ -2762,17 +3679,78 @@ export default function App() {
             {/* Left/Center: Large Canvas Workspace */}
             <div
               ref={canvasWorkspaceRef}
+              onPointerDown={handleCanvasPointerDown}
+              onWheel={handleWheel}
               onClick={() => {
+                if (justFinishedPanRef.current || isCtrlShiftDown) return;
                 setActiveSelectedColor(null);
                 setIsSelectionOutlineVisible(true);
               }}
               className={`h-[38vh] sm:h-[45vh] lg:h-full lg:flex-1 min-w-0 relative flex flex-col items-center justify-center p-3 sm:p-6 select-none overflow-hidden transition-colors border-b lg:border-b-0 ${
+                isPanning
+                  ? 'cursor-grabbing select-none'
+                  : isCtrlShiftDown
+                  ? 'cursor-grab'
+                  : ''
+              } ${
                 appTheme === 'dark' ? 'bg-[#060a12]' : 'bg-slate-100/90'
               }`}
             >
+              {/* Marquee Selection Box (Figma/Illustrator Light Blue Drag Box) */}
+              {marqueeBox && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    left: `${Math.min(marqueeBox.startX, marqueeBox.currentX)}px`,
+                    top: `${Math.min(marqueeBox.startY, marqueeBox.currentY)}px`,
+                    width: `${Math.abs(marqueeBox.currentX - marqueeBox.startX)}px`,
+                    height: `${Math.abs(marqueeBox.currentY - marqueeBox.startY)}px`,
+                  }}
+                  className="pointer-events-none z-30 border-2 border-cyan-400 bg-cyan-400/20 rounded shadow-md backdrop-blur-[0.5px]"
+                />
+              )}
+
               {/* Floating Canvas Controls & Direct Selection Indicator */}
               <div className="absolute top-2 inset-x-2 sm:top-4 sm:inset-x-6 flex items-center justify-between z-10 pointer-events-none gap-2">
-                {activeSelectedColor ? (
+                {isCtrlShiftDown || isPanning ? (
+                  <div className="pointer-events-auto backdrop-blur-md border px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-xl text-[10px] sm:text-xs flex items-center gap-1.5 sm:gap-2 shadow-xl bg-cyan-950/90 border-cyan-500/60 text-cyan-300 font-semibold animate-pulse">
+                    <Move3d className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Pan View Active &bull; Drag mouse to move</span>
+                  </div>
+                ) : selectedLayerIds && selectedLayerIds.length > 0 ? (
+                  <div className={`pointer-events-auto backdrop-blur-md border px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-xl text-[10px] sm:text-xs flex items-center gap-1.5 sm:gap-2 shadow-xl animate-in fade-in duration-150 ${
+                    appTheme === 'dark'
+                      ? 'bg-slate-900/95 border-cyan-500/60 text-slate-200 shadow-cyan-950/30'
+                      : 'bg-white/95 border-cyan-500/60 text-slate-800 shadow-slate-200'
+                  }`}>
+                    <Layers className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
+                    <span>
+                      <strong className="text-cyan-400 font-bold">{selectedLayerIds.length}</strong> {selectedLayerIds.length === 1 ? 'part' : 'parts'} selected
+                    </span>
+                    <div className="flex items-center gap-1 ml-1">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSelectAllLayers();
+                        }}
+                        className="px-1.5 py-0.5 rounded bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-[9px] font-semibold transition"
+                        title="Select all vector parts"
+                      >
+                        Select All
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeselectAllLayers();
+                        }}
+                        className="px-1.5 py-0.5 rounded bg-slate-700/60 hover:bg-slate-700 text-slate-300 text-[9px] font-semibold transition"
+                        title="Deselect all"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+                ) : activeSelectedColor ? (
                   <div className={`pointer-events-auto backdrop-blur-md border px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-xl text-[10px] sm:text-xs flex items-center gap-1.5 sm:gap-2 shadow-xl animate-in fade-in duration-150 ${
                     appTheme === 'dark'
                       ? 'bg-slate-900/95 border-cyan-500/60 text-slate-200'
@@ -2800,6 +3778,7 @@ export default function App() {
                   }`}>
                     <Sparkles className="w-3 h-3 text-cyan-500 flex-shrink-0" />
                     <span><strong>Touch/Click</strong> icon to change colors</span>
+                    <span className={`hidden md:inline text-[10px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>&bull; Scroll: Smooth Zoom &bull; Drag: Marquee Select</span>
                   </div>
                 )}
 
@@ -2808,32 +3787,71 @@ export default function App() {
                   appTheme === 'dark' ? 'bg-slate-900/90 border-slate-800' : 'bg-white/95 border-slate-200'
                 }`}>
                   <button
-                    onClick={() => setZoomLevel(prev => Math.max(0.2, Number((prev - 0.15).toFixed(2))))}
+                    onClick={() => {
+                      const prevTarget = targetZoomRef.current;
+                      const nextTarget = Math.max(0.1, Number((prevTarget * 0.8).toFixed(2)));
+                      targetZoomRef.current = nextTarget;
+                      if (nextTarget <= 1.05) {
+                        targetPanRef.current = { x: 0, y: 0 };
+                      } else {
+                        const ratio = Math.max(0, (nextTarget - 1) / Math.max(0.01, prevTarget - 1));
+                        targetPanRef.current = {
+                          x: Math.round(targetPanRef.current.x * ratio),
+                          y: Math.round(targetPanRef.current.y * ratio)
+                        };
+                      }
+                      startSmoothZoomLoop();
+                    }}
                     className={`p-1 sm:p-1.5 rounded-lg transition ${
                       appTheme === 'dark' ? 'hover:bg-slate-800 text-slate-300' : 'hover:bg-slate-100 text-slate-700'
                     }`}
-                    title="Zoom Out"
+                    title="Zoom Out (Auto-centers towards 100%)"
                   >
                     <ZoomOut className="w-3.5 h-3.5" />
                   </button>
                   <button
-                    onClick={() => setZoomLevel(1)}
+                    onClick={() => {
+                      targetZoomRef.current = 1;
+                      currentZoomRef.current = 1;
+                      targetPanRef.current = { x: 0, y: 0 };
+                      if (animFrameIdRef.current) {
+                        cancelAnimationFrame(animFrameIdRef.current);
+                        animFrameIdRef.current = null;
+                      }
+                      setZoomLevel(1);
+                      setCanvasPan({ x: 0, y: 0 });
+                    }}
                     className={`px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs font-mono font-bold rounded-md transition ${
                       appTheme === 'dark' ? 'hover:bg-slate-800 text-cyan-400' : 'hover:bg-slate-100 text-cyan-600'
                     }`}
-                    title="Click to Reset Zoom (100%)"
+                    title="Click to Reset Zoom (100%) & Center Pan"
                   >
                     {Math.round(zoomLevel * 100)}%
                   </button>
                   <button
-                    onClick={() => setZoomLevel(prev => Math.min(5, Number((prev + 0.15).toFixed(2))))}
+                    onClick={() => {
+                      targetZoomRef.current = Math.min(5, Number((targetZoomRef.current * 1.25).toFixed(2)));
+                      startSmoothZoomLoop();
+                    }}
                     className={`p-1 sm:p-1.5 rounded-lg transition ${
                       appTheme === 'dark' ? 'hover:bg-slate-800 text-slate-300' : 'hover:bg-slate-100 text-slate-700'
                     }`}
-                    title="Zoom In"
+                    title="Zoom In (up to 500%)"
                   >
                     <ZoomIn className="w-3.5 h-3.5" />
                   </button>
+                  {(canvasPan.x !== 0 || canvasPan.y !== 0) && (
+                    <button
+                      onClick={() => {
+                        targetPanRef.current = { x: 0, y: 0 };
+                        startSmoothZoomLoop();
+                      }}
+                      className="px-1.5 py-0.5 text-[9px] font-semibold rounded bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 transition border border-cyan-500/30"
+                      title="Reset View to Center"
+                    >
+                      Center
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -2861,25 +3879,33 @@ export default function App() {
               >
                 <div
                   ref={canvasSvgContainerRef}
+                  onPointerDown={handleCanvasPointerDown}
                   onClick={(e) => {
+                    if (justFinishedPanRef.current || isCtrlShiftDown || (e.ctrlKey && e.shiftKey)) {
+                      e.stopPropagation();
+                      return;
+                    }
                     e.stopPropagation();
                     handleCanvasElementClick(e);
                   }}
                   style={{
-                    width: `${iconWidth}px`,
-                    height: `${iconHeight}px`,
-                    transform: `scale(${zoomLevel}) perspective(${adjustments.perspective || 800}px) rotateX(${adjustments.rotateX || 0}deg) rotateY(${adjustments.rotateY || 0}deg) rotate(${adjustments.rotation || 0}deg) skew(${adjustments.skewX || 0}deg, ${adjustments.skewY || 0}deg) scale(${adjustments.flipH ? -1 : 1}, ${adjustments.flipV ? -1 : 1})`,
+                    '--zoom-level': zoomLevel,
+                    '--sel-w': `${Math.max(0.02, Number((0.9 / zoomLevel).toFixed(4)))}px`,
+                    '--hover-w': `${Math.max(0.015, Number((0.75 / zoomLevel).toFixed(4)))}px`,
+                    width: `${Math.round(iconWidth * zoomLevel)}px`,
+                    height: `${Math.round(iconHeight * zoomLevel)}px`,
+                    transform: `translate(${canvasPan.x}px, ${canvasPan.y}px) ${has3D ? `perspective(${adjustments.perspective || 800}px) rotateX(${adjustments.rotateX || 0}deg) rotateY(${adjustments.rotateY || 0}deg) ` : ''}rotate(${adjustments.rotation || 0}deg) skew(${adjustments.skewX || 0}deg, ${adjustments.skewY || 0}deg) scale(${adjustments.flipH ? -1 : 1}, ${adjustments.flipV ? -1 : 1})`,
                     transformOrigin: 'center center',
-                    transformStyle: 'preserve-3d',
+                    transformStyle: has3D ? 'preserve-3d' : undefined,
+                    willChange: isPanning ? 'transform' : 'auto',
                     filter: getComputedFilterStyle(),
-                    transition: 'transform 0.08s ease-out, width 0.1s ease, height 0.1s ease',
                     backgroundColor: bgShape !== 'none' ? bgShapeColor : 'transparent',
                     padding: bgShape !== 'none' ? `${bgShapePadding * 0.7}%` : '0px',
                     borderRadius: bgShape === 'circle' ? '9999px' : bgShape === 'squircle' ? '28%' : bgShape === 'rounded-square' ? '1.5rem' : '0px',
                     clipPath: bgShape === 'hexagon' ? 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)' : 'none',
                     border: bgShape !== 'none' && bgShapeBorder > 0 ? `${bgShapeBorder}px solid ${bgShapeBorderColor}` : 'none'
                   }}
-                  className={`flex items-center justify-center interactive-svg-canvas cursor-pointer select-none [&>svg]:w-full [&>svg]:h-full [&>svg]:block ${
+                  className={`flex items-center justify-center interactive-svg-canvas cursor-pointer select-none [&>svg]:w-full [&>svg]:h-full [&>svg]:block [shape-rendering:geometricPrecision] [text-rendering:geometricPrecision] ${
                     bgShape !== 'none' ? 'shadow-2xl' : ''
                   }`}
                   dangerouslySetInnerHTML={{ __html: currentPreviewSvg }}
@@ -2924,15 +3950,6 @@ export default function App() {
                     </div>
                   </div>
                 )}
-
-                {/* Resolution & Dimensions Indicator Pill */}
-                <div className={`pointer-events-auto hidden sm:flex items-center gap-2 p-2 sm:p-2.5 px-3 sm:px-4 backdrop-blur-md border rounded-xl sm:rounded-2xl text-[10px] sm:text-[11px] shadow-xl ml-auto ${
-                  appTheme === 'dark' ? 'bg-slate-900/90 border-slate-800 text-slate-400' : 'bg-white/95 border-slate-200 text-slate-600'
-                }`}>
-                  <span>Export: <strong className={`font-mono text-cyan-500 font-bold`}>{exportSize >= 1024 ? `${exportSize / 1024}K Ultra HD` : `${exportSize}px`}</strong></span>
-                  <span>&bull;</span>
-                  <span>Format: <strong className={`font-mono uppercase font-bold ${appTheme === 'dark' ? 'text-slate-200' : 'text-slate-900'}`}>.{exportFormat}</strong></span>
-                </div>
               </div>
             </div>
 
@@ -2974,7 +3991,7 @@ export default function App() {
 
             {/* Right: Studio Tools & Control Sidebar */}
             <div
-              style={isDesktopScreen ? { width: `${sidebarWidth}px`, maxWidth: 'calc(100% - 320px)', minWidth: '340px' } : undefined}
+              style={isDesktopScreen ? { width: `${sidebarWidth}px`, maxWidth: '50%', minWidth: '340px' } : undefined}
               className={`flex-1 lg:flex-none lg:h-full w-full border-t lg:border-t-0 flex flex-col flex-shrink-0 shadow-2xl z-20 overflow-hidden transition-[background-color,border-color] duration-200 ${
                 appTheme === 'dark' ? 'bg-[#0d1424] border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-900'
               }`}
@@ -3248,13 +4265,547 @@ export default function App() {
                         <Sparkles className="w-5 h-5 text-cyan-500 mx-auto mb-1" />
                         <p className={`font-semibold ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-800'}`}>Touch Element on Image</p>
                         <p className={`text-[11px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                          Image ke kisi bhi part ko click karein uska color yahan edit karne ke liye.
+                          Canvas par kisi bhi element ko click karein ya drag karein usko move, rotate aur reorder karne ke liye.
                         </p>
                       </div>
                     )}
 
+                    {/* Part Styling, Effects & Transform Card (Single & Multi-Part Selection) */}
+                    {(() => {
+                      const activeIds = (selectedLayerIds && selectedLayerIds.length > 0)
+                        ? selectedLayerIds
+                        : (selectedLayerId ? [selectedLayerId] : []);
+                      if (activeIds.length === 0) return null;
+
+                      const isMulti = activeIds.length > 1;
+                      const primaryId = activeIds[0];
+                      const cleanPrimaryId = String(primaryId).replace(/^pf_studio_/i, '');
+                      const numOnly = cleanPrimaryId.replace(/\D/g, '');
+                      const activeLayer = svgLayers.find(l => l.id === cleanPrimaryId || l.id === primaryId || (numOnly && l.id === `layer_${numOnly}`)) || {
+                        id: cleanPrimaryId || 'layer',
+                        name: numOnly ? `Layer ${Number(numOnly) + 1}` : (cleanPrimaryId ? cleanPrimaryId.replace('_', ' ').toUpperCase() : 'Layer'),
+                        tag: 'shape',
+                        color: '#38bdf8'
+                      };
+
+                      const firstTransform = layerTransforms[cleanPrimaryId] || layerTransforms[primaryId] || (numOnly ? layerTransforms[`layer_${numOnly}`] : null) || { x: 0, y: 0, rotate: 0 };
+                      const hasCustomTransform = activeIds.some(id => {
+                        const cid = String(id).replace(/^pf_studio_/i, '');
+                        const t = layerTransforms[cid] || layerTransforms[id];
+                        return t && (t.x !== 0 || t.y !== 0 || t.rotate !== 0);
+                      });
+
+                      const firstStyle = layerStyles[cleanPrimaryId] || layerStyles[primaryId] || {};
+                      const hasCustomColor = activeIds.some(id => {
+                        const cid = String(id).replace(/^pf_studio_/i, '');
+                        const s = layerStyles[cid] || layerStyles[id];
+                        return s && (s.fill || s.stroke);
+                      });
+                      const currentColor = firstStyle.fill || firstStyle.stroke || (isMulti ? '#38bdf8' : (activeLayer.color || '#38bdf8'));
+
+                      const glowEnabled = !!firstStyle.glow?.enabled;
+                      const glowColor = firstStyle.glow?.color || '#38bdf8';
+                      const glowRadius = firstStyle.glow?.radius !== undefined ? firstStyle.glow.radius : 12;
+                      const currentOpacity = firstStyle.opacity !== undefined ? Math.round(Number(firstStyle.opacity) * 100) : 100;
+                      const currentBlur = firstStyle.blur !== undefined ? Number(firstStyle.blur) : 0;
+                      const currentBrightness = firstStyle.brightness !== undefined ? Number(firstStyle.brightness) : 100;
+
+                      const hasCustomEffects = activeIds.some(id => {
+                        const cid = String(id).replace(/^pf_studio_/i, '');
+                        const s = layerStyles[cid] || layerStyles[id];
+                        return s && (s.glow?.enabled || s.opacity !== undefined || s.blur !== undefined || s.brightness !== undefined);
+                      });
+
+                      const currentLayerIdx = layerOrder.findIndex(id => id === cleanPrimaryId || id === primaryId || (numOnly && id === `layer_${numOnly}`));
+                      const totalLayers = layerOrder.length || svgLayers.length || 1;
+
+                      // Adaptive coordinate span based on SVG viewBox dimensions
+                      const maxOffset = (() => {
+                        const vbMatch = selectedAsset?.svgCode?.match(/viewBox=["']\s*([0-9.-]+)\s+([0-9.-]+)\s+([0-9.-]+)\s+([0-9.-]+)\s*["']/i);
+                        if (vbMatch) {
+                          const w = parseFloat(vbMatch[3]);
+                          const h = parseFloat(vbMatch[4]);
+                          if (w > 0 && h > 0) return Math.round(Math.max(w, h) * 0.85);
+                        }
+                        return 200;
+                      })();
+                      const offsetStep = maxOffset <= 40 ? 0.5 : 1;
+
+                      const colorPalette = [
+                        '#38bdf8', '#06b6d4', '#818cf8', '#a855f7', 
+                        '#ec4899', '#f43f5e', '#f97316', '#eab308', 
+                        '#10b981', '#22c55e', '#ffffff', '#0f172a'
+                      ];
+
+                      return (
+                        <div className={`p-4 rounded-2xl border shadow-xl space-y-4 animate-in fade-in duration-200 ${
+                          appTheme === 'dark'
+                            ? 'bg-slate-900/90 border-cyan-500/40 shadow-cyan-950/20'
+                            : 'bg-white border-cyan-400/60 shadow-slate-200'
+                        }`}>
+                          {/* Header */}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              {isMulti ? (
+                                <div className="w-7 h-7 rounded-xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center flex-shrink-0">
+                                  <Layers className="w-4 h-4 text-cyan-400" />
+                                </div>
+                              ) : (
+                                <div 
+                                  className="w-5 h-5 rounded-full border border-slate-600 shadow-sm flex-shrink-0"
+                                  style={{ backgroundColor: currentColor }}
+                                />
+                              )}
+                              <div>
+                                <div className="flex items-center gap-1.5">
+                                  <span className={`text-xs font-bold ${appTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                                    {isMulti ? `${activeIds.length} Parts Selected` : activeLayer.name}
+                                  </span>
+                                  {!isMulti && (
+                                    <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                                      &lt;{activeLayer.tag}&gt;
+                                    </span>
+                                  )}
+                                </div>
+                                <p className={`text-[10px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                                  {isMulti ? 'Bulk edit color, effects & position' : `Layer ${currentLayerIdx >= 0 ? currentLayerIdx + 1 : 1} of ${totalLayers} • Drag on canvas`}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1">
+                              {isMulti ? (
+                                <>
+                                  <button
+                                    onClick={handleSelectAllLayers}
+                                    className={`text-[9px] px-2 py-1 rounded-lg border transition font-medium ${
+                                      appTheme === 'dark'
+                                        ? 'text-cyan-300 hover:text-white bg-cyan-950/50 border-cyan-700/50'
+                                        : 'text-cyan-700 bg-cyan-50 border-cyan-300'
+                                    }`}
+                                  >
+                                    All ({svgLayers.length})
+                                  </button>
+                                  <button
+                                    onClick={handleDeselectAllLayers}
+                                    className={`text-[9px] px-2 py-1 rounded-lg border transition font-medium ${
+                                      appTheme === 'dark'
+                                        ? 'text-slate-400 hover:text-white bg-slate-800/80 border-slate-700'
+                                        : 'text-slate-600 bg-slate-100 border-slate-200'
+                                    }`}
+                                  >
+                                    Clear
+                                  </button>
+                                </>
+                              ) : (
+                                (hasCustomTransform || hasCustomColor || hasCustomEffects) && (
+                                  <button
+                                    onClick={() => {
+                                      handleResetLayerTransform(activeIds);
+                                      handleResetLayerColor(activeIds);
+                                      handleResetLayerEffects(activeIds);
+                                    }}
+                                    className={`text-[10px] flex items-center gap-1 px-2 py-1 rounded-lg border transition ${
+                                      appTheme === 'dark'
+                                        ? 'text-slate-400 hover:text-white bg-slate-800/80 border-slate-700'
+                                        : 'text-slate-600 hover:text-slate-900 bg-slate-100 border-slate-200'
+                                    }`}
+                                    title="Reset this part to default style and position"
+                                  >
+                                    <RotateCcw className="w-3 h-3 text-cyan-400" />
+                                    <span>Reset Part</span>
+                                  </button>
+                                )
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Canvas Drag Hint */}
+                          <div className={`p-2 rounded-xl text-[10px] flex items-center justify-between border ${
+                            appTheme === 'dark'
+                              ? 'bg-cyan-950/20 text-cyan-300 border-cyan-800/30'
+                              : 'bg-cyan-50 text-cyan-800 border-cyan-200'
+                          }`}>
+                            <span className="flex items-center gap-1.5 font-medium">
+                              <Move className="w-3 h-3 text-cyan-400 flex-shrink-0" />
+                              {isMulti ? 'Canvas par drag karein — sabhi selected parts ek sath move honge!' : 'Canvas par direct mouse se drag karke move karein!'}
+                            </span>
+                            {(firstTransform.x !== 0 || firstTransform.y !== 0) && (
+                              <span className="font-mono font-bold text-cyan-400">
+                                X: {firstTransform.x}px, Y: {firstTransform.y}px
+                              </span>
+                            )}
+                          </div>
+
+                          {/* 1. SEPARATE PART COLOR SECTION */}
+                          <div className="space-y-2.5 pt-1 border-t border-slate-800/60">
+                            <div className="flex items-center justify-between text-[11px] font-semibold">
+                              <span className="flex items-center gap-1.5 text-cyan-400">
+                                <Paintbrush className="w-3.5 h-3.5" />
+                                <span>{isMulti ? 'Apply Color to Selected Parts' : 'Part Color (Fill & Stroke)'}</span>
+                              </span>
+                              {hasCustomColor && (
+                                <button
+                                  onClick={() => handleResetLayerColor(activeIds)}
+                                  className={`text-[9px] px-1.5 py-0.5 rounded border transition ${
+                                    appTheme === 'dark' ? 'border-slate-800 text-slate-400 hover:text-white' : 'border-slate-200 text-slate-600 hover:text-slate-900'
+                                  }`}
+                                  title="Revert to original element color"
+                                >
+                                  Revert Color
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Quick Swatches */}
+                            <div className="grid grid-cols-6 gap-1.5">
+                              {colorPalette.map(color => (
+                                <button
+                                  key={color}
+                                  onClick={() => handleLayerColorChange(activeIds, color)}
+                                  style={{ backgroundColor: color }}
+                                  className={`h-6 rounded-lg border transition shadow-sm hover:scale-105 ${
+                                    currentColor.toLowerCase() === color.toLowerCase()
+                                      ? 'ring-2 ring-cyan-400 ring-offset-1 ring-offset-slate-900 border-white'
+                                      : 'border-slate-700/60'
+                                  }`}
+                                  title={`Apply ${color}`}
+                                />
+                              ))}
+                            </div>
+
+                            {/* Custom Color Input */}
+                            <div className="flex items-center gap-2 pt-0.5">
+                              <div className="relative flex-1">
+                                <input
+                                  type="color"
+                                  value={currentColor.startsWith('#') ? currentColor : '#38bdf8'}
+                                  onChange={(e) => handleLayerColorChange(activeIds, e.target.value)}
+                                  className="w-full h-8 rounded-lg cursor-pointer bg-transparent border border-slate-700/60 p-0.5"
+                                />
+                              </div>
+                              <input
+                                type="text"
+                                value={currentColor}
+                                onChange={(e) => handleLayerColorChange(activeIds, e.target.value)}
+                                className={`w-24 text-xs font-mono px-2 py-1.5 rounded-lg border transition ${
+                                  appTheme === 'dark'
+                                    ? 'bg-slate-950 border-slate-700 text-slate-200'
+                                    : 'bg-white border-slate-300 text-slate-800'
+                                }`}
+                                placeholder="#38bdf8"
+                              />
+                            </div>
+                          </div>
+
+                          {/* 2. SPECIAL EFFECTS SECTION (Glow Aura, Opacity, Blur, Brightness) */}
+                          <div className="space-y-3 pt-1 border-t border-slate-800/60">
+                            <div className="flex items-center justify-between text-[11px] font-semibold">
+                              <span className="flex items-center gap-1.5 text-cyan-400">
+                                <Sparkles className="w-3.5 h-3.5" />
+                                <span>Part Special Effects</span>
+                              </span>
+                              {hasCustomEffects && (
+                                <button
+                                  onClick={() => handleResetLayerEffects(activeIds)}
+                                  className={`text-[9px] px-1.5 py-0.5 rounded border transition ${
+                                    appTheme === 'dark' ? 'border-slate-800 text-slate-400 hover:text-white' : 'border-slate-200 text-slate-600 hover:text-slate-900'
+                                  }`}
+                                >
+                                  Reset Effects
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Glow Aura Toggle & Controls */}
+                            <div className={`p-2.5 rounded-xl border space-y-2 ${
+                              glowEnabled
+                                ? appTheme === 'dark' ? 'bg-cyan-950/30 border-cyan-500/50' : 'bg-cyan-50 border-cyan-300'
+                                : appTheme === 'dark' ? 'bg-slate-950/50 border-slate-800' : 'bg-slate-50 border-slate-200'
+                            }`}>
+                              <div className="flex items-center justify-between">
+                                <span className="text-[11px] font-medium flex items-center gap-1.5">
+                                  <span className={`w-2 h-2 rounded-full ${glowEnabled ? 'bg-cyan-400 animate-ping' : 'bg-slate-600'}`} />
+                                  <span>Glow Aura Effect</span>
+                                </span>
+                                <button
+                                  onClick={() => handleLayerEffectChange(activeIds, 'glow', { enabled: !glowEnabled, color: glowColor, radius: glowRadius })}
+                                  className={`px-2.5 py-0.5 rounded-md text-[10px] font-semibold transition ${
+                                    glowEnabled
+                                      ? 'bg-cyan-500 text-white shadow-md shadow-cyan-500/30'
+                                      : appTheme === 'dark' ? 'bg-slate-800 text-slate-400 hover:text-white' : 'bg-slate-200 text-slate-600'
+                                  }`}
+                                >
+                                  {glowEnabled ? 'Enabled' : 'Enable'}
+                                </button>
+                              </div>
+
+                              {glowEnabled && (
+                                <div className="space-y-2 pt-1 border-t border-cyan-500/20 animate-in fade-in duration-150">
+                                  <div className="flex items-center justify-between text-[10px]">
+                                    <span className="text-slate-400">Glow Radius:</span>
+                                    <span className="font-mono text-cyan-400 font-bold">{glowRadius}px</span>
+                                  </div>
+                                  <input
+                                    type="range"
+                                    min="2"
+                                    max="40"
+                                    value={glowRadius}
+                                    onChange={(e) => handleLayerEffectChange(activeIds, 'glow', { enabled: true, color: glowColor, radius: Number(e.target.value) })}
+                                    className="w-full accent-cyan-500 cursor-pointer h-1.5 bg-slate-700 rounded-lg"
+                                  />
+                                  <div className="flex items-center gap-1.5 pt-1">
+                                    <span className="text-[10px] text-slate-400">Aura Color:</span>
+                                    {['#38bdf8', '#a855f7', '#ec4899', '#10b981', '#ffffff'].map(c => (
+                                      <button
+                                        key={c}
+                                        onClick={() => handleLayerEffectChange(activeIds, 'glow', { enabled: true, color: c, radius: glowRadius })}
+                                        style={{ backgroundColor: c }}
+                                        className={`w-4 h-4 rounded-full border transition ${glowColor === c ? 'ring-2 ring-cyan-400 scale-110' : 'border-slate-700'}`}
+                                      />
+                                    ))}
+                                    <input
+                                      type="color"
+                                      value={glowColor}
+                                      onChange={(e) => handleLayerEffectChange(activeIds, 'glow', { enabled: true, color: e.target.value, radius: glowRadius })}
+                                      className="w-5 h-5 rounded cursor-pointer bg-transparent border-0 p-0 ml-auto"
+                                      title="Custom Glow Color"
+                                    />
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Opacity Slider */}
+                            <div className={`p-2 rounded-xl border ${appTheme === 'dark' ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                              <div className="flex items-center justify-between text-[10px] mb-1">
+                                <span className="text-slate-400 font-medium">Part Opacity:</span>
+                                <span className="font-mono text-cyan-400 font-bold">{currentOpacity}%</span>
+                              </div>
+                              <input
+                                type="range"
+                                min="0"
+                                max="100"
+                                value={currentOpacity}
+                                onChange={(e) => handleLayerEffectChange(activeIds, 'opacity', Number(e.target.value) / 100)}
+                                className="w-full accent-cyan-500 cursor-pointer h-1.5 bg-slate-700 rounded-lg"
+                              />
+                            </div>
+
+                            {/* Blur Slider */}
+                            <div className={`p-2 rounded-xl border ${appTheme === 'dark' ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                              <div className="flex items-center justify-between text-[10px] mb-1">
+                                <span className="text-slate-400 font-medium">Part Blur:</span>
+                                <span className="font-mono text-cyan-400 font-bold">{currentBlur}px</span>
+                              </div>
+                              <input
+                                type="range"
+                                min="0"
+                                max="20"
+                                step="0.5"
+                                value={currentBlur}
+                                onChange={(e) => handleLayerEffectChange(activeIds, 'blur', Number(e.target.value))}
+                                className="w-full accent-cyan-500 cursor-pointer h-1.5 bg-slate-700 rounded-lg"
+                              />
+                            </div>
+
+                            {/* Brightness Slider */}
+                            <div className={`p-2 rounded-xl border ${appTheme === 'dark' ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                              <div className="flex items-center justify-between text-[10px] mb-1">
+                                <span className="text-slate-400 font-medium">Part Brightness:</span>
+                                <span className="font-mono text-cyan-400 font-bold">{currentBrightness}%</span>
+                              </div>
+                              <input
+                                type="range"
+                                min="20"
+                                max="200"
+                                value={currentBrightness}
+                                onChange={(e) => handleLayerEffectChange(activeIds, 'brightness', Number(e.target.value))}
+                                className="w-full accent-cyan-500 cursor-pointer h-1.5 bg-slate-700 rounded-lg"
+                              />
+                            </div>
+                          </div>
+
+                          {/* 3. POSITION (X / Y) CONTROLS */}
+                          <div className="space-y-2.5 pt-1 border-t border-slate-800/60">
+                            <div className="flex items-center justify-between text-[11px] font-semibold">
+                              <span className={appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'}>
+                                {isMulti ? 'Move Selected Parts (Offset X / Y)' : 'Part Position (X / Y)'}
+                              </span>
+                              <button
+                                onClick={() => {
+                                  handleLayerPositionChange(activeIds, 'x', 0);
+                                  handleLayerPositionChange(activeIds, 'y', 0);
+                                }}
+                                className={`text-[9px] px-1.5 py-0.5 rounded border transition ${
+                                  appTheme === 'dark' ? 'border-slate-800 text-slate-400 hover:text-white' : 'border-slate-200 text-slate-600 hover:text-slate-900'
+                                }`}
+                              >
+                                Center (0, 0)
+                              </button>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2">
+                              {/* X Axis */}
+                              <div className={`p-2 rounded-xl border ${appTheme === 'dark' ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                                <div className="flex items-center justify-between text-[10px] mb-1">
+                                  <span className="text-slate-400 font-medium">Offset X:</span>
+                                  <span className="font-mono text-cyan-400 font-bold">{firstTransform.x || 0}px</span>
+                                </div>
+                                <input
+                                  type="range"
+                                  min={-maxOffset}
+                                  max={maxOffset}
+                                  step={offsetStep}
+                                  value={firstTransform.x || 0}
+                                  onChange={(e) => handleLayerPositionChange(activeIds, 'x', e.target.value)}
+                                  className="w-full accent-cyan-500 cursor-pointer h-1.5 bg-slate-700 rounded-lg"
+                                />
+                              </div>
+
+                              {/* Y Axis */}
+                              <div className={`p-2 rounded-xl border ${appTheme === 'dark' ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                                <div className="flex items-center justify-between text-[10px] mb-1">
+                                  <span className="text-slate-400 font-medium">Offset Y:</span>
+                                  <span className="font-mono text-cyan-400 font-bold">{firstTransform.y || 0}px</span>
+                                </div>
+                                <input
+                                  type="range"
+                                  min={-maxOffset}
+                                  max={maxOffset}
+                                  step={offsetStep}
+                                  value={firstTransform.y || 0}
+                                  onChange={(e) => handleLayerPositionChange(activeIds, 'y', e.target.value)}
+                                  className="w-full accent-cyan-500 cursor-pointer h-1.5 bg-slate-700 rounded-lg"
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* 4. ROTATION CONTROLS */}
+                          <div className="space-y-2 pt-1 border-t border-slate-800/60">
+                            <div className="flex items-center justify-between text-[11px] font-semibold">
+                              <span className={appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'}>
+                                {isMulti ? 'Rotate Selected Parts' : 'Part Rotation'}
+                              </span>
+                              <span className="font-mono text-cyan-400 text-xs font-bold">
+                                {firstTransform.rotate || 0}&deg;
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                              <input
+                                type="range"
+                                min="-180"
+                                max="180"
+                                step="1"
+                                value={firstTransform.rotate || 0}
+                                onChange={(e) => handleLayerRotationChange(activeIds, e.target.value)}
+                                className="flex-1 accent-cyan-500 cursor-pointer h-1.5 bg-slate-700 rounded-lg"
+                              />
+                              <div className="flex items-center gap-1">
+                                {[-90, 0, 90].map((deg) => (
+                                  <button
+                                    key={deg}
+                                    onClick={() => handleLayerRotationChange(activeIds, deg)}
+                                    className={`px-2 py-0.5 rounded text-[10px] font-mono font-medium border transition ${
+                                      (firstTransform.rotate || 0) === deg
+                                        ? 'bg-cyan-500 text-white border-cyan-400'
+                                        : appTheme === 'dark' ? 'bg-slate-800 text-slate-300 border-slate-700 hover:text-white' : 'bg-slate-100 text-slate-700 border-slate-200'
+                                    }`}
+                                  >
+                                    {deg === 0 ? '0°' : `${deg > 0 ? '+' : ''}${deg}°`}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* 5. LAYER HIERARCHY / Z-INDEX ORDERING CONTROLS */}
+                          {!isMulti && (
+                            <div className="space-y-2 pt-1 border-t border-slate-800/60">
+                              <div className="flex items-center justify-between text-[11px] font-semibold">
+                                <span className={appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'}>
+                                  Layer Hierarchy (Front / Back)
+                                </span>
+                                <span className={`text-[10px] font-normal ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                                  Position: {currentLayerIdx === totalLayers - 1 ? 'Top (Front)' : currentLayerIdx === 0 ? 'Bottom (Back)' : `#${currentLayerIdx + 1}`}
+                                </span>
+                              </div>
+
+                              <div className="grid grid-cols-4 gap-1.5">
+                                <button
+                                  onClick={() => handleBringToFront(cleanPrimaryId)}
+                                  disabled={currentLayerIdx === totalLayers - 1}
+                                  title="Bring this layer to the absolute front"
+                                  className={`py-2 px-1 rounded-xl text-[10px] font-semibold flex flex-col items-center gap-1 border transition ${
+                                    currentLayerIdx === totalLayers - 1
+                                      ? 'opacity-40 cursor-not-allowed border-transparent'
+                                      : appTheme === 'dark'
+                                      ? 'bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-200 hover:text-white'
+                                      : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
+                                  }`}
+                                >
+                                  <ChevronsUp className="w-3.5 h-3.5 text-cyan-400" />
+                                  <span>To Front</span>
+                                </button>
+
+                                <button
+                                  onClick={() => handleBringForward(cleanPrimaryId)}
+                                  disabled={currentLayerIdx === totalLayers - 1}
+                                  title="Move this layer 1 step forward"
+                                  className={`py-2 px-1 rounded-xl text-[10px] font-semibold flex flex-col items-center gap-1 border transition ${
+                                    currentLayerIdx === totalLayers - 1
+                                      ? 'opacity-40 cursor-not-allowed border-transparent'
+                                      : appTheme === 'dark'
+                                      ? 'bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-200 hover:text-white'
+                                      : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
+                                  }`}
+                                >
+                                  <ArrowUp className="w-3.5 h-3.5 text-cyan-400" />
+                                  <span>Forward</span>
+                                </button>
+
+                                <button
+                                  onClick={() => handleSendBackward(cleanPrimaryId)}
+                                  disabled={currentLayerIdx <= 0}
+                                  title="Move this layer 1 step backward"
+                                  className={`py-2 px-1 rounded-xl text-[10px] font-semibold flex flex-col items-center gap-1 border transition ${
+                                    currentLayerIdx <= 0
+                                      ? 'opacity-40 cursor-not-allowed border-transparent'
+                                      : appTheme === 'dark'
+                                      ? 'bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-200 hover:text-white'
+                                      : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
+                                  }`}
+                                >
+                                  <ArrowDown className="w-3.5 h-3.5 text-cyan-400" />
+                                  <span>Backward</span>
+                                </button>
+
+                                <button
+                                  onClick={() => handleSendToBack(cleanPrimaryId)}
+                                  disabled={currentLayerIdx <= 0}
+                                  title="Send this layer to the absolute back"
+                                  className={`py-2 px-1 rounded-xl text-[10px] font-semibold flex flex-col items-center gap-1 border transition ${
+                                    currentLayerIdx <= 0
+                                      ? 'opacity-40 cursor-not-allowed border-transparent'
+                                      : appTheme === 'dark'
+                                      ? 'bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-200 hover:text-white'
+                                      : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
+                                  }`}
+                                >
+                                  <ChevronsDown className="w-3.5 h-3.5 text-cyan-400" />
+                                  <span>To Back</span>
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
                     {/* Collapsible Dropdown for All Vector Layers & Colors */}
-                    {detectedColors.length > 0 && (
+                    {(svgLayers.length > 0 || detectedColors.length > 0) && (
                       <div className={`rounded-2xl border overflow-hidden shadow-md ${
                         appTheme === 'dark' ? 'border-slate-800 bg-[#131b2e]/50' : 'border-slate-200 bg-slate-50'
                       }`}>
@@ -3266,11 +4817,11 @@ export default function App() {
                         >
                           <div className="flex items-center gap-2">
                             <Layers className="w-4 h-4 text-cyan-500" />
-                            <span>All Vector Layers & Colors</span>
+                            <span>Vector Parts & Layers</span>
                             <span className={`text-[10px] px-2 py-0.5 rounded-full ${
                               appTheme === 'dark' ? 'bg-slate-800 text-slate-300' : 'bg-slate-200 text-slate-700'
                             }`}>
-                              {detectedColors.length}
+                              {svgLayers.length || detectedColors.length}
                             </span>
                           </div>
                           <div className={`flex items-center gap-2 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
@@ -3285,104 +4836,265 @@ export default function App() {
                           </div>
                         </button>
 
-                        {/* Collapsible List Container */}
+                        {/* Collapsible List Container with Tab Switch between Vector Parts and Unique Colors */}
                         {isLayersListExpanded && (
                           <div className={`p-3.5 pt-2 space-y-3 border-t ${
                             appTheme === 'dark' ? 'border-slate-800/60' : 'border-slate-200'
                           }`}>
-                            {detectedColors.map((item, idx) => {
-                              const origColor = item.color;
-                              const activeColor = adjustments.colorReplacements[origColor.toLowerCase()] || origColor;
-                              const isModified = Boolean(adjustments.colorReplacements[origColor.toLowerCase()]);
-                              const isSelected = activeSelectedColor?.toLowerCase() === origColor.toLowerCase();
+                            {/* Switch tabs between Vector Layers and Colors */}
+                            <div className={`flex items-center p-1 rounded-xl border ${
+                              appTheme === 'dark' ? 'bg-slate-950/80 border-slate-800' : 'bg-slate-200/70 border-slate-300'
+                            }`}>
+                              <button
+                                onClick={() => setLayerListViewMode('layers')}
+                                className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 ${
+                                  layerListViewMode === 'layers'
+                                    ? 'bg-blue-600 text-white shadow-md'
+                                    : appTheme === 'dark' ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                              >
+                                <Shapes className="w-3.5 h-3.5" />
+                                <span>Vector Layers ({svgLayers.length})</span>
+                              </button>
+                              <button
+                                onClick={() => setLayerListViewMode('colors')}
+                                className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 ${
+                                  layerListViewMode === 'colors'
+                                    ? 'bg-blue-600 text-white shadow-md'
+                                    : appTheme === 'dark' ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                              >
+                                <Palette className="w-3.5 h-3.5" />
+                                <span>Colors ({detectedColors.length})</span>
+                              </button>
+                            </div>
 
-                              return (
-                                <div
-                                  key={origColor + idx}
-                                  onClick={() => {
-                                    setActiveSelectedColor(origColor);
-                                    setIsSelectionOutlineVisible(true);
-                                  }}
-                                  className={`p-3 rounded-xl border transition-all cursor-pointer ${
-                                    isSelected
-                                      ? appTheme === 'dark' ? 'bg-slate-900 border-cyan-400 ring-2 ring-cyan-400/40 shadow-lg' : 'bg-white border-cyan-500 ring-2 ring-cyan-500/30 shadow-md'
-                                      : isModified 
-                                      ? appTheme === 'dark' ? 'bg-slate-900/80 border-cyan-500/40' : 'bg-cyan-50/50 border-cyan-300'
-                                      : appTheme === 'dark' ? 'bg-[#0b0f19]/70 border-slate-800/80 hover:border-slate-700' : 'bg-white border-slate-200 hover:border-slate-300'
-                                  }`}
-                                >
-                                  <div className="flex items-center justify-between gap-3 mb-2">
-                                    <div className="flex items-center gap-2.5">
-                                      <div
-                                        className="w-7 h-7 rounded-lg border shadow flex-shrink-0"
-                                        style={{ backgroundColor: activeColor }}
-                                      />
-                                      <div>
-                                        <div className="flex items-center gap-1.5">
-                                          <span className={`font-mono text-xs font-bold uppercase ${
-                                            appTheme === 'dark' ? 'text-slate-200' : 'text-slate-800'
-                                          }`}>
-                                            {activeColor}
-                                          </span>
-                                          {isSelected && (
-                                            <span className="text-[8px] font-semibold bg-cyan-500/20 text-cyan-600 px-1.5 py-0.5 rounded border border-cyan-500/30">
-                                              Active ✨
+                            {/* View 1: Vector Shape Layers in Hierarchy Order */}
+                            {layerListViewMode === 'layers' && (
+                              <div className="space-y-2 select-none">
+                                <div className="flex items-center justify-between text-[10px] px-1 pb-0.5 font-medium text-slate-400">
+                                  <span className="flex items-center gap-1">
+                                    <GripVertical className="w-3.5 h-3.5 text-cyan-400" />
+                                    <span>Drag layer up or down to reorder</span>
+                                  </span>
+                                  <span className="text-[9px] font-mono font-semibold text-cyan-400 px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20">
+                                    Top = Front
+                                  </span>
+                                </div>
+
+                                {[...layerOrder].reverse().map((layerId, displayIdx) => {
+                                  const layerObj = svgLayers.find(l => l.id === layerId) || {
+                                    id: layerId,
+                                    name: layerId.replace('_', ' ').toUpperCase(),
+                                    tag: 'shape',
+                                    color: '#38bdf8'
+                                  };
+                                  const isSelected = selectedLayerId === layerId || (selectedLayerIds && selectedLayerIds.includes(layerId));
+                                  const transform = layerTransforms[layerId] || { x: 0, y: 0, rotate: 0 };
+                                  const isMoved = transform.x !== 0 || transform.y !== 0;
+                                  const isRotated = transform.rotate !== 0;
+                                  const isDragging = draggedLayerIdx === displayIdx;
+                                  const isDragOver = dragOverLayerIdx === displayIdx && draggedLayerIdx !== displayIdx;
+
+                                  return (
+                                    <div
+                                      key={layerId}
+                                      draggable={true}
+                                      onDragStart={(e) => {
+                                        setDraggedLayerIdx(displayIdx);
+                                        e.dataTransfer.effectAllowed = 'move';
+                                        e.dataTransfer.setData('text/plain', String(displayIdx));
+                                      }}
+                                      onDragOver={(e) => {
+                                        e.preventDefault();
+                                        e.dataTransfer.dropEffect = 'move';
+                                        if (dragOverLayerIdx !== displayIdx) {
+                                          setDragOverLayerIdx(displayIdx);
+                                        }
+                                      }}
+                                      onDragLeave={(e) => {
+                                        if (e.currentTarget.contains(e.relatedTarget)) return;
+                                        if (dragOverLayerIdx === displayIdx) {
+                                          setDragOverLayerIdx(null);
+                                        }
+                                      }}
+                                      onDrop={(e) => {
+                                        e.preventDefault();
+                                        handleReorderLayers(draggedLayerIdx, displayIdx);
+                                        setDraggedLayerIdx(null);
+                                        setDragOverLayerIdx(null);
+                                      }}
+                                      onDragEnd={() => {
+                                        setDraggedLayerIdx(null);
+                                        setDragOverLayerIdx(null);
+                                      }}
+                                      onClick={() => {
+                                        setSelectedLayerId(layerId);
+                                        setSelectedLayerIds([layerId]);
+                                        setIsSelectionOutlineVisible(true);
+                                      }}
+                                      className={`p-2.5 rounded-xl border transition-all cursor-grab active:cursor-grabbing flex items-center justify-between gap-2.5 select-none relative ${
+                                        isDragging
+                                          ? 'opacity-30 scale-[0.98] border-dashed border-cyan-400 bg-cyan-950/20'
+                                          : isDragOver
+                                          ? 'ring-2 ring-cyan-400 bg-cyan-500/20 border-cyan-400 shadow-lg scale-[1.01]'
+                                          : isSelected
+                                          ? appTheme === 'dark'
+                                            ? 'bg-slate-900 border-cyan-400 ring-2 ring-cyan-400/40 shadow-lg'
+                                            : 'bg-white border-cyan-500 ring-2 ring-cyan-500/30 shadow-md'
+                                          : isMoved || isRotated
+                                          ? appTheme === 'dark' ? 'bg-slate-900/80 border-cyan-500/40' : 'bg-cyan-50/50 border-cyan-300'
+                                          : appTheme === 'dark' ? 'bg-[#0b0f19]/70 border-slate-800/80 hover:border-slate-700' : 'bg-white border-slate-200 hover:border-slate-300'
+                                      }`}
+                                    >
+                                      <div className="flex items-center gap-2 min-w-0 pointer-events-none">
+                                        <GripVertical className="w-4 h-4 text-slate-500 flex-shrink-0" />
+                                        <div
+                                          className="w-5 h-5 rounded-md border shadow flex-shrink-0"
+                                          style={{ backgroundColor: layerObj.color || '#38bdf8' }}
+                                        />
+                                        <div className="truncate">
+                                          <div className="flex items-center gap-1.5">
+                                            <span className={`text-xs font-semibold truncate ${appTheme === 'dark' ? 'text-slate-200' : 'text-slate-800'}`}>
+                                              {layerObj.name}
                                             </span>
+                                            <span className="text-[9px] font-mono text-slate-500">
+                                              &lt;{layerObj.tag}&gt;
+                                            </span>
+                                            {isSelected && (
+                                              <span className="text-[8px] font-semibold bg-cyan-500/20 text-cyan-400 px-1 py-0.5 rounded border border-cyan-500/30">
+                                                Selected
+                                              </span>
+                                            )}
+                                          </div>
+                                          {(isMoved || isRotated) && (
+                                            <div className="text-[9px] text-cyan-400 font-mono">
+                                              {isMoved ? `Δ(${transform.x}, ${transform.y})` : ''} {isRotated ? `${transform.rotate}°` : ''}
+                                            </div>
                                           )}
                                         </div>
-                                        <span className={`text-[9px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                                          Orig: {origColor} &bull; {item.count} layer{item.count > 1 ? 's' : ''}
-                                        </span>
+                                      </div>
+
+                                      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                        <button
+                                          onClick={() => handleBringForward(layerId)}
+                                          title="Move layer up (1 step forward)"
+                                          className={`p-1 rounded hover:bg-slate-700/60 ${appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'}`}
+                                        >
+                                          <ArrowUp className="w-3.5 h-3.5" />
+                                        </button>
+                                        <button
+                                          onClick={() => handleSendBackward(layerId)}
+                                          title="Move layer down (1 step backward)"
+                                          className={`p-1 rounded hover:bg-slate-700/60 ${appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'}`}
+                                        >
+                                          <ArrowDown className="w-3.5 h-3.5" />
+                                        </button>
                                       </div>
                                     </div>
+                                  );
+                                })}
+                              </div>
+                            )}
 
-                                    <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                                      <label className="cursor-pointer">
-                                        <input
-                                          type="color"
-                                          value={activeColor}
-                                          onFocus={() => setIsSelectionOutlineVisible(false)}
-                                          onInput={() => setIsSelectionOutlineVisible(false)}
-                                          onChange={(e) => handleColorChange(origColor, e.target.value)}
-                                          className="sr-only"
-                                        />
-                                        <div className={`px-2 py-1 rounded-lg text-[11px] font-semibold transition ${
-                                          appTheme === 'dark' ? 'bg-slate-800 hover:bg-slate-700 text-slate-200' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                                        }`}>
-                                          Pick
+                            {/* View 2: Unique Colors List */}
+                            {layerListViewMode === 'colors' && (
+                              <div className="space-y-2">
+                                {detectedColors.map((item, idx) => {
+                                  const origColor = item.color;
+                                  const activeColor = adjustments.colorReplacements[origColor.toLowerCase()] || origColor;
+                                  const isModified = Boolean(adjustments.colorReplacements[origColor.toLowerCase()]);
+                                  const isSelected = activeSelectedColor?.toLowerCase() === origColor.toLowerCase();
+
+                                  return (
+                                    <div
+                                      key={origColor + idx}
+                                      onClick={() => {
+                                        setActiveSelectedColor(origColor);
+                                        setIsSelectionOutlineVisible(true);
+                                      }}
+                                      className={`p-3 rounded-xl border transition-all cursor-pointer ${
+                                        isSelected
+                                          ? appTheme === 'dark' ? 'bg-slate-900 border-cyan-400 ring-2 ring-cyan-400/40 shadow-lg' : 'bg-white border-cyan-500 ring-2 ring-cyan-500/30 shadow-md'
+                                          : isModified 
+                                          ? appTheme === 'dark' ? 'bg-slate-900/80 border-cyan-500/40' : 'bg-cyan-50/50 border-cyan-300'
+                                          : appTheme === 'dark' ? 'bg-[#0b0f19]/70 border-slate-800/80 hover:border-slate-700' : 'bg-white border-slate-200 hover:border-slate-300'
+                                      }`}
+                                    >
+                                      <div className="flex items-center justify-between gap-3 mb-2">
+                                        <div className="flex items-center gap-2.5">
+                                          <div
+                                            className="w-7 h-7 rounded-lg border shadow flex-shrink-0"
+                                            style={{ backgroundColor: activeColor }}
+                                          />
+                                          <div>
+                                            <div className="flex items-center gap-1.5">
+                                              <span className={`font-mono text-xs font-bold uppercase ${
+                                                appTheme === 'dark' ? 'text-slate-200' : 'text-slate-800'
+                                              }`}>
+                                                {activeColor}
+                                              </span>
+                                              {isSelected && (
+                                                <span className="text-[8px] font-semibold bg-cyan-500/20 text-cyan-600 px-1.5 py-0.5 rounded border border-cyan-500/30">
+                                                  Active ✨
+                                                </span>
+                                              )}
+                                            </div>
+                                            <span className={`text-[9px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                                              Orig: {origColor} &bull; {item.count} layer{item.count > 1 ? 's' : ''}
+                                            </span>
+                                          </div>
                                         </div>
-                                      </label>
-                                      {isModified && (
-                                        <button
-                                          onClick={() => handleResetSingleColor(origColor)}
-                                          title="Reset layer"
-                                          className={`p-1 rounded-lg ${
-                                            appTheme === 'dark' ? 'bg-slate-800 text-slate-400 hover:text-white' : 'bg-slate-100 text-slate-500 hover:text-slate-900'
-                                          }`}
-                                        >
-                                          <Undo2 className="w-3 h-3" />
-                                        </button>
-                                      )}
-                                    </div>
-                                  </div>
 
-                                  {/* Quick dots */}
-                                  <div className={`flex items-center gap-1 pt-1.5 border-t overflow-x-auto no-scrollbar ${
-                                    appTheme === 'dark' ? 'border-slate-800/40' : 'border-slate-100'
-                                  }`} onClick={(e) => e.stopPropagation()}>
-                                    {QUICK_SWATCHES.map((swatch) => (
-                                      <button
-                                        key={swatch.hex}
-                                        onClick={() => handleColorChange(origColor, swatch.hex)}
-                                        className="w-4 h-4 rounded-full border border-slate-400/40 hover:scale-125 transition-transform flex-shrink-0"
-                                        style={{ backgroundColor: swatch.hex }}
-                                        title={swatch.name}
-                                      />
-                                    ))}
-                                  </div>
-                                </div>
-                              );
-                            })}
+                                        <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                                          <label className="cursor-pointer">
+                                            <input
+                                              type="color"
+                                              value={activeColor}
+                                              onFocus={() => setIsSelectionOutlineVisible(false)}
+                                              onInput={() => setIsSelectionOutlineVisible(false)}
+                                              onChange={(e) => handleColorChange(origColor, e.target.value)}
+                                              className="sr-only"
+                                            />
+                                            <div className={`px-2 py-1 rounded-lg text-[11px] font-semibold transition ${
+                                              appTheme === 'dark' ? 'bg-slate-800 hover:bg-slate-700 text-slate-200' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                                            }`}>
+                                              Pick
+                                            </div>
+                                          </label>
+                                          {isModified && (
+                                            <button
+                                              onClick={() => handleResetSingleColor(origColor)}
+                                              title="Reset layer"
+                                              className={`p-1 rounded-lg ${
+                                                appTheme === 'dark' ? 'bg-slate-800 text-slate-400 hover:text-white' : 'bg-slate-100 text-slate-500 hover:text-slate-900'
+                                              }`}
+                                            >
+                                              <Undo2 className="w-3 h-3" />
+                                            </button>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      {/* Quick dots */}
+                                      <div className={`flex items-center gap-1 pt-1.5 border-t overflow-x-auto no-scrollbar ${
+                                        appTheme === 'dark' ? 'border-slate-800/40' : 'border-slate-100'
+                                      }`} onClick={(e) => e.stopPropagation()}>
+                                        {QUICK_SWATCHES.map((swatch) => (
+                                          <button
+                                            key={swatch.hex}
+                                            onClick={() => handleColorChange(origColor, swatch.hex)}
+                                            className="w-4 h-4 rounded-full border border-slate-400/40 hover:scale-125 transition-transform flex-shrink-0"
+                                            style={{ backgroundColor: swatch.hex }}
+                                            title={swatch.name}
+                                          />
+                                        ))}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -5145,12 +6857,12 @@ export default function App() {
                       <label className={`block text-[11px] font-semibold mb-2 uppercase ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                         Target Format
                       </label>
-                      <div className="grid grid-cols-4 gap-2">
-                        {['png', 'webp', 'jpeg', 'gif'].map((fmt) => (
+                      <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
+                        {['png', 'svg', 'webp', 'jpeg', 'gif'].map((fmt) => (
                           <button
                             key={fmt}
                             onClick={() => setExportFormat(fmt)}
-                            className={`py-2.5 rounded-xl uppercase text-xs font-bold transition border text-center ${
+                            className={`py-2 rounded-xl uppercase text-xs font-bold transition border text-center ${
                               exportFormat === fmt
                                 ? 'bg-blue-600 text-white border-blue-500 shadow-md'
                                 : appTheme === 'dark'
@@ -5226,6 +6938,352 @@ export default function App() {
                       <Download className="w-4 h-4" />
                       {downloading ? 'Rendering & Exporting...' : `Download .${exportFormat.toUpperCase()} (${exportSize >= 1024 ? `${exportSize / 1024}K` : exportSize + 'px'})`}
                     </button>
+
+                    {/* Expandable Advanced Export Settings Section */}
+                    <div className="pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setIsAdvancedExportOpen(prev => !prev)}
+                        className={`w-full flex items-center justify-between p-3.5 rounded-2xl border transition-all ${
+                          isAdvancedExportOpen
+                            ? appTheme === 'dark'
+                              ? 'bg-slate-900 border-cyan-500/50 text-cyan-400 shadow-lg shadow-cyan-950/30'
+                              : 'bg-white border-cyan-500/50 text-cyan-700 shadow-md'
+                            : appTheme === 'dark'
+                            ? 'bg-slate-900/60 border-slate-800 text-slate-300 hover:bg-slate-900 hover:border-slate-700'
+                            : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <SlidersHorizontal className="w-4 h-4 text-cyan-500" />
+                          <span className="text-xs font-bold tracking-tight">Advanced Settings</span>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 font-semibold border border-cyan-500/20">
+                            Pro Tools
+                          </span>
+                        </div>
+                        <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isAdvancedExportOpen ? 'rotate-180 text-cyan-400' : 'text-slate-400'}`} />
+                      </button>
+
+                      {isAdvancedExportOpen && (
+                        <div className={`mt-3 p-4 rounded-2xl border space-y-5 animate-in fade-in zoom-in-95 duration-150 ${
+                          appTheme === 'dark' ? 'bg-[#090d16] border-slate-800' : 'bg-slate-50/90 border-slate-200'
+                        }`}>
+                          {/* 1. CUSTOM FILE NAME & AUTO-TAGGING */}
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <label className={`text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${
+                                appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
+                              }`}>
+                                <FileText className="w-3.5 h-3.5 text-cyan-500" />
+                                <span>Custom File Name</span>
+                              </label>
+                              <span className="text-[10px] font-mono text-cyan-400">
+                                .{exportFormat}
+                              </span>
+                            </div>
+
+                            <div className="relative">
+                              <input
+                                type="text"
+                                value={exportCustomFilename}
+                                onChange={(e) => setExportCustomFilename(e.target.value)}
+                                placeholder={selectedAsset?.title || 'my-custom-icon'}
+                                className={`w-full py-2 pl-3 pr-8 rounded-xl text-xs font-medium border transition outline-none ${
+                                  appTheme === 'dark'
+                                    ? 'bg-slate-900 border-slate-700 text-slate-100 placeholder-slate-500 focus:border-cyan-500'
+                                    : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400 focus:border-cyan-500'
+                                }`}
+                              />
+                              {exportCustomFilename && (
+                                <button
+                                  type="button"
+                                  onClick={() => setExportCustomFilename('')}
+                                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                                  title="Clear custom filename"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Auto Tag Dimensions Toggle */}
+                            <div className="flex items-center justify-between pt-1">
+                              <label className={`text-[11px] flex items-center gap-2 cursor-pointer ${
+                                appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'
+                              }`}>
+                                <input
+                                  type="checkbox"
+                                  checked={exportAutoTagDimensions}
+                                  onChange={(e) => setExportAutoTagDimensions(e.target.checked)}
+                                  className="w-4 h-4 accent-cyan-500 rounded cursor-pointer"
+                                />
+                                <span>Append resolution tag (e.g. -{exportSize}x{exportSize})</span>
+                              </label>
+                            </div>
+
+                            {/* Live Name Preview */}
+                            <div className={`p-2 rounded-xl border text-[11px] font-mono break-all flex items-center gap-1.5 ${
+                              appTheme === 'dark' ? 'bg-slate-900/90 border-slate-800 text-slate-400' : 'bg-white border-slate-200 text-slate-600'
+                            }`}>
+                              <span className="text-cyan-500 font-bold shrink-0">Output:</span>
+                              <span className="text-slate-200 font-semibold truncate">
+                                {((exportCustomFilename.trim() || selectedAsset?.title || 'icon')
+                                  .toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-_]/g, '') || 'icon')}
+                                {exportAutoTagDimensions ? `-${exportSize}x${exportSize}` : ''}.{exportFormat}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* 2. FILE SIZE & QUALITY COMPRESSION */}
+                          <div className="space-y-2.5 pt-1 border-t border-slate-800/60">
+                            <div className="flex items-center justify-between">
+                              <label className={`text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${
+                                appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
+                              }`}>
+                                <Zap className="w-3.5 h-3.5 text-amber-400" />
+                                <span>Compression &amp; Quality</span>
+                              </label>
+                              <span className="text-xs font-mono font-bold text-cyan-400">
+                                {exportQuality}%
+                              </span>
+                            </div>
+
+                            <input
+                              type="range"
+                              min="10"
+                              max="100"
+                              step="1"
+                              value={exportQuality}
+                              onChange={(e) => setExportQuality(Number(e.target.value))}
+                              className="theme-slider w-full"
+                            />
+
+                            {/* Preset Buttons */}
+                            <div className="grid grid-cols-4 gap-1.5">
+                              {[
+                                { label: 'Ultra 100%', q: 100 },
+                                { label: 'High 90%', q: 90 },
+                                { label: 'Balance 80%', q: 80 },
+                                { label: 'Light 60%', q: 60 }
+                              ].map((preset) => (
+                                <button
+                                  key={preset.label}
+                                  type="button"
+                                  onClick={() => setExportQuality(preset.q)}
+                                  className={`py-1 rounded-lg text-[10px] font-semibold border transition ${
+                                    exportQuality === preset.q
+                                      ? 'bg-blue-600 border-blue-400 text-white shadow'
+                                      : appTheme === 'dark'
+                                      ? 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                                      : 'bg-white border-slate-200 text-slate-600 hover:text-slate-900'
+                                  }`}
+                                >
+                                  {preset.label}
+                                </button>
+                              ))}
+                            </div>
+
+                            {/* Estimated File Size Indicator */}
+                            <div className={`p-2.5 rounded-xl border flex items-center justify-between text-[11px] ${
+                              appTheme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'
+                            }`}>
+                              <span className={appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}>
+                                Estimated Size:
+                              </span>
+                              <span className="font-mono font-bold text-emerald-400">
+                                {(() => {
+                                  if (exportFormat === 'svg') return '~3 - 8 KB (Pure Vector)';
+                                  const baseK = (exportSize * exportSize) / 1000;
+                                  let factor = 0.32;
+                                  if (exportFormat === 'webp') factor = 0.12 * (exportQuality / 100);
+                                  else if (exportFormat === 'jpeg') factor = 0.18 * (exportQuality / 100);
+                                  else factor = 0.40; // PNG
+                                  const kb = Math.max(4, Math.round(baseK * factor));
+                                  if (kb >= 1024) return `~${(kb / 1024).toFixed(1)} MB`;
+                                  return `~${kb} KB`;
+                                })()}
+                              </span>
+                            </div>
+                            <p className={`text-[10px] ${appTheme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>
+                              * WebP aur JPEG me compression image ko web speed ke liye optimize karta hai.
+                            </p>
+                          </div>
+
+                          {/* 3. SOLID / GRADIENT BACKGROUND SELECTOR */}
+                          <div className="space-y-3 pt-1 border-t border-slate-800/60">
+                            <div className="flex items-center justify-between">
+                              <label className={`text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${
+                                appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
+                              }`}>
+                                <Palette className="w-3.5 h-3.5 text-cyan-500" />
+                                <span>Export Background Fill</span>
+                              </label>
+                              {isTransparent && (
+                                <span className="text-[10px] text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
+                                  Transparent ON
+                                </span>
+                              )}
+                            </div>
+
+                            <p className={`text-[10px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                              {isTransparent 
+                                ? 'Notice: Upar "Transparent Background" uncheck karne par ye background render hoga.'
+                                : 'Active background: Download hone wali file me ye background apply hoga.'}
+                            </p>
+
+                            {/* Solid vs Gradient Switcher */}
+                            <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-slate-900 border border-slate-800">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setExportBgType('solid');
+                                  if (isTransparent) setIsTransparent(false);
+                                }}
+                                className={`py-1.5 rounded-lg text-xs font-semibold transition ${
+                                  exportBgType === 'solid'
+                                    ? 'bg-blue-600 text-white shadow'
+                                    : 'text-slate-400 hover:text-white'
+                                }`}
+                              >
+                                Solid Color
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setExportBgType('gradient');
+                                  if (isTransparent) setIsTransparent(false);
+                                }}
+                                className={`py-1.5 rounded-lg text-xs font-semibold transition ${
+                                  exportBgType === 'gradient'
+                                    ? 'bg-blue-600 text-white shadow'
+                                    : 'text-slate-400 hover:text-white'
+                                }`}
+                              >
+                                Gradient Fill
+                              </button>
+                            </div>
+
+                            {/* SOLID COLOR PICKER */}
+                            {exportBgType === 'solid' && (
+                              <div className="space-y-2">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  {[
+                                    '#FFFFFF', '#0b0f19', '#000000', '#082f49', 
+                                    '#1e1b4b', '#064e3b', '#4c0519', '#7c2d12'
+                                  ].map((c) => (
+                                    <button
+                                      key={c}
+                                      type="button"
+                                      onClick={() => {
+                                        setExportBgSolidColor(c);
+                                        if (isTransparent) setIsTransparent(false);
+                                      }}
+                                      title={c}
+                                      className={`w-7 h-7 rounded-full border-2 transition-transform hover:scale-110 relative ${
+                                        exportBgSolidColor.toLowerCase() === c.toLowerCase()
+                                          ? 'border-cyan-400 ring-2 ring-cyan-400/40 scale-110'
+                                          : 'border-slate-700'
+                                      }`}
+                                      style={{ backgroundColor: c }}
+                                    />
+                                  ))}
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="color"
+                                    value={exportBgSolidColor}
+                                    onChange={(e) => {
+                                      setExportBgSolidColor(e.target.value);
+                                      if (isTransparent) setIsTransparent(false);
+                                    }}
+                                    className="w-8 h-8 rounded-lg cursor-pointer bg-transparent border-0"
+                                  />
+                                  <input
+                                    type="text"
+                                    value={exportBgSolidColor}
+                                    onChange={(e) => {
+                                      setExportBgSolidColor(e.target.value);
+                                      if (isTransparent) setIsTransparent(false);
+                                    }}
+                                    className={`w-28 py-1 px-2.5 rounded-lg text-xs font-mono font-bold uppercase border ${
+                                      appTheme === 'dark' ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-300 text-slate-900'
+                                    }`}
+                                  />
+                                </div>
+                              </div>
+                            )}
+
+                            {/* GRADIENT PRESETS PICKER */}
+                            {exportBgType === 'gradient' && (
+                              <div className="space-y-2.5">
+                                <div className="grid grid-cols-3 gap-2">
+                                  {[
+                                    { id: 'cyber', name: 'Cyber Dark', from: '#060a12', to: '#1e293b' },
+                                    { id: 'indigo', name: 'Midnight', from: '#0f172a', to: '#312e81' },
+                                    { id: 'crimson', name: 'Sunset', from: '#450a0a', to: '#831843' },
+                                    { id: 'emerald', name: 'Forest', from: '#022c22', to: '#065f46' },
+                                    { id: 'mesh', name: 'Steel', from: '#18181b', to: '#3f3f46' },
+                                    { id: 'frost', name: 'Frost Light', from: '#f8fafc', to: '#cbd5e1' }
+                                  ].map((g) => {
+                                    const isSelected = exportBgGradient.from === g.from && exportBgGradient.to === g.to;
+                                    return (
+                                      <button
+                                        key={g.id}
+                                        type="button"
+                                        onClick={() => {
+                                          setExportBgGradient(prev => ({ ...prev, from: g.from, to: g.to, preset: g.id }));
+                                          if (isTransparent) setIsTransparent(false);
+                                        }}
+                                        className={`h-12 rounded-xl border p-1 text-left flex flex-col justify-end transition-transform hover:scale-105 ${
+                                          isSelected
+                                            ? 'border-cyan-400 ring-2 ring-cyan-400/40 shadow-lg'
+                                            : 'border-slate-800'
+                                        }`}
+                                        style={{ background: `linear-gradient(135deg, ${g.from}, ${g.to})` }}
+                                      >
+                                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded backdrop-blur-md ${
+                                          g.id === 'frost' ? 'bg-black/60 text-white' : 'bg-black/50 text-white'
+                                        }`}>
+                                          {g.name}
+                                        </span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+
+                                {/* Gradient Angle Buttons */}
+                                <div className="flex items-center justify-between pt-1 text-[10px]">
+                                  <span className={appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}>Angle:</span>
+                                  <div className="flex items-center gap-1">
+                                    {[
+                                      { label: '90° (Horiz)', angle: 90 },
+                                      { label: '135° (Diag)', angle: 135 },
+                                      { label: '180° (Vert)', angle: 180 }
+                                    ].map((a) => (
+                                      <button
+                                        key={a.angle}
+                                        type="button"
+                                        onClick={() => setExportBgGradient(prev => ({ ...prev, angle: a.angle }))}
+                                        className={`px-2 py-0.5 rounded border text-[10px] font-semibold transition ${
+                                          exportBgGradient.angle === a.angle
+                                            ? 'bg-cyan-600 text-white border-cyan-400'
+                                            : appTheme === 'dark'
+                                            ? 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'
+                                            : 'bg-white text-slate-600 border-slate-200 hover:text-slate-900'
+                                        }`}
+                                      >
+                                        {a.label}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>

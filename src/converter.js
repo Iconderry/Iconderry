@@ -1,5 +1,6 @@
 import { replaceSvgColors, applyUniversalStroke } from './colorUtils';
 import { transformSvgStyle } from './styleTransformer';
+import { applyLayerTransforms } from './layerUtils';
 import { GIFEncoder, quantize, applyPalette } from 'gifenc';
 
 export async function downloadAsset({
@@ -10,6 +11,10 @@ export async function downloadAsset({
   width,
   height,
   isTransparent = true,
+  quality = 0.92,
+  customFilename = '',
+  autoTagDimensions = true,
+  customBg = null,
   adjustments = {
     hue: 0,
     brightness: 100,
@@ -44,13 +49,32 @@ export async function downloadAsset({
     bgShapeBorderColor: '#38bdf8'
   }
 }) {
-  const safeFilename = filename.toLowerCase().replace(/\s+/g, '-');
+  const cleanName = (customFilename || filename || 'icon')
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-_]/g, '');
+  const safeFilename = cleanName || 'icon';
   const targetWidth = width || size;
   const targetHeight = height || size;
+  const baseFilename = autoTagDimensions ? `${safeFilename}-${targetWidth}x${targetHeight}` : safeFilename;
 
   // DIRECT PURE VECTOR SVG EXPORT
   if (format === 'svg') {
     let preparedSvg = prepareSvgWithAdjustments(svgCode, adjustments, targetWidth, targetHeight, true);
+
+    // If not transparent and no shape, embed custom solid/gradient background
+    if (!isTransparent && (!adjustments.bgShape || adjustments.bgShape === 'none')) {
+      let bgDef = '';
+      let bgFill = (customBg && customBg.solidColor) || '#0b0f19';
+      if (customBg && customBg.type === 'gradient' && customBg.gradient) {
+        const gradId = 'iconderry-custom-bg-grad';
+        bgDef = `<defs><linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="${customBg.gradient.from || '#060a12'}"/><stop offset="100%" stop-color="${customBg.gradient.to || '#1e293b'}"/></linearGradient></defs>`;
+        bgFill = `url(#${gradId})`;
+      }
+      const bgRect = `${bgDef}<rect width="100%" height="100%" fill="${bgFill}"/>`;
+      preparedSvg = preparedSvg.replace(/<svg([^>]*)>/, `<svg$1>${bgRect}`);
+    }
 
     // If background badge shape is active, embed container shape into SVG
     if (adjustments.bgShape && adjustments.bgShape !== 'none') {
@@ -58,7 +82,7 @@ export async function downloadAsset({
     }
 
     const blob = new Blob([preparedSvg], { type: 'image/svg+xml;charset=utf-8' });
-    triggerDownload(blob, `${safeFilename}-${targetWidth}x${targetHeight}.svg`);
+    triggerDownload(blob, `${baseFilename}.svg`);
     return Promise.resolve(true);
   }
 
@@ -90,9 +114,24 @@ export async function downloadAsset({
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
 
-      // 1. Solid canvas background (if not transparent or jpeg)
-      if (format === 'jpeg' || (!isTransparent && adjustments.bgShape === 'none')) {
-        ctx.fillStyle = '#FFFFFF';
+      // 1. Solid or gradient canvas background (if not transparent or jpeg)
+      if (format === 'jpeg' || (!isTransparent && (!adjustments.bgShape || adjustments.bgShape === 'none'))) {
+        if (customBg && customBg.type === 'gradient' && customBg.gradient) {
+          const angleRad = ((customBg.gradient.angle || 135) * Math.PI) / 180;
+          const cx = targetWidth / 2;
+          const cy = targetHeight / 2;
+          const dist = Math.sqrt(cx * cx + cy * cy);
+          const x1 = cx - Math.cos(angleRad) * dist;
+          const y1 = cy - Math.sin(angleRad) * dist;
+          const x2 = cx + Math.cos(angleRad) * dist;
+          const y2 = cy + Math.sin(angleRad) * dist;
+          const grad = ctx.createLinearGradient(x1, y1, x2, y2);
+          grad.addColorStop(0, customBg.gradient.from || '#060a12');
+          grad.addColorStop(1, customBg.gradient.to || '#1e293b');
+          ctx.fillStyle = grad;
+        } else {
+          ctx.fillStyle = (customBg && customBg.solidColor) ? customBg.solidColor : (format === 'jpeg' ? '#FFFFFF' : '#0b0f19');
+        }
         ctx.fillRect(0, 0, targetWidth, targetHeight);
       }
 
@@ -221,16 +260,17 @@ export async function downloadAsset({
       }
 
       const mimeType = format === 'jpeg' ? 'image/jpeg' : format === 'webp' ? 'image/webp' : 'image/png';
+      const compressionQuality = Math.max(0.1, Math.min(1.0, Number(quality) || 0.92));
 
       canvas.toBlob((resBlob) => {
         URL.revokeObjectURL(blobUrl);
         if (resBlob) {
-          triggerDownload(resBlob, `${safeFilename}-${targetWidth}x${targetHeight}.${format}`);
+          triggerDownload(resBlob, `${baseFilename}.${format}`);
           resolve(true);
         } else {
           reject(new Error('Conversion failed'));
         }
-      }, mimeType, 0.95);
+      }, mimeType, compressionQuality);
     };
 
     img.onerror = (err) => {
@@ -340,6 +380,13 @@ function prepareSvgWithAdjustments(svgCode, adjustments = {}, targetWidth, targe
   // Adjust stroke thickness (universal for both stroke icons and filled shapes)
   if (adjustments.strokeMultiplier && adjustments.strokeMultiplier !== 1) {
     res = applyUniversalStroke(res, adjustments.strokeMultiplier, adjustments.strokeColorMode, adjustments.customStrokeColor);
+  }
+
+  // Apply individual vector layer moves, rotations, DOM reordering, and per-layer custom styles
+  if ((adjustments.layerTransforms && Object.keys(adjustments.layerTransforms).length > 0) || 
+      (adjustments.layerOrder && adjustments.layerOrder.length > 0) ||
+      (adjustments.layerStyles && Object.keys(adjustments.layerStyles).length > 0)) {
+    res = applyLayerTransforms(res, adjustments.layerTransforms || {}, adjustments.layerOrder || [], false, adjustments.layerStyles || {});
   }
 
   // Ensure viewBox exists for responsive scaling before updating width/height

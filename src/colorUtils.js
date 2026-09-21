@@ -211,13 +211,14 @@ export function extractSvgColors(svgCode) {
 export function scopeSvgIds(svgCode, prefix = 'pf_studio_') {
   if (!svgCode || typeof svgCode !== 'string') return svgCode;
 
-  // Find all id="..." in the SVG
-  const idRegex = /\bid=["']([^"']+)["']/g;
+  // Find all id="..." in the SVG (strictly match id="...", not data-layer-id="..." or other data-* attrs)
+  const idRegex = /(?:^|[\s<])id=["']([^"']+)["']/g;
   const ids = new Set();
   let match;
   while ((match = idRegex.exec(svgCode)) !== null) {
-    if (match[1] && !match[1].startsWith(prefix)) {
-      ids.add(match[1]);
+    const val = match[1];
+    if (val && !val.startsWith(prefix) && !val.startsWith('layer_') && !val.startsWith('pf_')) {
+      ids.add(val);
     }
   }
 
@@ -227,9 +228,9 @@ export function scopeSvgIds(svgCode, prefix = 'pf_studio_') {
 
   ids.forEach(id => {
     const scopedId = `${prefix}${id}`;
-    // 1. Replace id definitions: id="xyz" or id='xyz'
-    const defRegex = new RegExp(`\\bid=(["'])${escapeRegExp(id)}\\1`, 'g');
-    scopedSvg = scopedSvg.replace(defRegex, `id=$1${scopedId}$1`);
+    // 1. Replace id definitions: id="xyz" or id='xyz' (strictly preceded by whitespace or <, not -)
+    const defRegex = new RegExp(`(^|[\\s<])id=(["'])${escapeRegExp(id)}\\2`, 'g');
+    scopedSvg = scopedSvg.replace(defRegex, `$1id=$2${scopedId}$2`);
 
     // 2. Replace url(#xyz) references (with optional quotes inside url)
     const urlRegex = new RegExp(`url\\(\\s*(["']?)#${escapeRegExp(id)}\\1\\s*\\)`, 'g');
