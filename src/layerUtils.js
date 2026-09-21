@@ -1,6 +1,6 @@
 // SVG Layer Extraction, Reordering, and Transformation Utilities for Iconderry
 
-import { normalizeColor } from './colorUtils';
+import { normalizeColor } from './colorUtils.js';
 
 const visualTagNames = ['path', 'rect', 'circle', 'ellipse', 'polygon', 'polyline', 'line', 'text'];
 

@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { 
-  Download, PlusCircle, LayoutGrid, Search, Trash2, CheckCircle2, 
-  Zap, UploadCloud, Sliders, Palette, RotateCw, 
+import {
+  Download, PlusCircle, LayoutGrid, Search, Trash2, CheckCircle2,
+  Zap, UploadCloud, Sliders, Palette, RotateCw,
   FlipHorizontal, FlipVertical, RefreshCw, Sparkles, Sun, Droplet,
   Paintbrush, Undo2, Redo2, Layers, Check, ArrowLeft, X, ChevronDown, ChevronUp,
   Settings, Moon, RotateCcw, SlidersHorizontal, HardDrive, Monitor,
   ZoomIn, ZoomOut, Maximize2, Link2, Unlink2, Wand2, Scan,
-  Heart, History, Shapes, MessageSquarePlus, Shield, FileText, Info,
-  Eye, EyeOff, Box, Compass, Move3d, Film, Play, Activity, GripVertical,
+  Heart, Shapes, MessageSquarePlus, Shield, FileText, Info,
+  Box, Compass, Move3d, Film, Play, Activity, GripVertical,
   Move, ArrowUp, ArrowDown, ChevronsUp, ChevronsDown
 } from 'lucide-react';
 import { INITIAL_ELEMENTS } from './initialData';
@@ -736,14 +736,14 @@ function FilterCardThumbnail({ preset }) {
   const hasGlow = (adjustments?.shadowBlur || 0) > 0;
 
   return (
-    <div 
+    <div
       className="w-full h-14 rounded-xl mb-2 overflow-hidden relative flex items-center justify-center border border-white/10 shadow-inner group-hover:scale-[1.02] transition-transform duration-200 select-none"
-      style={{ 
-        background: `linear-gradient(135deg, ${colorA}33, ${colorB}55, #0a0f1d 90%)` 
+      style={{
+        background: `linear-gradient(135deg, ${colorA}33, ${colorB}55, #0a0f1d 90%)`
       }}
     >
       {/* Ambient glowing backdrop */}
-      <div 
+      <div
         className="absolute inset-0 opacity-50 blur-md pointer-events-none"
         style={{
           background: `radial-gradient(circle at center, ${colorA} 0%, ${colorB} 60%, transparent 100%)`
@@ -751,7 +751,7 @@ function FilterCardThumbnail({ preset }) {
       />
 
       {/* Styled Glyph demonstrating this filter's exact look */}
-      <div 
+      <div
         className="relative z-10 w-7 h-7 rounded-lg flex items-center justify-center transition-transform group-hover:scale-110 shadow-md"
         style={{
           background: `linear-gradient(135deg, ${colorA}, ${colorB})`,
@@ -775,7 +775,7 @@ function EffectCardThumbnail({ preset }) {
   const { texture, icon, previewBg } = preset;
 
   return (
-    <div 
+    <div
       className="w-full h-14 rounded-xl mb-2.5 overflow-hidden relative flex items-center justify-center border border-white/20 shadow-inner group-hover:scale-[1.03] transition-transform duration-200 select-none"
       style={{ background: previewBg || 'linear-gradient(135deg, #1e293b, #0f172a)' }}
     >
@@ -784,126 +784,126 @@ function EffectCardThumbnail({ preset }) {
         <svg viewBox="0 0 100 45" className="w-full h-full absolute inset-0 opacity-90">
           <defs>
             <linearGradient id="thumb_water_grad" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="#ffffff" stopOpacity="0.8"/>
-              <stop offset="50%" stopColor="#38bdf8" stopOpacity="0.4"/>
-              <stop offset="100%" stopColor="#0284c7" stopOpacity="0.9"/>
+              <stop offset="0%" stopColor="#ffffff" stopOpacity="0.8" />
+              <stop offset="50%" stopColor="#38bdf8" stopOpacity="0.4" />
+              <stop offset="100%" stopColor="#0284c7" stopOpacity="0.9" />
             </linearGradient>
           </defs>
-          <path d="M0,25 Q25,15 50,25 T100,25 L100,45 L0,45 Z" fill="url(#thumb_water_grad)"/>
-          <circle cx="20" cy="18" r="4.5" fill="none" stroke="#ffffff" strokeWidth="1" opacity="0.85"/>
-          <circle cx="21" cy="16" r="1.5" fill="#ffffff" opacity="0.9"/>
-          <circle cx="75" cy="22" r="3.5" fill="none" stroke="#ffffff" strokeWidth="0.8" opacity="0.8"/>
-          <circle cx="76" cy="21" r="1" fill="#ffffff" opacity="0.9"/>
-          <circle cx="48" cy="12" r="2.5" fill="#ffffff" opacity="0.75"/>
-          <path d="M10,8 Q15,4 20,8 M60,6 Q65,3 70,6" stroke="#ffffff" strokeWidth="1" fill="none" opacity="0.8"/>
+          <path d="M0,25 Q25,15 50,25 T100,25 L100,45 L0,45 Z" fill="url(#thumb_water_grad)" />
+          <circle cx="20" cy="18" r="4.5" fill="none" stroke="#ffffff" strokeWidth="1" opacity="0.85" />
+          <circle cx="21" cy="16" r="1.5" fill="#ffffff" opacity="0.9" />
+          <circle cx="75" cy="22" r="3.5" fill="none" stroke="#ffffff" strokeWidth="0.8" opacity="0.8" />
+          <circle cx="76" cy="21" r="1" fill="#ffffff" opacity="0.9" />
+          <circle cx="48" cy="12" r="2.5" fill="#ffffff" opacity="0.75" />
+          <path d="M10,8 Q15,4 20,8 M60,6 Q65,3 70,6" stroke="#ffffff" strokeWidth="1" fill="none" opacity="0.8" />
         </svg>
       )}
 
       {texture === 'balloon' && (
         <svg viewBox="0 0 100 45" className="w-full h-full absolute inset-0">
-          <rect x="12" y="6" width="76" height="33" rx="12" fill="#2563eb" stroke="#93c5fd" strokeWidth="2.5" strokeDasharray="4 2"/>
-          <path d="M22,12 Q40,9 60,11" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" fill="none" opacity="0.85"/>
-          <ellipse cx="70" cy="16" rx="4" ry="2" fill="#ffffff" opacity="0.75"/>
-          <circle cx="12" cy="22" r="3" fill="#1d4ed8"/>
+          <rect x="12" y="6" width="76" height="33" rx="12" fill="#2563eb" stroke="#93c5fd" strokeWidth="2.5" strokeDasharray="4 2" />
+          <path d="M22,12 Q40,9 60,11" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" fill="none" opacity="0.85" />
+          <ellipse cx="70" cy="16" rx="4" ry="2" fill="#ffffff" opacity="0.75" />
+          <circle cx="12" cy="22" r="3" fill="#1d4ed8" />
         </svg>
       )}
 
       {texture === 'frost' && (
         <svg viewBox="0 0 100 45" className="w-full h-full absolute inset-0">
-          <path d="M50,4 L50,41 M30,22 L70,22 M35,7 L65,37 M35,37 L65,7" stroke="#ffffff" strokeWidth="1.5" opacity="0.8" strokeLinecap="round"/>
-          <path d="M50,12 L44,18 M50,12 L56,18 M50,32 L44,26 M50,32 L56,26 M38,22 L44,16 M38,22 L44,28 M62,22 L56,16 M62,22 L56,28" stroke="#ffffff" strokeWidth="1.2" opacity="0.75"/>
-          <circle cx="50" cy="22" r="2" fill="#ffffff"/>
-          <circle cx="20" cy="12" r="1" fill="#ffffff" opacity="0.9"/>
-          <circle cx="80" cy="30" r="1.5" fill="#ffffff" opacity="0.8"/>
+          <path d="M50,4 L50,41 M30,22 L70,22 M35,7 L65,37 M35,37 L65,7" stroke="#ffffff" strokeWidth="1.5" opacity="0.8" strokeLinecap="round" />
+          <path d="M50,12 L44,18 M50,12 L56,18 M50,32 L44,26 M50,32 L56,26 M38,22 L44,16 M38,22 L44,28 M62,22 L56,16 M62,22 L56,28" stroke="#ffffff" strokeWidth="1.2" opacity="0.75" />
+          <circle cx="50" cy="22" r="2" fill="#ffffff" />
+          <circle cx="20" cy="12" r="1" fill="#ffffff" opacity="0.9" />
+          <circle cx="80" cy="30" r="1.5" fill="#ffffff" opacity="0.8" />
         </svg>
       )}
 
       {texture === 'lava' && (
         <svg viewBox="0 0 100 45" className="w-full h-full absolute inset-0">
-          <path d="M0,22 Q25,12 45,28 T100,20" stroke="#ff3b00" strokeWidth="4" fill="none" opacity="0.9"/>
-          <path d="M0,22 Q25,12 45,28 T100,20" stroke="#ffea00" strokeWidth="1.8" fill="none"/>
-          <path d="M30,0 L35,24 M65,45 L60,22" stroke="#ff5500" strokeWidth="2" fill="none"/>
-          <circle cx="22" cy="10" r="1.5" fill="#ffea00" opacity="0.9"/>
-          <circle cx="78" cy="14" r="1.8" fill="#ff3b00" opacity="0.9"/>
-          <circle cx="45" cy="38" r="1.2" fill="#ffea00" opacity="0.9"/>
+          <path d="M0,22 Q25,12 45,28 T100,20" stroke="#ff3b00" strokeWidth="4" fill="none" opacity="0.9" />
+          <path d="M0,22 Q25,12 45,28 T100,20" stroke="#ffea00" strokeWidth="1.8" fill="none" />
+          <path d="M30,0 L35,24 M65,45 L60,22" stroke="#ff5500" strokeWidth="2" fill="none" />
+          <circle cx="22" cy="10" r="1.5" fill="#ffea00" opacity="0.9" />
+          <circle cx="78" cy="14" r="1.8" fill="#ff3b00" opacity="0.9" />
+          <circle cx="45" cy="38" r="1.2" fill="#ffea00" opacity="0.9" />
         </svg>
       )}
 
       {texture === 'wool' && (
         <svg viewBox="0 0 100 45" className="w-full h-full absolute inset-0 opacity-85">
-          <path d="M0,8 L100,8 M0,16 L100,16 M0,24 L100,24 M0,32 L100,32 M0,40 L100,40" stroke="#8c765c" strokeWidth="1" strokeDasharray="3 3"/>
-          <path d="M10,0 L10,45 M30,0 L30,45 M50,0 L50,45 M70,0 L70,45 M90,0 L90,45" stroke="#a38f78" strokeWidth="1.5" opacity="0.5"/>
-          <rect x="25" y="14" width="50" height="16" rx="4" fill="#a38f78" opacity="0.35" stroke="#78350f" strokeWidth="1.2" strokeDasharray="2 2"/>
+          <path d="M0,8 L100,8 M0,16 L100,16 M0,24 L100,24 M0,32 L100,32 M0,40 L100,40" stroke="#8c765c" strokeWidth="1" strokeDasharray="3 3" />
+          <path d="M10,0 L10,45 M30,0 L30,45 M50,0 L50,45 M70,0 L70,45 M90,0 L90,45" stroke="#a38f78" strokeWidth="1.5" opacity="0.5" />
+          <rect x="25" y="14" width="50" height="16" rx="4" fill="#a38f78" opacity="0.35" stroke="#78350f" strokeWidth="1.2" strokeDasharray="2 2" />
         </svg>
       )}
 
       {texture === 'lego' && (
         <svg viewBox="0 0 100 45" className="w-full h-full absolute inset-0">
-          <rect x="5" y="12" width="28" height="28" fill="#ffd500" stroke="#ca8a04" strokeWidth="1"/>
-          <rect x="33" y="12" width="34" height="28" fill="#0055bf" stroke="#1e40af" strokeWidth="1"/>
-          <rect x="67" y="12" width="28" height="28" fill="#e60012" stroke="#991b1b" strokeWidth="1"/>
-          <circle cx="19" cy="8" r="4.5" fill="#ffe033" stroke="#ca8a04" strokeWidth="1"/>
-          <circle cx="50" cy="8" r="4.5" fill="#2563eb" stroke="#1e40af" strokeWidth="1"/>
-          <circle cx="81" cy="8" r="4.5" fill="#ef4444" stroke="#991b1b" strokeWidth="1"/>
+          <rect x="5" y="12" width="28" height="28" fill="#ffd500" stroke="#ca8a04" strokeWidth="1" />
+          <rect x="33" y="12" width="34" height="28" fill="#0055bf" stroke="#1e40af" strokeWidth="1" />
+          <rect x="67" y="12" width="28" height="28" fill="#e60012" stroke="#991b1b" strokeWidth="1" />
+          <circle cx="19" cy="8" r="4.5" fill="#ffe033" stroke="#ca8a04" strokeWidth="1" />
+          <circle cx="50" cy="8" r="4.5" fill="#2563eb" stroke="#1e40af" strokeWidth="1" />
+          <circle cx="81" cy="8" r="4.5" fill="#ef4444" stroke="#991b1b" strokeWidth="1" />
         </svg>
       )}
 
       {texture === 'marble' && (
         <svg viewBox="0 0 100 45" className="w-full h-full absolute inset-0">
-          <path d="M5,5 Q30,35 60,18 T95,38" fill="none" stroke="#b48a4d" strokeWidth="1.8" opacity="0.75"/>
-          <path d="M5,5 Q30,35 60,18 T95,38" fill="none" stroke="#94a3b8" strokeWidth="0.8" opacity="0.5"/>
-          <path d="M40,0 Q60,15 75,45" fill="none" stroke="#d97706" strokeWidth="1.2" opacity="0.6"/>
-          <rect x="30" y="15" width="40" height="15" rx="3" fill="none" stroke="#b48a4d" strokeWidth="1" opacity="0.7"/>
+          <path d="M5,5 Q30,35 60,18 T95,38" fill="none" stroke="#b48a4d" strokeWidth="1.8" opacity="0.75" />
+          <path d="M5,5 Q30,35 60,18 T95,38" fill="none" stroke="#94a3b8" strokeWidth="0.8" opacity="0.5" />
+          <path d="M40,0 Q60,15 75,45" fill="none" stroke="#d97706" strokeWidth="1.2" opacity="0.6" />
+          <rect x="30" y="15" width="40" height="15" rx="3" fill="none" stroke="#b48a4d" strokeWidth="1" opacity="0.7" />
         </svg>
       )}
 
       {texture === 'neon_tube' && (
         <svg viewBox="0 0 100 45" className="w-full h-full absolute inset-0">
-          <rect x="15" y="8" width="70" height="29" rx="8" fill="rgba(8,51,68,0.7)" stroke="#00f0ff" strokeWidth="3"/>
-          <rect x="18" y="11" width="64" height="23" rx="6" fill="none" stroke="#ffffff" strokeWidth="1" opacity="0.85"/>
+          <rect x="15" y="8" width="70" height="29" rx="8" fill="rgba(8,51,68,0.7)" stroke="#00f0ff" strokeWidth="3" />
+          <rect x="18" y="11" width="64" height="23" rx="6" fill="none" stroke="#ffffff" strokeWidth="1" opacity="0.85" />
         </svg>
       )}
 
       {texture === 'gummy' && (
         <svg viewBox="0 0 100 45" className="w-full h-full absolute inset-0">
-          <circle cx="42" cy="14" r="5" fill="#ffe4e6" opacity="0.7"/>
-          <circle cx="58" cy="14" r="5" fill="#ffe4e6" opacity="0.7"/>
-          <ellipse cx="50" cy="22" rx="14" ry="12" fill="#fb7185" stroke="#ffe4e6" strokeWidth="1.5"/>
-          <ellipse cx="46" cy="19" rx="2" ry="3" fill="#ffffff" opacity="0.85"/>
+          <circle cx="42" cy="14" r="5" fill="#ffe4e6" opacity="0.7" />
+          <circle cx="58" cy="14" r="5" fill="#ffe4e6" opacity="0.7" />
+          <ellipse cx="50" cy="22" rx="14" ry="12" fill="#fb7185" stroke="#ffe4e6" strokeWidth="1.5" />
+          <ellipse cx="46" cy="19" rx="2" ry="3" fill="#ffffff" opacity="0.85" />
         </svg>
       )}
 
       {texture === 'diamond' && (
         <svg viewBox="0 0 100 45" className="w-full h-full absolute inset-0">
-          <polygon points="50,4 75,18 50,41 25,18" fill="rgba(255,255,255,0.4)" stroke="#ffffff" strokeWidth="1.5"/>
-          <polygon points="50,4 25,18 50,18" fill="rgba(186,230,253,0.5)"/>
-          <polygon points="50,4 75,18 50,18" fill="rgba(251,207,232,0.5)"/>
-          <polygon points="50,18 25,18 50,41" fill="rgba(254,240,138,0.5)"/>
-          <polygon points="50,18 75,18 50,41" fill="rgba(199,210,254,0.5)"/>
+          <polygon points="50,4 75,18 50,41 25,18" fill="rgba(255,255,255,0.4)" stroke="#ffffff" strokeWidth="1.5" />
+          <polygon points="50,4 25,18 50,18" fill="rgba(186,230,253,0.5)" />
+          <polygon points="50,4 75,18 50,18" fill="rgba(251,207,232,0.5)" />
+          <polygon points="50,18 25,18 50,41" fill="rgba(254,240,138,0.5)" />
+          <polygon points="50,18 75,18 50,41" fill="rgba(199,210,254,0.5)" />
         </svg>
       )}
 
       {texture === 'pcb' && (
         <svg viewBox="0 0 100 45" className="w-full h-full absolute inset-0">
-          <path d="M0,15 L25,15 L35,28 L70,28 L80,12 L100,12" fill="none" stroke="#00f0ff" strokeWidth="1.5"/>
-          <circle cx="25" cy="15" r="2.5" fill="#00f0ff"/>
-          <circle cx="70" cy="28" r="2.5" fill="#00f0ff"/>
-          <rect x="42" y="10" width="16" height="14" rx="2" fill="#0e7490" stroke="#00f0ff" strokeWidth="1"/>
+          <path d="M0,15 L25,15 L35,28 L70,28 L80,12 L100,12" fill="none" stroke="#00f0ff" strokeWidth="1.5" />
+          <circle cx="25" cy="15" r="2.5" fill="#00f0ff" />
+          <circle cx="70" cy="28" r="2.5" fill="#00f0ff" />
+          <rect x="42" y="10" width="16" height="14" rx="2" fill="#0e7490" stroke="#00f0ff" strokeWidth="1" />
         </svg>
       )}
 
       {texture === 'gold' && (
         <svg viewBox="0 0 100 45" className="w-full h-full absolute inset-0">
-          <path d="M0,0 L100,45" stroke="#ffffff" strokeWidth="12" opacity="0.25"/>
-          <polygon points="50,6 54,18 66,18 56,26 60,38 50,30 40,38 44,26 34,18 46,18" fill="#fef08a" stroke="#ca8a04" strokeWidth="1"/>
+          <path d="M0,0 L100,45" stroke="#ffffff" strokeWidth="12" opacity="0.25" />
+          <polygon points="50,6 54,18 66,18 56,26 60,38 50,30 40,38 44,26 34,18 46,18" fill="#fef08a" stroke="#ca8a04" strokeWidth="1" />
         </svg>
       )}
 
       {texture === 'mercury' && (
         <svg viewBox="0 0 100 45" className="w-full h-full absolute inset-0">
-          <path d="M10,22 Q30,5 50,22 T90,22" fill="none" stroke="#ffffff" strokeWidth="4"/>
-          <path d="M10,22 Q30,5 50,22 T90,22" fill="none" stroke="#334155" strokeWidth="1.5"/>
-          <circle cx="50" cy="22" r="6" fill="#f8fafc" stroke="#64748b" strokeWidth="1"/>
+          <path d="M10,22 Q30,5 50,22 T90,22" fill="none" stroke="#ffffff" strokeWidth="4" />
+          <path d="M10,22 Q30,5 50,22 T90,22" fill="none" stroke="#334155" strokeWidth="1.5" />
+          <circle cx="50" cy="22" r="6" fill="#f8fafc" stroke="#64748b" strokeWidth="1" />
         </svg>
       )}
 
@@ -990,7 +990,7 @@ function Trackball3DPad({ rotateX, rotateY, onChange, onReset, appTheme }) {
     setIsDragging(false);
     try {
       e.currentTarget.releasePointerCapture(e.pointerId);
-    } catch (_) {}
+    } catch (_) { }
   };
 
   // Map rotateX [-85, 85] and rotateY [-85, 85] to puck position [-36px, 36px]
@@ -998,20 +998,18 @@ function Trackball3DPad({ rotateX, rotateY, onChange, onReset, appTheme }) {
   const puckY = Math.round((-rotateX / 85) * 36);
 
   return (
-    <div className={`p-3 rounded-2xl border flex flex-col items-center gap-2 select-none ${
-      appTheme === 'dark' ? 'bg-slate-900/80 border-slate-800' : 'bg-slate-50 border-slate-200 shadow-sm'
-    }`}>
+    <div className={`p-3 rounded-2xl border flex flex-col items-center gap-2 select-none ${appTheme === 'dark' ? 'bg-slate-900/80 border-slate-800' : 'bg-slate-50 border-slate-200 shadow-sm'
+      }`}>
       <div className="w-full flex items-center justify-between text-[11px]">
         <span className={`font-semibold flex items-center gap-1.5 ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
           <Compass className="w-3.5 h-3.5 text-cyan-500" /> 3D Virtual Orbit Pad
         </span>
         <button
           onClick={onReset}
-          className={`px-2 py-0.5 rounded-md border text-[10px] font-medium transition ${
-            appTheme === 'dark'
-              ? 'border-slate-700 hover:border-slate-600 text-slate-400 hover:text-white'
-              : 'border-slate-300 hover:border-slate-400 text-slate-600 hover:text-slate-900'
-          }`}
+          className={`px-2 py-0.5 rounded-md border text-[10px] font-medium transition ${appTheme === 'dark'
+            ? 'border-slate-700 hover:border-slate-600 text-slate-400 hover:text-white'
+            : 'border-slate-300 hover:border-slate-400 text-slate-600 hover:text-slate-900'
+            }`}
           title="Reset 3D tilt to 0° 0°"
         >
           Reset 0&deg;
@@ -1025,13 +1023,11 @@ function Trackball3DPad({ rotateX, rotateY, onChange, onReset, appTheme }) {
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
-        className={`w-36 h-36 rounded-full relative flex items-center justify-center cursor-grab active:cursor-grabbing touch-none transition-shadow ${
-          isDragging ? 'ring-2 ring-cyan-400/60 shadow-lg shadow-cyan-500/20' : ''
-        } ${
-          appTheme === 'dark'
+        className={`w-36 h-36 rounded-full relative flex items-center justify-center cursor-grab active:cursor-grabbing touch-none transition-shadow ${isDragging ? 'ring-2 ring-cyan-400/60 shadow-lg shadow-cyan-500/20' : ''
+          } ${appTheme === 'dark'
             ? 'bg-gradient-to-b from-slate-950 via-[#0c1425] to-slate-950 border border-cyan-500/20 shadow-inner'
             : 'bg-gradient-to-b from-slate-100 via-white to-slate-200 border border-slate-300 shadow-inner'
-        }`}
+          }`}
         title="Click & Drag in 3D space to rotate element"
       >
         {/* Concentric Gyro Rings */}
@@ -1076,8 +1072,8 @@ export default function App() {
   const [elements, setElements] = useState(() => {
     const saved = localStorage.getItem('iconderry_assets') || localStorage.getItem('pixlflow_assets');
     if (saved) {
-      try { 
-        const parsed = JSON.parse(saved); 
+      try {
+        const parsed = JSON.parse(saved);
         if (!parsed.some(el => el.id === 'elem-iconderry-official')) {
           return [INITIAL_ELEMENTS[0], ...parsed];
         }
@@ -1373,7 +1369,6 @@ export default function App() {
             }
             setSelectedLayerId(layerId);
           }
-          setIsSelectionOutlineVisible(true);
 
           isDraggingLayerRef.current = true;
           layerDragStartPosRef.current = { x: e.clientX, y: e.clientY };
@@ -1503,7 +1498,6 @@ export default function App() {
               hitLayerIds = currentHits;
               setSelectedLayerIds(currentHits);
               setSelectedLayerId(currentHits[0] || null);
-              setIsSelectionOutlineVisible(true);
             }
           }
         };
@@ -1520,7 +1514,6 @@ export default function App() {
             if (hitLayerIds.length > 0) {
               setSelectedLayerIds(hitLayerIds);
               setSelectedLayerId(hitLayerIds[0]);
-              setIsSelectionOutlineVisible(true);
               setStudioTab('colors');
             }
           } else {
@@ -1730,7 +1723,6 @@ export default function App() {
     const allIds = svgLayers.map(l => l.id);
     setSelectedLayerIds(allIds);
     if (allIds.length > 0) setSelectedLayerId(allIds[0]);
-    setIsSelectionOutlineVisible(true);
     setStudioTab('colors');
   };
 
@@ -1754,10 +1746,22 @@ export default function App() {
     }
     return 480;
   });
-  const [isResizingSidebar, setIsResizingSidebar] = useState(false);
   const [isDesktopScreen, setIsDesktopScreen] = useState(() =>
     typeof window !== 'undefined' ? window.innerWidth >= 1024 : true
   );
+  const [isResizingSidebar, setIsResizingSidebar] = useState(false);
+
+  // Mobile Canvas vs Tools Vertical Resizer State (Default: 40vh, resizable between 18vh and 75vh)
+  const DEFAULT_MOBILE_CANVAS_HEIGHT = 40;
+  const [mobileCanvasHeight, setMobileCanvasHeight] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('iconderry_mobile_canvas_height');
+      const num = Number(saved);
+      if (!isNaN(num) && num >= 18 && num <= 75) return num;
+    }
+    return DEFAULT_MOBILE_CANVAS_HEIGHT;
+  });
+  const [isResizingMobileCanvas, setIsResizingMobileCanvas] = useState(false);
 
   useEffect(() => {
     const handleResize = () => {
@@ -1798,13 +1802,50 @@ export default function App() {
       setSidebarWidth((finalWidth) => {
         try {
           localStorage.setItem('iconderry_studio_sidebar_width', String(finalWidth));
-        } catch {}
+        } catch { }
         return finalWidth;
       });
     };
 
     window.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerup', onPointerUp);
+  };
+
+  // Mobile Canvas vs Tools Vertical Resizer Pointer Handler
+  const handleStartResizeMobileCanvas = (e) => {
+    e.preventDefault();
+    setIsResizingMobileCanvas(true);
+
+    const startY = e.clientY ?? (e.touches && e.touches[0]?.clientY) ?? 0;
+    const startHeight = mobileCanvasHeight;
+    const windowH = window.innerHeight || 800;
+
+    const onPointerMove = (moveEvt) => {
+      const clientY = moveEvt.clientY ?? (moveEvt.touches && moveEvt.touches[0]?.clientY) ?? 0;
+      const deltaY = clientY - startY;
+      const deltaVh = (deltaY / windowH) * 100;
+      const newHeightVh = Math.round(Math.min(75, Math.max(18, startHeight + deltaVh)));
+      setMobileCanvasHeight(newHeightVh);
+    };
+
+    const onPointerUp = () => {
+      setIsResizingMobileCanvas(false);
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('touchmove', onPointerMove);
+      window.removeEventListener('touchend', onPointerUp);
+      setMobileCanvasHeight((finalH) => {
+        try {
+          localStorage.setItem('iconderry_mobile_canvas_height', String(finalH));
+        } catch { }
+        return finalH;
+      });
+    };
+
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('touchmove', onPointerMove, { passive: false });
+    window.addEventListener('touchend', onPointerUp);
   };
 
   // Top Right Export Dropdown Menu State
@@ -1866,7 +1907,6 @@ export default function App() {
   const [filterVersionFilter, setFilterVersionFilter] = useState('all'); // 'all' | 'new' | 'old'
   const [activeFilterPreset, setActiveFilterPreset] = useState('original');
   const [activeSelectedColor, setActiveSelectedColor] = useState(null);
-  const [isSelectionOutlineVisible, setIsSelectionOutlineVisible] = useState(true);
   const [isLayersListExpanded, setIsLayersListExpanded] = useState(false);
   const canvasSvgContainerRef = useRef(null);
 
@@ -1880,9 +1920,9 @@ export default function App() {
       if (filterCategory !== 'All' && preset.category !== filterCategory) return false;
 
       const q = filterSearchTerm.trim().toLowerCase();
-      const matchesSearch = !q || 
-        preset.name.toLowerCase().includes(q) || 
-        (preset.desc && preset.desc.toLowerCase().includes(q)) || 
+      const matchesSearch = !q ||
+        preset.name.toLowerCase().includes(q) ||
+        (preset.desc && preset.desc.toLowerCase().includes(q)) ||
         (preset.badge && preset.badge.toLowerCase().includes(q));
       return matchesSearch;
     });
@@ -1899,9 +1939,9 @@ export default function App() {
       if (effectCategory !== 'All' && mode.category !== effectCategory) return false;
 
       const q = effectSearchTerm.trim().toLowerCase();
-      const matchesSearch = !q || 
-        mode.name.toLowerCase().includes(q) || 
-        (mode.desc && mode.desc.toLowerCase().includes(q)) || 
+      const matchesSearch = !q ||
+        mode.name.toLowerCase().includes(q) ||
+        (mode.desc && mode.desc.toLowerCase().includes(q)) ||
         (mode.badge && mode.badge.toLowerCase().includes(q));
       return matchesSearch;
     });
@@ -1925,18 +1965,10 @@ export default function App() {
   const [bgShapeBorder, setBgShapeBorder] = useState(0);
   const [bgShapeBorderColor, setBgShapeBorderColor] = useState('#38bdf8');
 
-  // Favorites & Recents Persistent State
+  // Favorites Persistent State
   const [favorites, setFavorites] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem('iconderry_favorites')) || [];
-    } catch {
-      return [];
-    }
-  });
-
-  const [recentIds, setRecentIds] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem('iconderry_recents')) || [];
     } catch {
       return [];
     }
@@ -2094,14 +2126,10 @@ export default function App() {
   };
 
   // Solid Selection Outline effect on Canvas SVG elements
-  // When editing starts, isSelectionOutlineVisible is set to false so user sees the clean, unoutlined icon.
-  // When the user taps the canvas icon again, isSelectionOutlineVisible is restored to true.
   useEffect(() => {
     if (!canvasSvgContainerRef.current) return;
     const container = canvasSvgContainerRef.current;
     container.querySelectorAll('.svg-element-selected').forEach(el => el.classList.remove('svg-element-selected'));
-
-    if (!isSelectionOutlineVisible) return;
 
     // Multi-selection / single-selection outline on all selected vector parts
     const activeIds = selectedLayerIds && selectedLayerIds.length > 0
@@ -2113,8 +2141,8 @@ export default function App() {
         const cleanId = String(id).replace(/^pf_studio_/i, '');
         const numOnly = cleanId.replace(/\D/g, '');
         const targetEl = container.querySelector(`[data-layer-id="${id}"]`) ||
-                         container.querySelector(`[data-layer-id="${cleanId}"]`) ||
-                         (numOnly ? container.querySelector(`[data-layer-id="layer_${numOnly}"]`) : null);
+          container.querySelector(`[data-layer-id="${cleanId}"]`) ||
+          (numOnly ? container.querySelector(`[data-layer-id="layer_${numOnly}"]`) : null);
         if (targetEl) {
           targetEl.classList.add('svg-element-selected');
         }
@@ -2130,13 +2158,11 @@ export default function App() {
         }
       });
     }
-  }, [selectedLayerId, selectedLayerIds, activeSelectedColor, currentPreviewSvg, isSelectionOutlineVisible]);
+  }, [selectedLayerId, selectedLayerIds, activeSelectedColor, currentPreviewSvg]);
 
   const handleColorChange = (originalColor, newColor) => {
     // Record undo state before color replacement
     recordUndo();
-    // Hide selection outline while editing so user can see clean preview of the element
-    setIsSelectionOutlineVisible(false);
     const origKey = originalColor.toLowerCase();
     const newNorm = normalizeColor(newColor) || newColor;
     const linkedStops = selectedAsset ? getLinkedGradientColors(selectedAsset.svgCode, origKey) : [];
@@ -2163,7 +2189,6 @@ export default function App() {
 
   const handleResetSingleColor = (originalColor) => {
     recordUndo();
-    setIsSelectionOutlineVisible(false);
     const origKey = originalColor.toLowerCase();
     const linkedStops = selectedAsset ? getLinkedGradientColors(selectedAsset.svgCode, origKey) : [];
 
@@ -2191,7 +2216,6 @@ export default function App() {
     setLayerOrder(svgLayers.map(l => l.id));
     setSelectedLayerId(svgLayers.length > 0 ? svgLayers[0].id : null);
     setSelectedLayerIds(svgLayers.length > 0 ? [svgLayers[0].id] : []);
-    setIsSelectionOutlineVisible(false);
     setIconWidth(384);
     setIconHeight(384);
     setLockAspectRatio(true);
@@ -2219,6 +2243,8 @@ export default function App() {
     setExportFormat('png');
     setExportSize(1024);
     setIsTransparent(true);
+    setMobileCanvasHeight(DEFAULT_MOBILE_CANVAS_HEIGHT);
+    try { localStorage.removeItem('iconderry_mobile_canvas_height'); } catch { }
   };
 
   // Panel 1: Colors Reset
@@ -2326,7 +2352,6 @@ export default function App() {
   getStudioSnapshotRef.current = getStudioSnapshot;
 
   const recordUndo = () => {
-    setIsSelectionOutlineVisible(false);
     const snap = getStudioSnapshot();
     setUndoStack(prev => [...prev.slice(-30), snap]);
     setRedoStack([]);
@@ -2393,18 +2418,12 @@ export default function App() {
       const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id];
       try {
         localStorage.setItem('iconderry_favorites', JSON.stringify(next));
-      } catch (e) {}
+      } catch (e) { }
       return next;
     });
   };
 
-  // Clear recents handler
-  const handleClearRecents = () => {
-    setRecentIds([]);
-    try {
-      localStorage.removeItem('iconderry_recents');
-    } catch (e) {}
-  };
+
 
   // Direct Click/Touch on Image SVG elements
   const handleCanvasElementClick = (e) => {
@@ -2418,7 +2437,6 @@ export default function App() {
     const layerId = rawLayerId ? rawLayerId.replace(/^pf_studio_/, '') : null;
     if (layerId) {
       setSelectedLayerId(layerId);
-      setIsSelectionOutlineVisible(true);
       setStudioTab('colors');
     }
 
@@ -2504,7 +2522,6 @@ export default function App() {
 
         const targetOrigColor = match ? match.color : norm;
         setActiveSelectedColor(targetOrigColor);
-        setIsSelectionOutlineVisible(true);
         setStudioTab('colors');
         return;
       }
@@ -2518,8 +2535,8 @@ export default function App() {
   const categories = ['All', 'Favorites', ...new Set(elements.map(item => item.category))];
 
   const filteredElements = elements.filter(el => {
-    const matchesSearch = el.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          el.tags?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = el.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      el.tags?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === 'All'
       ? true
       : selectedCategory === 'Favorites'
@@ -2528,11 +2545,7 @@ export default function App() {
     return matchesSearch && matchesCategory;
   });
 
-  const recentElements = useMemo(() => {
-    return recentIds
-      .map(id => elements.find(el => el.id === id))
-      .filter(Boolean);
-  }, [recentIds, elements]);
+
 
   const handleOpenAsset = (item) => {
     setSelectedAsset(item);
@@ -2540,6 +2553,7 @@ export default function App() {
     setLayerTransforms({});
     setLayerOrder([]);
     setSelectedLayerId(null);
+    setSelectedLayerIds([]);
     setAdjustments({
       ...DEFAULT_ADJUSTMENTS,
       colorReplacements: {}
@@ -2569,14 +2583,7 @@ export default function App() {
     setUndoStack([]);
     setRedoStack([]);
 
-    // Record to recents
-    setRecentIds(prev => {
-      const next = [item.id, ...prev.filter(id => id !== item.id)].slice(0, 8);
-      try {
-        localStorage.setItem('iconderry_recents', JSON.stringify(next));
-      } catch (e) {}
-      return next;
-    });
+
   };
 
   // Keyboard shortcut listener for Ctrl+Z (Undo) and Ctrl+Y / Ctrl+Shift+Z (Redo)
@@ -2788,7 +2795,7 @@ export default function App() {
         }
       });
 
-      setElements(prev => prev.map(item => 
+      setElements(prev => prev.map(item =>
         item.id === selectedAsset.id ? { ...item, downloads: (item.downloads || 0) + 1 } : item
       ));
     } catch (err) {
@@ -2839,7 +2846,7 @@ export default function App() {
         }
       });
 
-      setElements(prev => prev.map(item => 
+      setElements(prev => prev.map(item =>
         item.id === selectedAsset.id ? { ...item, downloads: (item.downloads || 0) + 1 } : item
       ));
     } catch (err) {
@@ -2902,8 +2909,8 @@ export default function App() {
       `invert(${adjustments.invert}%)`,
       `opacity(${adjustments.opacity}%)`,
       adjustments.blur > 0 ? `blur(${adjustments.blur}px)` : '',
-      adjustments.shadowBlur > 0 
-        ? `drop-shadow(0px 0px ${adjustments.shadowBlur}px ${adjustments.shadowColor || '#38bdf8'}) drop-shadow(0px 0px ${Math.max(1, Math.round(adjustments.shadowBlur * 0.4))}px ${adjustments.shadowColor || '#38bdf8'})` 
+      adjustments.shadowBlur > 0
+        ? `drop-shadow(0px 0px ${adjustments.shadowBlur}px ${adjustments.shadowColor || '#38bdf8'}) drop-shadow(0px 0px ${Math.max(1, Math.round(adjustments.shadowBlur * 0.4))}px ${adjustments.shadowColor || '#38bdf8'})`
         : ''
     ];
 
@@ -2921,28 +2928,26 @@ export default function App() {
   };
 
   return (
-    <div className={`min-h-screen flex flex-col font-sans transition-colors duration-200 selection:bg-blue-500 selection:text-white ${
-      appTheme === 'dark' ? 'bg-[#0b0f19] text-slate-100' : 'bg-slate-50 text-slate-900'
-    }`}>
-      {/* Top Bar */}
-      <header className={`border-b sticky top-0 z-40 px-3 sm:px-6 py-3 sm:py-4 flex items-center justify-between backdrop-blur transition-colors ${
-        appTheme === 'dark' ? 'border-slate-800 bg-[#0d1424]/90' : 'border-slate-200 bg-white/90 shadow-sm'
+    <div className={`min-h-screen flex flex-col font-sans transition-colors duration-200 selection:bg-blue-500 selection:text-white ${appTheme === 'dark' ? 'bg-[#0b0f19] text-slate-100' : 'bg-slate-50 text-slate-900'
       }`}>
+      {/* Top Bar */}
+      <header className={`border-b sticky top-0 z-40 px-3 sm:px-6 py-3 sm:py-4 flex items-center justify-between backdrop-blur transition-colors ${appTheme === 'dark' ? 'border-slate-800 bg-[#0d1424]/90' : 'border-slate-200 bg-white/90 shadow-sm'
+        }`}>
         <div className="flex items-center gap-2.5 sm:gap-3">
-          <div 
+          <div
             onClick={() => setActiveTab('browse')}
             className="cursor-pointer relative group flex-shrink-0"
             title="Iconderry Home"
           >
-            <img 
-              src="/app-icon.png" 
-              alt="Iconderry Logo" 
-              className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl object-cover shadow-lg shadow-purple-600/30 border border-white/20 transition-all duration-200 group-hover:scale-105 group-hover:shadow-purple-500/50" 
+            <img
+              src="/app-icon.png"
+              alt="Iconderry Logo"
+              className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl object-cover shadow-lg shadow-purple-600/30 border border-white/20 transition-all duration-200 group-hover:scale-105 group-hover:shadow-purple-500/50"
             />
           </div>
           <div>
             <h1 className={`text-base sm:text-lg font-bold tracking-wide flex items-center gap-1.5 sm:gap-2 ${appTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-              Iconderry <span className="text-[9px] sm:text-[10px] bg-blue-500/20 text-blue-400 px-1.5 sm:px-2 py-0.5 rounded-full border border-blue-500/30">Pro Studio</span>
+              Iconderry
             </h1>
             <p className={`hidden md:block text-xs ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Advanced Visual Grading &bull; 8K Multi-Format Engine</p>
           </div>
@@ -2954,36 +2959,32 @@ export default function App() {
           <button
             onClick={() => setAppTheme(prev => prev === 'dark' ? 'light' : 'dark')}
             title={appTheme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-            className={`p-2 sm:p-2.5 rounded-xl border transition flex items-center justify-center ${
-              appTheme === 'dark' 
-                ? 'bg-slate-900 border-slate-800 text-cyan-400 hover:text-white hover:border-slate-700' 
-                : 'bg-white border-slate-200 text-amber-500 hover:text-amber-600 hover:border-slate-300 shadow-sm'
-            }`}
+            className={`p-2 sm:p-2.5 rounded-xl border transition flex items-center justify-center ${appTheme === 'dark'
+              ? 'bg-slate-900 border-slate-800 text-cyan-400 hover:text-white hover:border-slate-700'
+              : 'bg-white border-slate-200 text-amber-500 hover:text-amber-600 hover:border-slate-300 shadow-sm'
+              }`}
           >
             {appTheme === 'dark' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
           </button>
 
           {/* Tab Toggle */}
-          <div className={`flex gap-1 p-0.5 sm:p-1 rounded-xl border ${
-            appTheme === 'dark' ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200'
-          }`}>
+          <div className={`flex gap-1 p-0.5 sm:p-1 rounded-xl border ${appTheme === 'dark' ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200'
+            }`}>
             <button
               onClick={() => setActiveTab('browse')}
-              className={`flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
-                activeTab === 'browse'
-                  ? 'bg-blue-600 text-white shadow-md'
-                  : appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
-              }`}
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${activeTab === 'browse'
+                ? 'bg-blue-600 text-white shadow-md'
+                : appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                }`}
             >
               <LayoutGrid className="w-3.5 h-3.5" /> <span className="hidden xs:inline">Gallery</span>
             </button>
             <button
               onClick={() => setActiveTab('admin')}
-              className={`flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
-                activeTab === 'admin'
-                  ? 'bg-blue-600 text-white shadow-md'
-                  : appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
-              }`}
+              className={`flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${activeTab === 'admin'
+                ? 'bg-blue-600 text-white shadow-md'
+                : appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                }`}
             >
               <PlusCircle className="w-3.5 h-3.5" /> <span className="hidden xs:inline">Upload</span>
             </button>
@@ -2992,11 +2993,10 @@ export default function App() {
           {/* Settings Panel Button */}
           <button
             onClick={() => setIsSettingsOpen(true)}
-            className={`flex items-center gap-1.5 px-2.5 sm:px-3.5 py-2 rounded-xl text-xs font-semibold border transition ${
-              appTheme === 'dark'
-                ? 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:border-slate-700'
-                : 'bg-white border-slate-200 text-slate-700 hover:text-slate-900 hover:border-slate-300 shadow-sm'
-            }`}
+            className={`flex items-center gap-1.5 px-2.5 sm:px-3.5 py-2 rounded-xl text-xs font-semibold border transition ${appTheme === 'dark'
+              ? 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:border-slate-700'
+              : 'bg-white border-slate-200 text-slate-700 hover:text-slate-900 hover:border-slate-300 shadow-sm'
+              }`}
             title="Open Settings"
           >
             <Settings className="w-4 h-4 text-cyan-400" />
@@ -3009,9 +3009,8 @@ export default function App() {
       <main className="flex-1 p-3 sm:p-6 max-w-7xl w-full mx-auto">
         {activeTab === 'admin' ? (
           /* Admin Upload Panel */
-          <div className={`max-w-3xl mx-auto border rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-xl transition ${
-            appTheme === 'dark' ? 'bg-[#131b2e] border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-900 shadow-xl'
-          }`}>
+          <div className={`max-w-3xl mx-auto border rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-xl transition ${appTheme === 'dark' ? 'bg-[#131b2e] border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-900 shadow-xl'
+            }`}>
             <h2 className="text-lg sm:text-xl font-bold mb-1">Add New Element</h2>
             <p className={`text-xs sm:text-sm mb-5 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
               Drop `.svg` file or paste XML markup. Users can only download finalized customized images.
@@ -3029,13 +3028,12 @@ export default function App() {
               onDragLeave={() => setIsDragging(false)}
               onDrop={handleDrop}
               onClick={() => fileInputRef.current?.click()}
-              className={`border-2 border-dashed rounded-2xl p-5 sm:p-6 text-center cursor-pointer transition mb-5 flex flex-col items-center justify-center gap-2 ${
-                isDragging 
-                  ? 'border-cyan-500 bg-cyan-500/10' 
-                  : appTheme === 'dark'
-                    ? 'border-slate-700 hover:border-slate-600 bg-[#0b0f19]/50'
-                    : 'border-slate-300 hover:border-slate-400 bg-slate-50'
-              }`}
+              className={`border-2 border-dashed rounded-2xl p-5 sm:p-6 text-center cursor-pointer transition mb-5 flex flex-col items-center justify-center gap-2 ${isDragging
+                ? 'border-cyan-500 bg-cyan-500/10'
+                : appTheme === 'dark'
+                  ? 'border-slate-700 hover:border-slate-600 bg-[#0b0f19]/50'
+                  : 'border-slate-300 hover:border-slate-400 bg-slate-50'
+                }`}
             >
               <input
                 type="file"
@@ -3064,11 +3062,10 @@ export default function App() {
                   placeholder="e.g. Glowing Neon Trophy"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className={`w-full rounded-xl px-3.5 py-2.5 sm:py-3 text-sm focus:outline-none focus:border-blue-500 transition border ${
-                    appTheme === 'dark'
-                      ? 'bg-[#0b0f19] border-slate-700 text-slate-100 placeholder-slate-500'
-                      : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400'
-                  }`}
+                  className={`w-full rounded-xl px-3.5 py-2.5 sm:py-3 text-sm focus:outline-none focus:border-blue-500 transition border ${appTheme === 'dark'
+                    ? 'bg-[#0b0f19] border-slate-700 text-slate-100 placeholder-slate-500'
+                    : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400'
+                    }`}
                 />
               </div>
 
@@ -3083,11 +3080,10 @@ export default function App() {
                     placeholder="e.g. UI Icons, Badges, Logos"
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
-                    className={`w-full rounded-xl px-3.5 py-2.5 sm:py-3 text-sm focus:outline-none focus:border-blue-500 transition border ${
-                      appTheme === 'dark'
-                        ? 'bg-[#0b0f19] border-slate-700 text-slate-100 placeholder-slate-500'
-                        : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400'
-                    }`}
+                    className={`w-full rounded-xl px-3.5 py-2.5 sm:py-3 text-sm focus:outline-none focus:border-blue-500 transition border ${appTheme === 'dark'
+                      ? 'bg-[#0b0f19] border-slate-700 text-slate-100 placeholder-slate-500'
+                      : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400'
+                      }`}
                   />
                 </div>
                 <div>
@@ -3099,11 +3095,10 @@ export default function App() {
                     placeholder="neon, icon, gold, vector"
                     value={tags}
                     onChange={(e) => setTags(e.target.value)}
-                    className={`w-full rounded-xl px-3.5 py-2.5 sm:py-3 text-sm focus:outline-none focus:border-blue-500 transition border ${
-                      appTheme === 'dark'
-                        ? 'bg-[#0b0f19] border-slate-700 text-slate-100 placeholder-slate-500'
-                        : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400'
-                    }`}
+                    className={`w-full rounded-xl px-3.5 py-2.5 sm:py-3 text-sm focus:outline-none focus:border-blue-500 transition border ${appTheme === 'dark'
+                      ? 'bg-[#0b0f19] border-slate-700 text-slate-100 placeholder-slate-500'
+                      : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400'
+                      }`}
                   />
                 </div>
               </div>
@@ -3118,22 +3113,19 @@ export default function App() {
                   placeholder="<svg viewBox='0 0 200 200' ...> ... </svg>"
                   value={svgInput}
                   onChange={(e) => setSvgInput(e.target.value)}
-                  className={`w-full font-mono text-xs rounded-xl p-3.5 sm:p-4 focus:outline-none focus:border-blue-500 transition border ${
-                    appTheme === 'dark'
-                      ? 'bg-[#0b0f19] border-slate-700 text-slate-100 placeholder-slate-500'
-                      : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400'
-                  }`}
+                  className={`w-full font-mono text-xs rounded-xl p-3.5 sm:p-4 focus:outline-none focus:border-blue-500 transition border ${appTheme === 'dark'
+                    ? 'bg-[#0b0f19] border-slate-700 text-slate-100 placeholder-slate-500'
+                    : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400'
+                    }`}
                 />
               </div>
 
               {svgInput.trim() && (
-                <div className={`p-3 sm:p-4 rounded-xl border flex items-center gap-4 sm:gap-6 ${
-                  appTheme === 'dark' ? 'bg-[#0b0f19] border-slate-800' : 'bg-slate-50 border-slate-200'
-                }`}>
-                  <div className={`w-20 h-20 sm:w-24 sm:h-24 rounded-lg flex items-center justify-center p-2 border flex-shrink-0 ${
-                    appTheme === 'dark' ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-inner'
-                  }`}
-                       dangerouslySetInnerHTML={{ __html: svgInput }} />
+                <div className={`p-3 sm:p-4 rounded-xl border flex items-center gap-4 sm:gap-6 ${appTheme === 'dark' ? 'bg-[#0b0f19] border-slate-800' : 'bg-slate-50 border-slate-200'
+                  }`}>
+                  <div className={`w-20 h-20 sm:w-24 sm:h-24 rounded-lg flex items-center justify-center p-2 border flex-shrink-0 ${appTheme === 'dark' ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-inner'
+                    }`}
+                    dangerouslySetInnerHTML={{ __html: svgInput }} />
                   <div className="text-xs">
                     <p className={`font-semibold ${appTheme === 'dark' ? 'text-slate-200' : 'text-slate-800'}`}>Live SVG Preview</p>
                     <p className={appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}>Make sure SVG me <code>viewBox</code> mojood ho.</p>
@@ -3152,56 +3144,7 @@ export default function App() {
         ) : (
           /* Browse Gallery */
           <div>
-            {/* Recently Opened / Edited Icons Strip */}
-            {recentElements.length > 0 && (
-              <div className={`mb-6 p-3 sm:p-4 rounded-2xl border transition ${
-                appTheme === 'dark' ? 'bg-[#131b2e]/60 border-slate-800' : 'bg-white border-slate-200 shadow-sm'
-              }`}>
-                <div className="flex items-center justify-between mb-2.5">
-                  <div className="flex items-center gap-1.5">
-                    <History className="w-3.5 h-3.5 text-cyan-400" />
-                    <span className={`text-xs font-bold uppercase tracking-wider ${
-                      appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
-                    }`}>
-                      Recently Opened Icons
-                    </span>
-                    <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-mono">
-                      {recentElements.length}
-                    </span>
-                  </div>
-                  <button
-                    onClick={handleClearRecents}
-                    className="text-[11px] text-slate-500 hover:text-rose-400 transition"
-                  >
-                    Clear History
-                  </button>
-                </div>
 
-                <div className="flex items-center gap-2.5 overflow-x-auto no-scrollbar pb-1">
-                  {recentElements.map((item) => (
-                    <button
-                      key={'recent-' + item.id}
-                      onClick={() => handleOpenAsset(item)}
-                      className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-left transition hover:scale-105 flex-shrink-0 group ${
-                        appTheme === 'dark'
-                          ? 'bg-slate-900 border-slate-800 hover:border-cyan-500/50'
-                          : 'bg-slate-50 border-slate-200 hover:border-blue-400 shadow-sm'
-                      }`}
-                    >
-                      <div
-                        className="w-5 h-5 flex items-center justify-center [&>svg]:w-full [&>svg]:h-full"
-                        dangerouslySetInnerHTML={{ __html: item.svgCode }}
-                      />
-                      <span className={`text-xs font-medium truncate max-w-[110px] ${
-                        appTheme === 'dark' ? 'text-slate-300 group-hover:text-white' : 'text-slate-700 group-hover:text-blue-600'
-                      }`}>
-                        {item.title}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
 
             <div className="flex flex-col md:flex-row gap-3 md:gap-4 justify-between items-stretch md:items-center mb-6">
               <div className="relative w-full md:w-96">
@@ -3211,11 +3154,10 @@ export default function App() {
                   placeholder="Search assets or tags..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className={`w-full border rounded-xl pl-10 pr-3.5 py-2.5 sm:py-3 text-sm focus:outline-none focus:border-blue-500 transition ${
-                    appTheme === 'dark'
-                      ? 'bg-[#131b2e] border-slate-800 text-slate-100 placeholder-slate-500'
-                      : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400 shadow-sm'
-                  }`}
+                  className={`w-full border rounded-xl pl-10 pr-3.5 py-2.5 sm:py-3 text-sm focus:outline-none focus:border-blue-500 transition ${appTheme === 'dark'
+                    ? 'bg-[#131b2e] border-slate-800 text-slate-100 placeholder-slate-500'
+                    : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400 shadow-sm'
+                    }`}
                 />
               </div>
 
@@ -3227,13 +3169,12 @@ export default function App() {
                     <button
                       key={cat}
                       onClick={() => setSelectedCategory(cat)}
-                      className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition flex-shrink-0 flex items-center gap-1.5 ${
-                        isSelected
-                          ? (isFavCat ? 'bg-rose-600 text-white shadow-md' : 'bg-blue-600 text-white shadow-md')
-                          : appTheme === 'dark'
-                            ? 'bg-[#131b2e] text-slate-400 hover:text-white border border-slate-800'
-                            : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200 shadow-sm'
-                      }`}
+                      className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition flex-shrink-0 flex items-center gap-1.5 ${isSelected
+                        ? (isFavCat ? 'bg-rose-600 text-white shadow-md' : 'bg-blue-600 text-white shadow-md')
+                        : appTheme === 'dark'
+                          ? 'bg-[#131b2e] text-slate-400 hover:text-white border border-slate-800'
+                          : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200 shadow-sm'
+                        }`}
                     >
                       {isFavCat ? (
                         <>
@@ -3256,11 +3197,10 @@ export default function App() {
                   <div
                     key={item.id}
                     onClick={() => handleOpenAsset(item)}
-                    className={`group border rounded-2xl p-3 sm:p-4 flex flex-col items-center cursor-pointer transition-all duration-300 ease-out hover:-translate-y-1.5 relative ${
-                      appTheme === 'dark'
-                        ? 'bg-[#131b2e] border-slate-800 hover:border-slate-700/80 shadow-sm hover:shadow-[0_16px_32px_-6px_rgba(255,255,255,0.09),0_6px_16px_-4px_rgba(255,255,255,0.05)]'
-                        : 'bg-white border-slate-200 hover:border-slate-300/80 shadow-sm hover:shadow-[0_16px_32px_-6px_rgba(0,0,0,0.15),0_8px_16px_-4px_rgba(0,0,0,0.08)]'
-                    }`}
+                    className={`group border rounded-2xl p-3 sm:p-4 flex flex-col items-center cursor-pointer transition-all duration-300 ease-out hover:-translate-y-1.5 relative ${appTheme === 'dark'
+                      ? 'bg-[#131b2e] border-slate-800 hover:border-slate-700/80 shadow-sm hover:shadow-[0_16px_32px_-6px_rgba(255,255,255,0.09),0_6px_16px_-4px_rgba(255,255,255,0.05)]'
+                      : 'bg-white border-slate-200 hover:border-slate-300/80 shadow-sm hover:shadow-[0_16px_32px_-6px_rgba(0,0,0,0.15),0_8px_16px_-4px_rgba(0,0,0,0.08)]'
+                      }`}
                   >
                     {/* Favorite Toggle Button */}
                     <button
@@ -3269,11 +3209,10 @@ export default function App() {
                         toggleFavorite(item.id);
                       }}
                       title={isFav ? "Remove from Favorites" : "Save to Favorites"}
-                      className={`absolute top-2.5 left-2.5 p-1.5 rounded-lg transition-all z-10 ${
-                        isFav
-                          ? 'bg-rose-500/15 text-rose-500 scale-105'
-                          : 'opacity-70 sm:opacity-0 sm:group-hover:opacity-100 hover:bg-slate-500/10 text-slate-400 hover:text-rose-500'
-                      }`}
+                      className={`absolute top-2.5 left-2.5 p-1.5 rounded-lg transition-all z-10 ${isFav
+                        ? 'bg-rose-500/15 text-rose-500 scale-105'
+                        : 'opacity-70 sm:opacity-0 sm:group-hover:opacity-100 hover:bg-slate-500/10 text-slate-400 hover:text-rose-500'
+                        }`}
                     >
                       <Heart className={`w-3.5 h-3.5 ${isFav ? 'fill-rose-500 text-rose-500' : ''}`} />
                     </button>
@@ -3285,9 +3224,8 @@ export default function App() {
                     <h3 className={`font-medium text-xs sm:text-sm text-center truncate w-full ${appTheme === 'dark' ? 'text-slate-200' : 'text-slate-800'}`}>
                       {item.title}
                     </h3>
-                    <div className={`flex items-center justify-between w-full mt-1.5 px-1 text-[10px] sm:text-[11px] ${
-                      appTheme === 'dark' ? 'text-slate-500' : 'text-slate-400'
-                    }`}>
+                    <div className={`flex items-center justify-between w-full mt-1.5 px-1 text-[10px] sm:text-[11px] ${appTheme === 'dark' ? 'text-slate-500' : 'text-slate-400'
+                      }`}>
                       <span>{item.category}</span>
                       <span>{item.downloads || 0} dl</span>
                     </div>
@@ -3298,9 +3236,8 @@ export default function App() {
                         handleDelete(item.id);
                       }}
                       title="Delete Element"
-                      className={`absolute top-2.5 right-2.5 p-1.5 rounded-lg opacity-80 sm:opacity-0 sm:group-hover:opacity-100 transition z-10 ${
-                        appTheme === 'dark' ? 'bg-slate-900/80 text-slate-400 hover:text-rose-400' : 'bg-slate-100 text-slate-400 hover:text-rose-500 shadow-sm'
-                      }`}
+                      className={`absolute top-2.5 right-2.5 p-1.5 rounded-lg opacity-80 sm:opacity-0 sm:group-hover:opacity-100 transition z-10 ${appTheme === 'dark' ? 'bg-slate-900/80 text-slate-400 hover:text-rose-400' : 'bg-slate-100 text-slate-400 hover:text-rose-500 shadow-sm'
+                        }`}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -3327,9 +3264,8 @@ export default function App() {
       </main>
 
       {/* Website Footer */}
-      <footer className={`border-t mt-12 py-10 transition-colors ${
-        appTheme === 'dark' ? 'bg-[#0a0f1d] border-slate-800/80 text-slate-400' : 'bg-white border-slate-200 text-slate-600'
-      }`}>
+      <footer className={`border-t mt-12 py-10 transition-colors ${appTheme === 'dark' ? 'bg-[#0a0f1d] border-slate-800/80 text-slate-400' : 'bg-white border-slate-200 text-slate-600'
+        }`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
             {/* Brand Col */}
@@ -3403,9 +3339,8 @@ export default function App() {
             </div>
           </div>
 
-          <div className={`pt-6 border-t flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] ${
-            appTheme === 'dark' ? 'border-slate-800 text-slate-500' : 'border-slate-100 text-slate-400'
-          }`}>
+          <div className={`pt-6 border-t flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] ${appTheme === 'dark' ? 'border-slate-800 text-slate-500' : 'border-slate-100 text-slate-400'
+            }`}>
             <p>&copy; {new Date().getFullYear()} Iconderry Studio. Crafted for creators &amp; developers.</p>
             <div className="flex items-center gap-4">
               <span>Zero tracking cookies</span>
@@ -3418,35 +3353,34 @@ export default function App() {
 
       {/* Full-Screen Immersive Studio Workspace */}
       {selectedAsset && (
-        <div className={`fixed inset-0 z-50 flex flex-col w-full h-full max-w-full max-h-full overflow-hidden font-sans studio-workspace select-none transition-colors duration-200 ${
-          appTheme === 'dark' ? 'bg-[#060a12] text-slate-100' : 'bg-slate-100 text-slate-900'
-        }`}>
-          {/* Top Navigation Bar */}
-          <header className={`h-14 sm:h-16 px-3 sm:px-6 border-b flex items-center justify-between z-30 flex-shrink-0 transition-colors ${
-            appTheme === 'dark' ? 'bg-[#0d1424] border-slate-800' : 'bg-white border-slate-200 shadow-sm'
+        <div className={`fixed inset-0 z-50 flex flex-col w-full h-full max-w-full max-h-full overflow-hidden font-sans studio-workspace select-none transition-colors duration-200 ${appTheme === 'dark' ? 'bg-[#060a12] text-slate-100' : 'bg-slate-100 text-slate-900'
           }`}>
+          {/* Top Navigation Bar */}
+          <header className={`h-14 sm:h-16 px-2 sm:px-6 border-b flex items-center justify-between z-30 flex-shrink-0 transition-colors ${appTheme === 'dark' ? 'bg-[#0d1424] border-slate-800' : 'bg-white border-slate-200 shadow-sm'
+            }`}>
             {/* Left: Back & Asset Details */}
-            <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink min-w-0">
               <button
                 onClick={() => setSelectedAsset(null)}
-                className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border text-xs font-semibold transition ${
-                  appTheme === 'dark'
-                    ? 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white'
-                    : 'bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700'
-                }`}
+                className={`flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-xl border text-xs font-semibold transition flex-shrink-0 ${appTheme === 'dark'
+                  ? 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white'
+                  : 'bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700'
+                  }`}
+                title="Back to Gallery"
               >
-                <ArrowLeft className="w-4 h-4 text-cyan-500" />
-                <span className="hidden xs:inline">Gallery</span>
+                <ArrowLeft className="w-4 h-4 text-cyan-500 flex-shrink-0" />
+                <span className="hidden sm:inline">Gallery</span>
               </button>
 
-              <div className={`h-5 w-px ${appTheme === 'dark' ? 'bg-slate-800' : 'bg-slate-200'}`} />
+              <div className={`hidden sm:block h-5 w-px ${appTheme === 'dark' ? 'bg-slate-800' : 'bg-slate-200'}`} />
 
-              <div>
+              <div className="min-w-0">
                 <div className="flex items-center gap-1.5 sm:gap-2">
-                  <h2 className={`text-xs sm:text-sm font-bold truncate max-w-[90px] xs:max-w-[140px] sm:max-w-xs ${appTheme === 'dark' ? 'text-slate-100' : 'text-slate-900'}`}>
+                  <h2 className={`text-xs sm:text-sm font-bold truncate max-w-[80px] xs:max-w-[130px] sm:max-w-xs ${appTheme === 'dark' ? 'text-slate-100' : 'text-slate-900'}`}>
                     {selectedAsset.title}
                   </h2>
-                  <span className="text-[9px] sm:text-[10px] bg-cyan-500/10 text-cyan-500 px-1.5 sm:px-2 py-0.5 rounded-full border border-cyan-500/20 font-semibold">
+                  {/* Studio badge - hidden on mobile UI */}
+                  <span className="hidden sm:inline-flex text-[9px] sm:text-[10px] bg-cyan-500/10 text-cyan-500 px-1.5 sm:px-2 py-0.5 rounded-full border border-cyan-500/20 font-semibold">
                     Studio
                   </span>
                 </div>
@@ -3454,23 +3388,19 @@ export default function App() {
               </div>
             </div>
 
-
-
             {/* Right: Quick Actions */}
-            <div className="flex items-center gap-1.5 sm:gap-2">
+            <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
               {/* Undo & Redo History Buttons */}
-              <div className={`flex items-center gap-0.5 p-0.5 rounded-xl border ${
-                appTheme === 'dark' ? 'bg-slate-900/90 border-slate-800' : 'bg-slate-100 border-slate-200'
-              }`}>
+              <div className={`flex items-center gap-0.5 p-0.5 rounded-xl border ${appTheme === 'dark' ? 'bg-slate-900/90 border-slate-800' : 'bg-slate-100 border-slate-200'
+                }`}>
                 <button
                   onClick={handleUndo}
                   disabled={undoStack.length === 0}
                   title="Undo edit (Ctrl + Z)"
-                  className={`p-1.5 rounded-lg transition ${
-                    undoStack.length === 0 
-                      ? 'opacity-25 cursor-not-allowed text-slate-500' 
-                      : appTheme === 'dark' ? 'text-slate-300 hover:text-white hover:bg-slate-800' : 'text-slate-700 hover:text-slate-900 hover:bg-white shadow-sm'
-                  }`}
+                  className={`p-1.5 rounded-lg transition ${undoStack.length === 0
+                    ? 'opacity-25 cursor-not-allowed text-slate-500'
+                    : appTheme === 'dark' ? 'text-slate-300 hover:text-white hover:bg-slate-800' : 'text-slate-700 hover:text-slate-900 hover:bg-white shadow-sm'
+                    }`}
                 >
                   <Undo2 className="w-3.5 h-3.5" />
                 </button>
@@ -3478,49 +3408,46 @@ export default function App() {
                   onClick={handleRedo}
                   disabled={redoStack.length === 0}
                   title="Redo edit (Ctrl + Y / Ctrl + Shift + Z)"
-                  className={`p-1.5 rounded-lg transition ${
-                    redoStack.length === 0 
-                      ? 'opacity-25 cursor-not-allowed text-slate-500' 
-                      : appTheme === 'dark' ? 'text-slate-300 hover:text-white hover:bg-slate-800' : 'text-slate-700 hover:text-slate-900 hover:bg-white shadow-sm'
-                  }`}
+                  className={`p-1.5 rounded-lg transition ${redoStack.length === 0
+                    ? 'opacity-25 cursor-not-allowed text-slate-500'
+                    : appTheme === 'dark' ? 'text-slate-300 hover:text-white hover:bg-slate-800' : 'text-slate-700 hover:text-slate-900 hover:bg-white shadow-sm'
+                    }`}
                 >
                   <Redo2 className="w-3.5 h-3.5" />
                 </button>
               </div>
 
-              {/* Favorite Toggle inside Studio */}
-              <button
-                onClick={() => toggleFavorite(selectedAsset.id)}
-                title={favorites.includes(selectedAsset.id) ? "Saved to Favorites" : "Save to Favorites"}
-                className={`p-1.5 sm:p-2 rounded-xl border transition flex items-center justify-center ${
-                  favorites.includes(selectedAsset.id)
-                    ? 'bg-rose-500/20 border-rose-500/40 text-rose-500'
-                    : appTheme === 'dark' ? 'bg-slate-900 border-slate-800 text-slate-400 hover:text-rose-400' : 'bg-slate-100 border-slate-200 text-slate-500 hover:text-rose-500'
-                }`}
-              >
-                <Heart className={`w-3.5 h-3.5 ${favorites.includes(selectedAsset.id) ? 'fill-rose-500 text-rose-500' : ''}`} />
-              </button>
-
-              {/* Quick Dark/Light Toggle in Studio Header */}
+              {/* Quick Dark/Light Toggle in Studio Header (Visible on Mobile & Desktop) */}
               <button
                 onClick={() => setAppTheme(prev => prev === 'dark' ? 'light' : 'dark')}
                 title={appTheme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-                className={`p-1.5 sm:p-2 rounded-xl border transition flex items-center justify-center ${
-                  appTheme === 'dark' 
-                    ? 'bg-slate-900 border-slate-800 text-cyan-400 hover:text-white hover:border-slate-700' 
-                    : 'bg-slate-100 border-slate-200 text-amber-500 hover:text-amber-600 hover:bg-slate-200'
-                }`}
+                className={`p-1.5 sm:p-2 rounded-xl border transition flex items-center justify-center ${appTheme === 'dark'
+                  ? 'bg-slate-900 border-slate-800 text-cyan-400 hover:text-white hover:border-slate-700'
+                  : 'bg-slate-100 border-slate-200 text-amber-500 hover:text-amber-600 hover:bg-slate-200'
+                  }`}
               >
                 {appTheme === 'dark' ? <Moon className="w-3.5 h-3.5" /> : <Sun className="w-3.5 h-3.5" />}
               </button>
 
+              {/* Favorite Toggle inside Studio (Desktop / Tablet) */}
+              <button
+                onClick={() => toggleFavorite(selectedAsset.id)}
+                title={favorites.includes(selectedAsset.id) ? "Saved to Favorites" : "Save to Favorites"}
+                className={`hidden sm:flex p-1.5 sm:p-2 rounded-xl border transition items-center justify-center ${favorites.includes(selectedAsset.id)
+                  ? 'bg-rose-500/20 border-rose-500/40 text-rose-500'
+                  : appTheme === 'dark' ? 'bg-slate-900 border-slate-800 text-slate-400 hover:text-rose-400' : 'bg-slate-100 border-slate-200 text-slate-500 hover:text-rose-500'
+                  }`}
+              >
+                <Heart className={`w-3.5 h-3.5 ${favorites.includes(selectedAsset.id) ? 'fill-rose-500 text-rose-500' : ''}`} />
+              </button>
+
+              {/* Reset All button */}
               <button
                 onClick={handleResetAll}
-                className={`text-xs flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-xl border transition ${
-                  appTheme === 'dark'
-                    ? 'text-slate-300 hover:text-white bg-slate-900/90 border-slate-800 hover:bg-slate-800 hover:border-cyan-500/40'
-                    : 'text-slate-700 hover:text-slate-900 bg-slate-100 border-slate-200 hover:bg-slate-200'
-                }`}
+                className={`text-xs flex items-center gap-1 sm:gap-1.5 p-1.5 sm:px-3 sm:py-1.5 rounded-xl border transition ${appTheme === 'dark'
+                  ? 'text-slate-300 hover:text-white bg-slate-900/90 border-slate-800 hover:bg-slate-800 hover:border-cyan-500/40'
+                  : 'text-slate-700 hover:text-slate-900 bg-slate-100 border-slate-200 hover:bg-slate-200'
+                  }`}
                 title="Reset product 100% to upload state"
               >
                 <RefreshCw className="w-3.5 h-3.5 text-cyan-500" />
@@ -3528,26 +3455,27 @@ export default function App() {
               </button>
 
               {/* Export Button with Quality & Resolution Dropdown */}
-              <div className="relative" ref={exportDropdownRef}>
+              <div className="relative flex-shrink-0" ref={exportDropdownRef}>
                 <button
                   onClick={() => setIsExportDropdownOpen(prev => !prev)}
                   disabled={downloading}
-                  className={`bg-emerald-600 hover:bg-emerald-500 px-2.5 sm:px-4 py-1.5 rounded-xl font-semibold text-xs transition flex items-center gap-1.5 shadow-lg shadow-emerald-600/20 text-white disabled:opacity-50 ${
-                    isExportDropdownOpen ? 'ring-2 ring-emerald-400 bg-emerald-500' : ''
-                  }`}
+                  className={`h-8 px-2 sm:px-3.5 rounded-xl font-bold text-xs whitespace-nowrap flex-shrink-0 transition flex items-center gap-1 sm:gap-1.5 shadow-md shadow-emerald-600/20 text-white disabled:opacity-50 ${isExportDropdownOpen ? 'ring-2 ring-emerald-400 bg-emerald-500' : 'bg-emerald-600 hover:bg-emerald-500 active:scale-95'
+                    }`}
                   title="Export Quality & Options"
                 >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>{downloading ? 'Exporting...' : `Export .${exportFormat.toUpperCase()}`}</span>
-                  <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isExportDropdownOpen ? 'rotate-180 text-emerald-200' : 'text-white/70'}`} />
+                  <Download className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span>{downloading ? '...' : 'Export'}</span>
+                  <span className="hidden sm:inline-block text-[10px] font-mono font-bold uppercase px-1.5 py-0.5 rounded bg-black/25 text-emerald-200">
+                    .{exportFormat}
+                  </span>
+                  <ChevronDown className={`w-3 h-3 flex-shrink-0 transition-transform duration-200 ${isExportDropdownOpen ? 'rotate-180 text-emerald-200' : 'text-white/70'}`} />
                 </button>
 
                 {isExportDropdownOpen && (
-                  <div className={`absolute right-0 top-full mt-2 w-72 sm:w-80 rounded-2xl shadow-2xl border p-3.5 z-50 animate-in fade-in zoom-in-95 duration-150 backdrop-blur-xl ${
-                    appTheme === 'dark'
-                      ? 'bg-[#0d1527]/98 border-slate-700/80 text-slate-100 shadow-black/80'
-                      : 'bg-white/98 border-slate-200 text-slate-900 shadow-slate-300'
-                  }`}>
+                  <div className={`absolute right-0 top-full mt-2 w-72 sm:w-80 rounded-2xl shadow-2xl border p-3.5 z-50 animate-in fade-in zoom-in-95 duration-150 backdrop-blur-xl ${appTheme === 'dark'
+                    ? 'bg-[#0d1527]/98 border-slate-700/80 text-slate-100 shadow-black/80'
+                    : 'bg-white/98 border-slate-200 text-slate-900 shadow-slate-300'
+                    }`}>
                     {/* Header */}
                     <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-slate-700/30">
                       <div>
@@ -3566,9 +3494,8 @@ export default function App() {
 
                     {/* Format Selector Pills */}
                     <div className="mb-3">
-                      <label className={`block text-[10px] font-semibold uppercase tracking-wider mb-1.5 ${
-                        appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'
-                      }`}>
+                      <label className={`block text-[10px] font-semibold uppercase tracking-wider mb-1.5 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'
+                        }`}>
                         Format
                       </label>
                       <div className="grid grid-cols-5 gap-1">
@@ -3576,13 +3503,12 @@ export default function App() {
                           <button
                             key={fmt}
                             onClick={() => setExportFormat(fmt)}
-                            className={`py-1 text-[10px] font-mono font-bold uppercase rounded-lg border transition ${
-                              exportFormat === fmt
-                                ? 'bg-emerald-600 border-emerald-500 text-white shadow'
-                                : appTheme === 'dark'
+                            className={`py-1 text-[10px] font-mono font-bold uppercase rounded-lg border transition ${exportFormat === fmt
+                              ? 'bg-emerald-600 border-emerald-500 text-white shadow'
+                              : appTheme === 'dark'
                                 ? 'bg-slate-900/80 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700'
                                 : 'bg-slate-100 border-slate-200 text-slate-600 hover:text-slate-900'
-                            }`}
+                              }`}
                           >
                             .{fmt}
                           </button>
@@ -3592,9 +3518,8 @@ export default function App() {
 
                     {/* Resolution Options Grid (128px to 8K) */}
                     <div>
-                      <label className={`block text-[10px] font-semibold uppercase tracking-wider mb-1.5 ${
-                        appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'
-                      }`}>
+                      <label className={`block text-[10px] font-semibold uppercase tracking-wider mb-1.5 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'
+                        }`}>
                         Resolution ({exportSize >= 1024 ? `${exportSize / 1024}K Ultra HD` : `${exportSize}px Standard`})
                       </label>
                       <div className="grid grid-cols-4 gap-1.5">
@@ -3612,13 +3537,12 @@ export default function App() {
                             <button
                               key={size}
                               onClick={() => setExportSize(size)}
-                              className={`py-1.5 px-1 rounded-xl text-xs font-bold transition border text-center flex flex-col items-center justify-center ${
-                                isSelected
-                                  ? 'bg-blue-600 text-white border-blue-400 shadow-md ring-2 ring-blue-500/40 scale-[1.02]'
-                                  : appTheme === 'dark'
+                              className={`py-1.5 px-1 rounded-xl text-xs font-bold transition border text-center flex flex-col items-center justify-center ${isSelected
+                                ? 'bg-blue-600 text-white border-blue-400 shadow-md ring-2 ring-blue-500/40 scale-[1.02]'
+                                : appTheme === 'dark'
                                   ? 'bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700 hover:text-white'
                                   : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200 hover:text-slate-900'
-                              } ${size === 8192 ? 'col-span-2 bg-gradient-to-r from-cyan-900/40 to-blue-900/40 border-cyan-700/50' : ''}`}
+                                } ${size === 8192 ? 'col-span-2 bg-gradient-to-r from-cyan-900/40 to-blue-900/40 border-cyan-700/50' : ''}`}
                             >
                               <span className={size === 8192 && !isSelected ? 'text-cyan-300' : ''}>{label}</span>
                               <span className="text-[9px] opacity-70 font-normal">{size}px</span>
@@ -3648,25 +3572,25 @@ export default function App() {
                 )}
               </div>
 
+              {/* Settings Button - always clearly visible */}
               <button
                 onClick={() => setIsSettingsOpen(true)}
-                className={`p-1.5 sm:p-2 rounded-xl border transition ${
-                  appTheme === 'dark'
-                    ? 'text-slate-400 hover:text-white bg-slate-900/80 border-slate-800 hover:bg-slate-800'
-                    : 'text-slate-700 hover:text-slate-900 bg-slate-100 border-slate-200 hover:bg-slate-200'
-                }`}
+                className={`p-1.5 sm:p-2 rounded-xl border transition flex-shrink-0 flex items-center justify-center ${appTheme === 'dark'
+                  ? 'text-slate-300 hover:text-white bg-slate-900/80 border-slate-800 hover:bg-slate-800 hover:border-cyan-500/40'
+                  : 'text-slate-700 hover:text-slate-900 bg-slate-100 border-slate-200 hover:bg-slate-200'
+                  }`}
                 title="Settings & Themes"
               >
                 <Settings className="w-3.5 h-3.5 text-cyan-500" />
               </button>
 
+              {/* Redundant Close button on desktop only (mobile uses Back to Gallery button) */}
               <button
                 onClick={() => setSelectedAsset(null)}
-                className={`p-1.5 rounded-full transition ${
-                  appTheme === 'dark'
-                    ? 'text-slate-400 hover:text-white bg-slate-800/80 hover:bg-slate-700'
-                    : 'text-slate-600 hover:text-slate-900 bg-slate-200 hover:bg-slate-300'
-                }`}
+                className={`hidden sm:flex p-1.5 rounded-full transition flex-shrink-0 ${appTheme === 'dark'
+                  ? 'text-slate-400 hover:text-white bg-slate-800/80 hover:bg-slate-700'
+                  : 'text-slate-600 hover:text-slate-900 bg-slate-200 hover:bg-slate-300'
+                  }`}
                 title="Close Studio"
               >
                 <X className="w-4 h-4" />
@@ -3684,17 +3608,15 @@ export default function App() {
               onClick={() => {
                 if (justFinishedPanRef.current || isCtrlShiftDown) return;
                 setActiveSelectedColor(null);
-                setIsSelectionOutlineVisible(true);
               }}
-              className={`h-[38vh] sm:h-[45vh] lg:h-full lg:flex-1 min-w-0 relative flex flex-col items-center justify-center p-3 sm:p-6 select-none overflow-hidden transition-colors border-b lg:border-b-0 ${
-                isPanning
-                  ? 'cursor-grabbing select-none'
-                  : isCtrlShiftDown
+              style={!isDesktopScreen ? { height: `${Number(mobileCanvasHeight) || 40}vh`, minHeight: '120px', maxHeight: '75vh' } : undefined}
+              className={`w-full flex-shrink-0 lg:flex-shrink lg:h-full lg:flex-1 min-w-0 relative flex flex-col items-center justify-center p-3 sm:p-6 select-none overflow-hidden transition-colors border-b lg:border-b-0 ${isPanning
+                ? 'cursor-grabbing select-none'
+                : isCtrlShiftDown
                   ? 'cursor-grab'
                   : ''
-              } ${
-                appTheme === 'dark' ? 'bg-[#060a12]' : 'bg-slate-100/90'
-              }`}
+                } ${appTheme === 'dark' ? 'bg-[#060a12]' : 'bg-slate-100/90'
+                }`}
             >
               {/* Marquee Selection Box (Figma/Illustrator Light Blue Drag Box) */}
               {marqueeBox && (
@@ -3710,19 +3632,18 @@ export default function App() {
                 />
               )}
 
-              {/* Floating Canvas Controls & Direct Selection Indicator */}
-              <div className="absolute top-2 inset-x-2 sm:top-4 sm:inset-x-6 flex items-center justify-between z-10 pointer-events-none gap-2">
+              {/* Floating Canvas Controls & Direct Selection Indicator (Hidden on mobile UI per user request for a completely clean, empty canvas) */}
+              <div className="hidden sm:flex absolute top-2 inset-x-2 sm:top-4 sm:inset-x-6 items-center justify-between z-10 pointer-events-none gap-2">
                 {isCtrlShiftDown || isPanning ? (
                   <div className="pointer-events-auto backdrop-blur-md border px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-xl text-[10px] sm:text-xs flex items-center gap-1.5 sm:gap-2 shadow-xl bg-cyan-950/90 border-cyan-500/60 text-cyan-300 font-semibold animate-pulse">
                     <Move3d className="w-3.5 h-3.5 text-cyan-400" />
                     <span>Pan View Active &bull; Drag mouse to move</span>
                   </div>
                 ) : selectedLayerIds && selectedLayerIds.length > 0 ? (
-                  <div className={`pointer-events-auto backdrop-blur-md border px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-xl text-[10px] sm:text-xs flex items-center gap-1.5 sm:gap-2 shadow-xl animate-in fade-in duration-150 ${
-                    appTheme === 'dark'
-                      ? 'bg-slate-900/95 border-cyan-500/60 text-slate-200 shadow-cyan-950/30'
-                      : 'bg-white/95 border-cyan-500/60 text-slate-800 shadow-slate-200'
-                  }`}>
+                  <div className={`pointer-events-auto backdrop-blur-md border px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-xl text-[10px] sm:text-xs flex items-center gap-1.5 sm:gap-2 shadow-xl animate-in fade-in duration-150 ${appTheme === 'dark'
+                    ? 'bg-slate-900/95 border-cyan-500/60 text-slate-200 shadow-cyan-950/30'
+                    : 'bg-white/95 border-cyan-500/60 text-slate-800 shadow-slate-200'
+                    }`}>
                     <Layers className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
                     <span>
                       <strong className="text-cyan-400 font-bold">{selectedLayerIds.length}</strong> {selectedLayerIds.length === 1 ? 'part' : 'parts'} selected
@@ -3751,11 +3672,10 @@ export default function App() {
                     </div>
                   </div>
                 ) : activeSelectedColor ? (
-                  <div className={`pointer-events-auto backdrop-blur-md border px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-xl text-[10px] sm:text-xs flex items-center gap-1.5 sm:gap-2 shadow-xl animate-in fade-in duration-150 ${
-                    appTheme === 'dark'
-                      ? 'bg-slate-900/95 border-cyan-500/60 text-slate-200'
-                      : 'bg-white/95 border-cyan-500/60 text-slate-800'
-                  }`}>
+                  <div className={`pointer-events-auto backdrop-blur-md border px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-xl text-[10px] sm:text-xs flex items-center gap-1.5 sm:gap-2 shadow-xl animate-in fade-in duration-150 ${appTheme === 'dark'
+                    ? 'bg-slate-900/95 border-cyan-500/60 text-slate-200'
+                    : 'bg-white/95 border-cyan-500/60 text-slate-800'
+                    }`}>
                     <span
                       className="w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-full border border-slate-400 shadow ring-2 ring-cyan-400/40"
                       style={{
@@ -3765,17 +3685,13 @@ export default function App() {
                       }}
                     />
                     <span>Selected: <strong className="font-mono text-cyan-500 uppercase">{adjustments.colorReplacements[activeSelectedColor.toLowerCase()] || activeSelectedColor}</strong></span>
-                    {!isSelectionOutlineVisible && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-medium">Clean View</span>
-                    )}
                     <span className={`hidden xs:inline text-[10px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>&bull; Tap canvas to deselect</span>
                   </div>
                 ) : (
-                  <div className={`pointer-events-auto backdrop-blur-md border px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[10px] sm:text-[11px] flex items-center gap-1.5 shadow-lg ${
-                    appTheme === 'dark'
-                      ? 'bg-slate-900/90 border-slate-800 text-cyan-400'
-                      : 'bg-white/90 border-slate-200 text-cyan-600 font-medium'
-                  }`}>
+                  <div className={`pointer-events-auto backdrop-blur-md border px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[10px] sm:text-[11px] flex items-center gap-1.5 shadow-lg ${appTheme === 'dark'
+                    ? 'bg-slate-900/90 border-slate-800 text-cyan-400'
+                    : 'bg-white/90 border-slate-200 text-cyan-600 font-medium'
+                    }`}>
                     <Sparkles className="w-3 h-3 text-cyan-500 flex-shrink-0" />
                     <span><strong>Touch/Click</strong> icon to change colors</span>
                     <span className={`hidden md:inline text-[10px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>&bull; Scroll: Smooth Zoom &bull; Drag: Marquee Select</span>
@@ -3783,9 +3699,8 @@ export default function App() {
                 )}
 
                 {/* Zoom Controls Pill */}
-                <div className={`pointer-events-auto flex items-center border p-0.5 sm:p-1 rounded-xl gap-0.5 sm:gap-1 shadow-lg backdrop-blur-md ${
-                  appTheme === 'dark' ? 'bg-slate-900/90 border-slate-800' : 'bg-white/95 border-slate-200'
-                }`}>
+                <div className={`pointer-events-auto flex items-center border p-0.5 sm:p-1 rounded-xl gap-0.5 sm:gap-1 shadow-lg backdrop-blur-md ${appTheme === 'dark' ? 'bg-slate-900/90 border-slate-800' : 'bg-white/95 border-slate-200'
+                  }`}>
                   <button
                     onClick={() => {
                       const prevTarget = targetZoomRef.current;
@@ -3802,9 +3717,8 @@ export default function App() {
                       }
                       startSmoothZoomLoop();
                     }}
-                    className={`p-1 sm:p-1.5 rounded-lg transition ${
-                      appTheme === 'dark' ? 'hover:bg-slate-800 text-slate-300' : 'hover:bg-slate-100 text-slate-700'
-                    }`}
+                    className={`p-1 sm:p-1.5 rounded-lg transition ${appTheme === 'dark' ? 'hover:bg-slate-800 text-slate-300' : 'hover:bg-slate-100 text-slate-700'
+                      }`}
                     title="Zoom Out (Auto-centers towards 100%)"
                   >
                     <ZoomOut className="w-3.5 h-3.5" />
@@ -3821,9 +3735,8 @@ export default function App() {
                       setZoomLevel(1);
                       setCanvasPan({ x: 0, y: 0 });
                     }}
-                    className={`px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs font-mono font-bold rounded-md transition ${
-                      appTheme === 'dark' ? 'hover:bg-slate-800 text-cyan-400' : 'hover:bg-slate-100 text-cyan-600'
-                    }`}
+                    className={`px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs font-mono font-bold rounded-md transition ${appTheme === 'dark' ? 'hover:bg-slate-800 text-cyan-400' : 'hover:bg-slate-100 text-cyan-600'
+                      }`}
                     title="Click to Reset Zoom (100%) & Center Pan"
                   >
                     {Math.round(zoomLevel * 100)}%
@@ -3833,9 +3746,8 @@ export default function App() {
                       targetZoomRef.current = Math.min(5, Number((targetZoomRef.current * 1.25).toFixed(2)));
                       startSmoothZoomLoop();
                     }}
-                    className={`p-1 sm:p-1.5 rounded-lg transition ${
-                      appTheme === 'dark' ? 'hover:bg-slate-800 text-slate-300' : 'hover:bg-slate-100 text-slate-700'
-                    }`}
+                    className={`p-1 sm:p-1.5 rounded-lg transition ${appTheme === 'dark' ? 'hover:bg-slate-800 text-slate-300' : 'hover:bg-slate-100 text-slate-700'
+                      }`}
                     title="Zoom In (up to 500%)"
                   >
                     <ZoomIn className="w-3.5 h-3.5" />
@@ -3858,18 +3770,18 @@ export default function App() {
 
 
               {/* Floating SVG Icon or Background Badge Shape with Interactive Selection, Custom Dimensions & Smooth Zoom */}
-              <div 
+              <div
                 className={
                   adjustments.is3DFloating
                     ? adjustments.animPreset === 'spin360'
                       ? 'animate-spin-3d'
                       : adjustments.animPreset === 'pulse'
-                      ? 'animate-pulse-3d'
-                      : adjustments.animPreset === 'wobble'
-                      ? 'animate-wobble-3d'
-                      : adjustments.animPreset === 'wave'
-                      ? 'animate-wave-3d'
-                      : 'animate-floating-3d'
+                        ? 'animate-pulse-3d'
+                        : adjustments.animPreset === 'wobble'
+                          ? 'animate-wobble-3d'
+                          : adjustments.animPreset === 'wave'
+                            ? 'animate-wave-3d'
+                            : 'animate-floating-3d'
                     : ''
                 }
                 style={{
@@ -3905,20 +3817,18 @@ export default function App() {
                     clipPath: bgShape === 'hexagon' ? 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)' : 'none',
                     border: bgShape !== 'none' && bgShapeBorder > 0 ? `${bgShapeBorder}px solid ${bgShapeBorderColor}` : 'none'
                   }}
-                  className={`flex items-center justify-center interactive-svg-canvas cursor-pointer select-none [&>svg]:w-full [&>svg]:h-full [&>svg]:block [shape-rendering:geometricPrecision] [text-rendering:geometricPrecision] ${
-                    bgShape !== 'none' ? 'shadow-2xl' : ''
-                  }`}
+                  className={`flex items-center justify-center interactive-svg-canvas cursor-pointer select-none [&>svg]:w-full [&>svg]:h-full [&>svg]:block [shape-rendering:geometricPrecision] [text-rendering:geometricPrecision] ${bgShape !== 'none' ? 'shadow-2xl' : ''
+                    }`}
                   dangerouslySetInnerHTML={{ __html: currentPreviewSvg }}
                 />
               </div>
 
-              {/* Bottom Floating Bar on Canvas */}
-              <div className="absolute bottom-2 inset-x-2 sm:bottom-4 sm:inset-x-6 flex items-center justify-between pointer-events-none gap-2">
+              {/* Bottom Floating Bar on Canvas (Hidden on mobile UI per user request, visible on tablet/desktop) */}
+              <div className="hidden sm:flex absolute bottom-2 inset-x-2 sm:bottom-4 sm:inset-x-6 items-center justify-between pointer-events-none gap-2">
                 {/* Element colors quick strip */}
                 {detectedColors.length > 0 && (
-                  <div className={`pointer-events-auto p-1.5 sm:p-2.5 px-2.5 sm:px-4 backdrop-blur-md border rounded-xl sm:rounded-2xl flex items-center gap-2 sm:gap-3 shadow-xl ${
-                    appTheme === 'dark' ? 'bg-slate-900/90 border-slate-800' : 'bg-white/95 border-slate-200'
-                  }`}>
+                  <div className={`pointer-events-auto p-1.5 sm:p-2.5 px-2.5 sm:px-4 backdrop-blur-md border rounded-xl sm:rounded-2xl flex items-center gap-2 sm:gap-3 shadow-xl ${appTheme === 'dark' ? 'bg-slate-900/90 border-slate-800' : 'bg-white/95 border-slate-200'
+                    }`}>
                     <span className={`text-[10px] sm:text-[11px] font-medium ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Palette:</span>
                     <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap max-w-[200px] sm:max-w-none">
                       {detectedColors.map((c) => {
@@ -3936,13 +3846,12 @@ export default function App() {
                               if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                             }}
                             title={`Original: ${c.color} | Current: ${activeColor}${isChanged ? ' (Modified)' : ''}`}
-                            className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 transition-transform hover:scale-125 relative ${
-                              isSelected
-                                ? 'border-cyan-400 ring-2 sm:ring-4 ring-cyan-400/40 scale-110'
-                                : isChanged
+                            className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 transition-transform hover:scale-125 relative ${isSelected
+                              ? 'border-cyan-400 ring-2 sm:ring-4 ring-cyan-400/40 scale-110'
+                              : isChanged
                                 ? 'border-cyan-400 ring-1 sm:ring-2 ring-cyan-400/30'
                                 : appTheme === 'dark' ? 'border-slate-700' : 'border-slate-300'
-                            }`}
+                              }`}
                             style={{ backgroundColor: activeColor }}
                           />
                         );
@@ -3953,31 +3862,65 @@ export default function App() {
               </div>
             </div>
 
+            {/* Draggable Divider Handle between Canvas and Tools (Mobile Vertical Resize) */}
+            <div
+              onPointerDown={handleStartResizeMobileCanvas}
+              onTouchStart={handleStartResizeMobileCanvas}
+              onDoubleClick={() => {
+                setMobileCanvasHeight(DEFAULT_MOBILE_CANVAS_HEIGHT);
+                try { localStorage.setItem('iconderry_mobile_canvas_height', String(DEFAULT_MOBILE_CANVAS_HEIGHT)); } catch { }
+              }}
+              className={`flex lg:hidden items-center justify-center relative select-none cursor-row-resize z-30 transition-all duration-150 group flex-shrink-0 touch-none py-1.5 ${isResizingMobileCanvas
+                ? 'bg-cyan-500/20 border-y border-cyan-400'
+                : appTheme === 'dark'
+                  ? 'bg-[#0b0f19] border-y border-slate-800 hover:bg-cyan-500/10 hover:border-cyan-500/40 active:bg-cyan-500/20'
+                  : 'bg-slate-100 border-y border-slate-200 hover:bg-cyan-500/10 hover:border-cyan-500/40 active:bg-cyan-500/20'
+                }`}
+              title="Drag up/down to resize Canvas vs Tools • Double-tap to reset"
+            >
+              {/* Visual grip pill */}
+              <div
+                className={`w-12 h-1.5 rounded-full transition-all duration-150 ${isResizingMobileCanvas
+                  ? 'w-16 h-2 bg-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.8)]'
+                  : appTheme === 'dark'
+                    ? 'bg-slate-600 group-hover:bg-cyan-400 group-active:bg-cyan-400'
+                    : 'bg-slate-400 group-hover:bg-cyan-500 group-active:bg-cyan-500'
+                  }`}
+              />
+            </div>
+
+            {/* Invisible overlay while resizing mobile canvas to prevent pointer event loss */}
+            {isResizingMobileCanvas && (
+              <div
+                onPointerDown={(e) => e.preventDefault()}
+                onTouchStart={(e) => e.preventDefault()}
+                className="fixed inset-0 z-50 cursor-row-resize select-none"
+              />
+            )}
+
             {/* Draggable Sidebar Resizer Handle (VS Code style - Desktop only) */}
             <div
               onPointerDown={handleStartResizeSidebar}
               onDoubleClick={() => {
                 setSidebarWidth(480);
-                try { localStorage.setItem('iconderry_studio_sidebar_width', '480'); } catch {}
+                try { localStorage.setItem('iconderry_studio_sidebar_width', '480'); } catch { }
               }}
-              className={`hidden lg:flex items-center justify-center relative select-none cursor-col-resize z-30 transition-all duration-150 group flex-shrink-0 border-l ${
-                isResizingSidebar
-                  ? 'w-2 bg-cyan-500 border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.8)]'
-                  : appTheme === 'dark'
+              className={`hidden lg:flex items-center justify-center relative select-none cursor-col-resize z-30 transition-all duration-150 group flex-shrink-0 border-l ${isResizingSidebar
+                ? 'w-2 bg-cyan-500 border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.8)]'
+                : appTheme === 'dark'
                   ? 'w-2 bg-[#0b0f19] border-slate-800 hover:bg-cyan-500/20 hover:border-cyan-500/60'
                   : 'w-2 bg-slate-100 border-slate-200 hover:bg-cyan-500/20 hover:border-cyan-500/60'
-              }`}
+                }`}
               title="Drag left/right to resize panel width • Double-click to reset (480px)"
             >
               {/* Center visual grip pill */}
               <div
-                className={`w-1 rounded-full transition-all duration-150 ${
-                  isResizingSidebar
-                    ? 'h-16 bg-white shadow-md'
-                    : appTheme === 'dark'
+                className={`w-1 rounded-full transition-all duration-150 ${isResizingSidebar
+                  ? 'h-16 bg-white shadow-md'
+                  : appTheme === 'dark'
                     ? 'h-8 bg-slate-600 group-hover:h-12 group-hover:bg-cyan-400'
                     : 'h-8 bg-slate-400 group-hover:h-12 group-hover:bg-cyan-500'
-                }`}
+                  }`}
               />
             </div>
 
@@ -3992,87 +3935,81 @@ export default function App() {
             {/* Right: Studio Tools & Control Sidebar */}
             <div
               style={isDesktopScreen ? { width: `${sidebarWidth}px`, maxWidth: '50%', minWidth: '340px' } : undefined}
-              className={`flex-1 lg:flex-none lg:h-full w-full border-t lg:border-t-0 flex flex-col flex-shrink-0 shadow-2xl z-20 overflow-hidden transition-[background-color,border-color] duration-200 ${
-                appTheme === 'dark' ? 'bg-[#0d1424] border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-900'
-              }`}
+              className={`min-h-0 min-w-0 flex-1 lg:flex-none lg:h-full w-full border-t lg:border-t-0 flex flex-col lg:flex-shrink-0 shadow-2xl z-20 overflow-hidden transition-[background-color,border-color] duration-200 ${appTheme === 'dark' ? 'bg-[#0d1424] border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-900'
+                }`}
             >
-              {/* Studio Segmented Navigation Tabs */}
-              <div className={`p-2 sm:p-4 border-b flex-shrink-0 ${
-                appTheme === 'dark' ? 'border-slate-800 bg-[#0b0f19]' : 'border-slate-200 bg-slate-50'
-              }`}>
-                <div className={`grid grid-cols-6 gap-1 p-0.5 sm:p-1 rounded-xl border ${
-                  appTheme === 'dark' ? 'bg-slate-900 border-slate-800' : 'bg-slate-200/70 border-slate-300/60'
-                }`}>
+              {/* Studio Segmented Navigation Tabs (Pinned to bottom on Mobile UI like a native app, top on desktop) */}
+              <div
+                style={{ paddingBottom: 'max(0.4rem, env(safe-area-inset-bottom, 0.4rem))' }}
+                className={`p-1.5 sm:p-2 lg:p-4 border-t lg:border-t-0 lg:border-b flex-shrink-0 order-last lg:order-first z-30 shadow-[0_-4px_20px_rgba(0,0,0,0.3)] lg:shadow-none ${appTheme === 'dark' ? 'border-slate-800 bg-[#0b0f19]/95 backdrop-blur-md' : 'border-slate-200 bg-slate-50/95 backdrop-blur-md'
+                  }`}
+              >
+                <div className={`grid grid-cols-6 gap-1 p-0.5 sm:p-1 rounded-xl border ${appTheme === 'dark' ? 'bg-slate-900 border-slate-800' : 'bg-slate-200/70 border-slate-300/60'
+                  }`}>
                   <button
                     onClick={() => setStudioTab('colors')}
-                    className={`flex flex-col items-center justify-center gap-0.5 py-1.5 sm:py-2 px-0.5 sm:px-1 rounded-lg text-xs font-semibold transition ${
-                      studioTab === 'colors' 
-                        ? 'bg-blue-600 text-white shadow' 
-                        : appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
-                    }`}
+                    className={`flex flex-col items-center justify-center gap-0.5 py-1.5 sm:py-2 px-0.5 sm:px-1 rounded-lg text-xs font-semibold transition active:scale-95 ${studioTab === 'colors'
+                      ? 'bg-blue-600 text-white shadow'
+                      : appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                      }`}
                   >
-                    <Palette className="w-3.5 h-3.5" />
-                    <span className="text-[10px] sm:text-[11px]">Colors</span>
+                    <Palette className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
+                    <span className="text-[9px] sm:text-[10px] lg:text-[11px] leading-tight">Colors</span>
                   </button>
 
                   <button
                     onClick={() => setStudioTab('filters')}
-                    className={`flex flex-col items-center justify-center gap-0.5 py-1.5 sm:py-2 px-0.5 sm:px-1 rounded-lg text-xs font-semibold transition ${
-                      studioTab === 'filters' 
-                        ? 'bg-blue-600 text-white shadow' 
-                        : appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
-                    }`}
+                    className={`flex flex-col items-center justify-center gap-0.5 py-1.5 sm:py-2 px-0.5 sm:px-1 rounded-lg text-xs font-semibold transition active:scale-95 ${studioTab === 'filters'
+                      ? 'bg-blue-600 text-white shadow'
+                      : appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                      }`}
                   >
-                    <Wand2 className="w-3.5 h-3.5" />
-                    <span className="text-[10px] sm:text-[11px]">Filters</span>
+                    <Wand2 className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
+                    <span className="text-[9px] sm:text-[10px] lg:text-[11px] leading-tight">Filters</span>
                   </button>
 
                   <button
                     onClick={() => setStudioTab('effects')}
-                    className={`flex flex-col items-center justify-center gap-0.5 py-1.5 sm:py-2 px-0.5 sm:px-1 rounded-lg text-xs font-semibold transition ${
-                      studioTab === 'effects' 
-                        ? 'bg-blue-600 text-white shadow' 
-                        : appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
-                    }`}
+                    className={`flex flex-col items-center justify-center gap-0.5 py-1.5 sm:py-2 px-0.5 sm:px-1 rounded-lg text-xs font-semibold transition active:scale-95 ${studioTab === 'effects'
+                      ? 'bg-blue-600 text-white shadow'
+                      : appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                      }`}
                   >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span className="text-[10px] sm:text-[11px]">Effects</span>
+                    <Sparkles className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
+                    <span className="text-[9px] sm:text-[10px] lg:text-[11px] leading-tight">Effects</span>
                   </button>
 
                   <button
                     onClick={() => setStudioTab('dimensions')}
-                    className={`flex flex-col items-center justify-center gap-0.5 py-1.5 sm:py-2 px-0.5 sm:px-1 rounded-lg text-xs font-semibold transition ${
-                      studioTab === 'dimensions' 
-                        ? 'bg-blue-600 text-white shadow' 
-                        : appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
-                    }`}
+                    className={`flex flex-col items-center justify-center gap-0.5 py-1.5 sm:py-2 px-0.5 sm:px-1 rounded-lg text-xs font-semibold transition active:scale-95 ${studioTab === 'dimensions'
+                      ? 'bg-blue-600 text-white shadow'
+                      : appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                      }`}
                   >
-                    <Maximize2 className="w-3.5 h-3.5" />
-                    <span className="text-[10px] sm:text-[11px]">Size</span>
+                    <Maximize2 className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
+                    <span className="text-[9px] sm:text-[10px] lg:text-[11px] leading-tight">Size</span>
                   </button>
 
                   <button
                     onClick={() => setStudioTab('transform')}
-                    className={`flex flex-col items-center justify-center gap-0.5 py-1.5 sm:py-2 px-0.5 sm:px-1 rounded-lg text-xs font-semibold transition ${
-                      studioTab === 'transform' 
-                        ? 'bg-blue-600 text-white shadow' 
-                        : appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
-                    }`}
+                    className={`flex flex-col items-center justify-center gap-0.5 py-1.5 sm:py-2 px-0.5 sm:px-1 rounded-lg text-xs font-semibold transition active:scale-95 ${studioTab === 'transform'
+                      ? 'bg-blue-600 text-white shadow'
+                      : appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                      }`}
                   >
-                    <Move3d className="w-3.5 h-3.5" />
-                    <span className="text-[10px] sm:text-[11px]">3D Rotate</span>
+                    <Move3d className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
+                    <span className="text-[9px] sm:text-[10px] lg:text-[11px] leading-tight">3D Rotate</span>
                   </button>
 
                   <button
                     onClick={() => setStudioTab('export')}
-                    className={`flex flex-col items-center justify-center gap-0.5 py-1.5 sm:py-2 px-0.5 sm:px-1 rounded-lg text-xs font-semibold transition ${
-                      studioTab === 'export' 
-                        ? 'bg-blue-600 text-white shadow' 
-                        : appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
-                    }`}
+                    className={`flex flex-col items-center justify-center gap-0.5 py-1.5 sm:py-2 px-0.5 sm:px-1 rounded-lg text-xs font-semibold transition active:scale-95 ${studioTab === 'export'
+                      ? 'bg-blue-600 text-white shadow'
+                      : appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                      }`}
                   >
-                    <Download className="w-3.5 h-3.5" />
-                    <span className="text-[10px] sm:text-[11px]">Export</span>
+                    <Download className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
+                    <span className="text-[9px] sm:text-[10px] lg:text-[11px] leading-tight">Export</span>
                   </button>
                 </div>
               </div>
@@ -4084,9 +4021,8 @@ export default function App() {
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <div>
-                        <h4 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
-                          appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
-                        }`}>
+                        <h4 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
+                          }`}>
                           <Paintbrush className="w-3.5 h-3.5 text-cyan-500" /> Vector Color Studio
                         </h4>
                         <p className={`text-[11px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
@@ -4096,11 +4032,10 @@ export default function App() {
 
                       <button
                         onClick={handleResetColorsPanel}
-                        className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition flex items-center gap-1.5 flex-shrink-0 ${
-                          appTheme === 'dark'
-                            ? 'text-slate-300 hover:text-white bg-slate-900 border-slate-800 hover:border-slate-700'
-                            : 'text-slate-700 hover:text-slate-900 bg-white border-slate-200 hover:bg-slate-50'
-                        }`}
+                        className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition flex items-center gap-1.5 flex-shrink-0 ${appTheme === 'dark'
+                          ? 'text-slate-300 hover:text-white bg-slate-900 border-slate-800 hover:border-slate-700'
+                          : 'text-slate-700 hover:text-slate-900 bg-white border-slate-200 hover:bg-slate-50'
+                          }`}
                         title="Reset all custom color replacements in this panel"
                       >
                         <Undo2 className="w-3 h-3 text-cyan-500" />
@@ -4109,166 +4044,176 @@ export default function App() {
                     </div>
 
                     {/* Active Selected Element Direct Editor Card */}
-                    {activeSelectedColor ? (
-                      <div className={`p-4 rounded-2xl border-2 shadow-xl space-y-3 animate-in fade-in duration-200 ${
-                        appTheme === 'dark' 
-                          ? 'bg-slate-900 border-cyan-400/80 shadow-cyan-500/10' 
-                          : 'bg-slate-50 border-cyan-500 shadow-cyan-500/10'
-                      }`}>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className={`w-2.5 h-2.5 rounded-full ${isSelectionOutlineVisible ? 'bg-cyan-500 animate-pulse' : 'bg-emerald-400'}`} />
-                            <span className="text-xs font-bold uppercase tracking-wider text-cyan-500">
-                              Active Selected Element
-                            </span>
+                    {(() => {
+                      const activeIds = (selectedLayerIds && selectedLayerIds.length > 0)
+                        ? selectedLayerIds
+                        : (selectedLayerId ? [selectedLayerId] : []);
+                      const primaryId = activeIds[0];
+                      const cleanPrimaryId = primaryId ? String(primaryId).replace(/^pf_studio_/i, '') : null;
+                      const numOnly = cleanPrimaryId ? cleanPrimaryId.replace(/\D/g, '') : null;
+                      const activeLayer = cleanPrimaryId
+                        ? svgLayers.find(l => l.id === cleanPrimaryId || l.id === primaryId || (numOnly && l.id === `layer_${numOnly}`))
+                        : null;
+                      const layerStyle = cleanPrimaryId ? (layerStyles[cleanPrimaryId] || layerStyles[primaryId] || {}) : {};
+                      const currentLayerColor = layerStyle.fill || layerStyle.stroke || (activeLayer ? activeLayer.color : null);
+
+                      const effectiveColor = (activeSelectedColor && adjustments.colorReplacements[activeSelectedColor.toLowerCase()])
+                        || activeSelectedColor
+                        || currentLayerColor
+                        || (activeIds.length > 0 ? '#38bdf8' : null);
+
+                      const originalColorDisplay = activeSelectedColor
+                        || (activeLayer ? (activeLayer.color || '#38bdf8') : (effectiveColor || '#38bdf8'));
+
+                      const hasCustomColor = (activeSelectedColor && !!adjustments.colorReplacements[activeSelectedColor.toLowerCase()])
+                        || (activeIds.length > 0 && activeIds.some(id => {
+                          const cid = String(id).replace(/^pf_studio_/i, '');
+                          const s = layerStyles[cid] || layerStyles[id];
+                          return s && (s.fill || s.stroke);
+                        }));
+
+                      const handleApplyColor = (newCol) => {
+                        const norm = normalizeColor(newCol) || newCol;
+                        if (activeSelectedColor) {
+                          handleColorChange(activeSelectedColor, norm);
+                        }
+                        if (activeIds.length > 0) {
+                          handleLayerColorChange(activeIds, norm);
+                        } else if (!activeSelectedColor && originalColorDisplay) {
+                          handleColorChange(originalColorDisplay, norm);
+                        }
+                      };
+
+                      const handleResetEffectiveColor = () => {
+                        if (activeSelectedColor) {
+                          handleResetSingleColor(activeSelectedColor);
+                        }
+                        if (activeIds.length > 0) {
+                          handleResetLayerColor(activeIds);
+                        }
+                      };
+
+                      const isAnySelected = !!activeSelectedColor || activeIds.length > 0;
+
+                      if (!isAnySelected || !effectiveColor) {
+                        return (
+                          <div className={`p-5 rounded-2xl border border-dashed text-center text-xs space-y-1 ${appTheme === 'dark' ? 'bg-slate-900/60 border-slate-800 text-slate-400' : 'bg-slate-50 border-slate-300 text-slate-600'
+                            }`}>
+                            <Sparkles className="w-5 h-5 text-cyan-500 mx-auto mb-1" />
+                            <p className={`font-semibold ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-800'}`}>Touch Element on Image</p>
+                            <p className={`text-[11px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                              Canvas par kisi bhi element ko click karein ya drag karein usko move, rotate, color aur reorder karne ke liye.
+                            </p>
                           </div>
+                        );
+                      }
 
-                          <div className="flex items-center gap-1.5">
-                            {/* Outline Toggle / Clean Preview Mode Indicator */}
-                            <button
-                              onClick={() => setIsSelectionOutlineVisible(!isSelectionOutlineVisible)}
-                              className={`text-[11px] flex items-center gap-1.5 px-2.5 py-1 rounded-xl transition border font-semibold ${
-                                isSelectionOutlineVisible
-                                  ? (appTheme === 'dark' ? 'bg-cyan-950/40 border-cyan-800/60 text-cyan-400 hover:bg-cyan-900/40' : 'bg-cyan-50 border-cyan-300 text-cyan-700 hover:bg-cyan-100')
-                                  : (appTheme === 'dark' ? 'bg-emerald-950/40 border-emerald-500/50 text-emerald-300 hover:bg-emerald-900/40' : 'bg-emerald-50 border-emerald-300 text-emerald-800 hover:bg-emerald-100')
-                              }`}
-                              title={isSelectionOutlineVisible ? 'Click to hide selection outline for clean viewing' : 'Click to show selection outline'}
-                            >
-                              {isSelectionOutlineVisible ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-                              <span>{isSelectionOutlineVisible ? 'Outline: On' : 'Clean Preview'}</span>
-                            </button>
+                      return (
+                        <div className={`p-4 rounded-2xl border-2 shadow-xl space-y-3 animate-in fade-in duration-200 ${appTheme === 'dark'
+                          ? 'bg-slate-900 border-cyan-400/80 shadow-cyan-500/10'
+                          : 'bg-slate-50 border-cyan-500 shadow-cyan-500/10'
+                          }`}>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="w-2.5 h-2.5 rounded-full bg-cyan-500" />
+                              <span className="text-xs font-bold uppercase tracking-wider text-cyan-500">
+                                {activeIds.length > 1
+                                  ? `${activeIds.length} Parts Selected`
+                                  : (activeLayer ? `${activeLayer.name}` : 'Active Selected Element')}
+                              </span>
+                              {activeLayer && activeIds.length <= 1 && (
+                                <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                                  &lt;{activeLayer.tag}&gt;
+                                </span>
+                              )}
+                            </div>
 
-                            {adjustments.colorReplacements[activeSelectedColor.toLowerCase()] && (
+                            {hasCustomColor && (
                               <button
-                                onClick={() => handleResetSingleColor(activeSelectedColor)}
-                                className={`text-[11px] flex items-center gap-1 px-2.5 py-1 rounded-xl transition border ${
-                                  appTheme === 'dark'
-                                    ? 'text-slate-400 hover:text-white bg-slate-800 border-slate-700'
-                                    : 'text-slate-600 hover:text-slate-900 bg-white border-slate-300'
-                                }`}
+                                onClick={handleResetEffectiveColor}
+                                className={`text-[11px] flex items-center gap-1 px-2.5 py-1 rounded-xl transition border ${appTheme === 'dark'
+                                  ? 'text-slate-400 hover:text-white bg-slate-800 border-slate-700'
+                                  : 'text-slate-600 hover:text-slate-900 bg-white border-slate-300'
+                                  }`}
                               >
-                                <Undo2 className="w-3 h-3" /> Reset Layer
+                                <Undo2 className="w-3 h-3" /> Reset Color
                               </button>
                             )}
                           </div>
-                        </div>
 
-                        {/* Clean Preview status notice when editing */}
-                        {!isSelectionOutlineVisible && (
-                          <div className={`px-2.5 py-1.5 rounded-xl text-[10px] flex items-center justify-between border ${
-                            appTheme === 'dark' 
-                              ? 'bg-emerald-950/30 text-emerald-300 border-emerald-800/40' 
-                              : 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                          }`}>
-                            <span className="flex items-center gap-1.5">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                              Clean Preview Mode: Editing without outline border.
-                            </span>
-                            <span className="opacity-80 font-medium">Click icon on canvas to re-show outline</span>
-                          </div>
-                        )}
+                          {/* Color Preview, Picker & Hex */}
+                          <div className={`flex items-center justify-between gap-3 p-3 rounded-xl border ${appTheme === 'dark' ? 'bg-[#0b0f19] border-slate-800' : 'bg-white border-slate-200 shadow-sm'
+                            }`}>
+                            <div className="flex items-center gap-3">
+                              <div
+                                className="w-11 h-11 rounded-xl border-2 border-slate-400 shadow-inner flex items-center justify-center flex-shrink-0"
+                                style={{ backgroundColor: effectiveColor }}
+                              />
+                              <div>
+                                <span className={`font-mono text-sm font-bold uppercase ${appTheme === 'dark' ? 'text-slate-100' : 'text-slate-900'
+                                  }`}>
+                                  {effectiveColor}
+                                </span>
+                                <p className={`text-[10px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                                  Original: <span className="font-mono uppercase">{originalColorDisplay}</span>
+                                </p>
+                              </div>
+                            </div>
 
-                        {/* Color Preview, Picker & Hex */}
-                        <div className={`flex items-center justify-between gap-3 p-3 rounded-xl border ${
-                          appTheme === 'dark' ? 'bg-[#0b0f19] border-slate-800' : 'bg-white border-slate-200 shadow-sm'
-                        }`}>
-                          <div className="flex items-center gap-3">
-                            <div
-                              className="w-11 h-11 rounded-xl border-2 border-slate-400 shadow-inner flex items-center justify-center flex-shrink-0"
-                              style={{
-                                backgroundColor:
-                                  adjustments.colorReplacements[activeSelectedColor.toLowerCase()] ||
-                                  activeSelectedColor
-                              }}
-                            />
-                            <div>
-                              <span className={`font-mono text-sm font-bold uppercase ${
-                                appTheme === 'dark' ? 'text-slate-100' : 'text-slate-900'
-                              }`}>
-                                {adjustments.colorReplacements[activeSelectedColor.toLowerCase()] ||
-                                  activeSelectedColor}
-                              </span>
-                              <p className={`text-[10px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                                Original: <span className="font-mono uppercase">{activeSelectedColor}</span>
-                              </p>
+                            <div className="flex items-center gap-2">
+                              <label className="cursor-pointer">
+                                <input
+                                  type="color"
+                                  value={effectiveColor.startsWith('#') ? effectiveColor : '#38bdf8'}
+                                  onChange={(e) => handleApplyColor(e.target.value)}
+                                  className="sr-only"
+                                />
+                                <div className="px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs transition flex items-center gap-1.5 shadow-md shadow-blue-600/30">
+                                  <Paintbrush className="w-3.5 h-3.5" />
+                                  <span>Pick</span>
+                                </div>
+                              </label>
+
+                              <input
+                                type="text"
+                                maxLength={7}
+                                value={effectiveColor.toUpperCase()}
+                                onChange={(e) => {
+                                  let val = e.target.value;
+                                  if (!val.startsWith('#')) val = '#' + val;
+                                  handleApplyColor(val);
+                                }}
+                                className={`w-20 px-2 py-2 rounded-xl text-xs font-mono text-center uppercase focus:outline-none focus:border-cyan-500 border ${appTheme === 'dark'
+                                  ? 'bg-slate-950 border-slate-800 text-slate-200'
+                                  : 'bg-slate-100 border-slate-300 text-slate-800'
+                                  }`}
+                              />
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-2">
-                            <label className="cursor-pointer">
-                              <input
-                                type="color"
-                                value={
-                                  adjustments.colorReplacements[activeSelectedColor.toLowerCase()] ||
-                                  activeSelectedColor
-                                }
-                                onFocus={() => setIsSelectionOutlineVisible(false)}
-                                onInput={() => setIsSelectionOutlineVisible(false)}
-                                onChange={(e) => handleColorChange(activeSelectedColor, e.target.value)}
-                                className="sr-only"
-                              />
-                              <div className="px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs transition flex items-center gap-1.5 shadow-md shadow-blue-600/30">
-                                <Paintbrush className="w-3.5 h-3.5" />
-                                <span>Pick</span>
-                              </div>
-                            </label>
-
-                            <input
-                              type="text"
-                              maxLength={7}
-                              value={(adjustments.colorReplacements[activeSelectedColor.toLowerCase()] || activeSelectedColor).toUpperCase()}
-                              onFocus={() => setIsSelectionOutlineVisible(false)}
-                              onChange={(e) => {
-                                setIsSelectionOutlineVisible(false);
-                                let val = e.target.value;
-                                if (!val.startsWith('#')) val = '#' + val;
-                                handleColorChange(activeSelectedColor, val);
-                              }}
-                              className={`w-20 px-2 py-2 rounded-xl text-xs font-mono text-center uppercase focus:outline-none focus:border-cyan-500 border ${
-                                appTheme === 'dark'
-                                  ? 'bg-slate-950 border-slate-800 text-slate-200'
-                                  : 'bg-slate-100 border-slate-300 text-slate-800'
-                              }`}
-                            />
-                          </div>
-                        </div>
-
-                        {/* 1-Tap Quick Swatches */}
-                        <div className="space-y-1.5 pt-1">
-                          <span className={`text-[10px] font-medium ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                            Quick Color Presets:
-                          </span>
-                          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
-                            {QUICK_SWATCHES.map((swatch) => (
-                              <button
-                                key={swatch.hex}
-                                onClick={() => {
-                                  setIsSelectionOutlineVisible(false);
-                                  handleColorChange(activeSelectedColor, swatch.hex);
-                                }}
-                                title={`${swatch.name} (${swatch.hex})`}
-                                className={`w-6 h-6 rounded-full border transition-all hover:scale-125 flex-shrink-0 ${
-                                  (adjustments.colorReplacements[activeSelectedColor.toLowerCase()] || activeSelectedColor).toLowerCase() === swatch.hex.toLowerCase()
+                          {/* 1-Tap Quick Swatches */}
+                          <div className="space-y-1.5 pt-1">
+                            <span className={`text-[10px] font-medium ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                              Quick Color Presets:
+                            </span>
+                            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
+                              {QUICK_SWATCHES.map((swatch) => (
+                                <button
+                                  key={swatch.hex}
+                                  onClick={() => handleApplyColor(swatch.hex)}
+                                  title={`${swatch.name} (${swatch.hex})`}
+                                  className={`w-6 h-6 rounded-full border transition-all hover:scale-125 flex-shrink-0 ${effectiveColor.toLowerCase() === swatch.hex.toLowerCase()
                                     ? 'border-white scale-110 shadow-lg ring-2 ring-cyan-400'
                                     : appTheme === 'dark' ? 'border-slate-800 hover:border-slate-500' : 'border-slate-300 hover:border-slate-500'
-                                }`}
-                                style={{ backgroundColor: swatch.hex }}
-                              />
-                            ))}
+                                    }`}
+                                  style={{ backgroundColor: swatch.hex }}
+                                />
+                              ))}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ) : (
-                      <div className={`p-5 rounded-2xl border border-dashed text-center text-xs space-y-1 ${
-                        appTheme === 'dark' ? 'bg-slate-900/60 border-slate-800 text-slate-400' : 'bg-slate-50 border-slate-300 text-slate-600'
-                      }`}>
-                        <Sparkles className="w-5 h-5 text-cyan-500 mx-auto mb-1" />
-                        <p className={`font-semibold ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-800'}`}>Touch Element on Image</p>
-                        <p className={`text-[11px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                          Canvas par kisi bhi element ko click karein ya drag karein usko move, rotate aur reorder karne ke liye.
-                        </p>
-                      </div>
-                    )}
+                      );
+                    })()}
 
                     {/* Part Styling, Effects & Transform Card (Single & Multi-Part Selection) */}
                     {(() => {
@@ -4331,18 +4276,11 @@ export default function App() {
                       })();
                       const offsetStep = maxOffset <= 40 ? 0.5 : 1;
 
-                      const colorPalette = [
-                        '#38bdf8', '#06b6d4', '#818cf8', '#a855f7', 
-                        '#ec4899', '#f43f5e', '#f97316', '#eab308', 
-                        '#10b981', '#22c55e', '#ffffff', '#0f172a'
-                      ];
-
                       return (
-                        <div className={`p-4 rounded-2xl border shadow-xl space-y-4 animate-in fade-in duration-200 ${
-                          appTheme === 'dark'
-                            ? 'bg-slate-900/90 border-cyan-500/40 shadow-cyan-950/20'
-                            : 'bg-white border-cyan-400/60 shadow-slate-200'
-                        }`}>
+                        <div className={`p-4 rounded-2xl border shadow-xl space-y-4 animate-in fade-in duration-200 ${appTheme === 'dark'
+                          ? 'bg-slate-900/90 border-cyan-500/40 shadow-cyan-950/20'
+                          : 'bg-white border-cyan-400/60 shadow-slate-200'
+                          }`}>
                           {/* Header */}
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
@@ -4351,7 +4289,7 @@ export default function App() {
                                   <Layers className="w-4 h-4 text-cyan-400" />
                                 </div>
                               ) : (
-                                <div 
+                                <div
                                   className="w-5 h-5 rounded-full border border-slate-600 shadow-sm flex-shrink-0"
                                   style={{ backgroundColor: currentColor }}
                                 />
@@ -4378,21 +4316,19 @@ export default function App() {
                                 <>
                                   <button
                                     onClick={handleSelectAllLayers}
-                                    className={`text-[9px] px-2 py-1 rounded-lg border transition font-medium ${
-                                      appTheme === 'dark'
-                                        ? 'text-cyan-300 hover:text-white bg-cyan-950/50 border-cyan-700/50'
-                                        : 'text-cyan-700 bg-cyan-50 border-cyan-300'
-                                    }`}
+                                    className={`text-[9px] px-2 py-1 rounded-lg border transition font-medium ${appTheme === 'dark'
+                                      ? 'text-cyan-300 hover:text-white bg-cyan-950/50 border-cyan-700/50'
+                                      : 'text-cyan-700 bg-cyan-50 border-cyan-300'
+                                      }`}
                                   >
                                     All ({svgLayers.length})
                                   </button>
                                   <button
                                     onClick={handleDeselectAllLayers}
-                                    className={`text-[9px] px-2 py-1 rounded-lg border transition font-medium ${
-                                      appTheme === 'dark'
-                                        ? 'text-slate-400 hover:text-white bg-slate-800/80 border-slate-700'
-                                        : 'text-slate-600 bg-slate-100 border-slate-200'
-                                    }`}
+                                    className={`text-[9px] px-2 py-1 rounded-lg border transition font-medium ${appTheme === 'dark'
+                                      ? 'text-slate-400 hover:text-white bg-slate-800/80 border-slate-700'
+                                      : 'text-slate-600 bg-slate-100 border-slate-200'
+                                      }`}
                                   >
                                     Clear
                                   </button>
@@ -4405,11 +4341,10 @@ export default function App() {
                                       handleResetLayerColor(activeIds);
                                       handleResetLayerEffects(activeIds);
                                     }}
-                                    className={`text-[10px] flex items-center gap-1 px-2 py-1 rounded-lg border transition ${
-                                      appTheme === 'dark'
-                                        ? 'text-slate-400 hover:text-white bg-slate-800/80 border-slate-700'
-                                        : 'text-slate-600 hover:text-slate-900 bg-slate-100 border-slate-200'
-                                    }`}
+                                    className={`text-[10px] flex items-center gap-1 px-2 py-1 rounded-lg border transition ${appTheme === 'dark'
+                                      ? 'text-slate-400 hover:text-white bg-slate-800/80 border-slate-700'
+                                      : 'text-slate-600 hover:text-slate-900 bg-slate-100 border-slate-200'
+                                      }`}
                                     title="Reset this part to default style and position"
                                   >
                                     <RotateCcw className="w-3 h-3 text-cyan-400" />
@@ -4421,11 +4356,10 @@ export default function App() {
                           </div>
 
                           {/* Canvas Drag Hint */}
-                          <div className={`p-2 rounded-xl text-[10px] flex items-center justify-between border ${
-                            appTheme === 'dark'
-                              ? 'bg-cyan-950/20 text-cyan-300 border-cyan-800/30'
-                              : 'bg-cyan-50 text-cyan-800 border-cyan-200'
-                          }`}>
+                          <div className={`p-2 rounded-xl text-[10px] flex items-center justify-between border ${appTheme === 'dark'
+                            ? 'bg-cyan-950/20 text-cyan-300 border-cyan-800/30'
+                            : 'bg-cyan-50 text-cyan-800 border-cyan-200'
+                            }`}>
                             <span className="flex items-center gap-1.5 font-medium">
                               <Move className="w-3 h-3 text-cyan-400 flex-shrink-0" />
                               {isMulti ? 'Canvas par drag karein — sabhi selected parts ek sath move honge!' : 'Canvas par direct mouse se drag karke move karein!'}
@@ -4437,68 +4371,7 @@ export default function App() {
                             )}
                           </div>
 
-                          {/* 1. SEPARATE PART COLOR SECTION */}
-                          <div className="space-y-2.5 pt-1 border-t border-slate-800/60">
-                            <div className="flex items-center justify-between text-[11px] font-semibold">
-                              <span className="flex items-center gap-1.5 text-cyan-400">
-                                <Paintbrush className="w-3.5 h-3.5" />
-                                <span>{isMulti ? 'Apply Color to Selected Parts' : 'Part Color (Fill & Stroke)'}</span>
-                              </span>
-                              {hasCustomColor && (
-                                <button
-                                  onClick={() => handleResetLayerColor(activeIds)}
-                                  className={`text-[9px] px-1.5 py-0.5 rounded border transition ${
-                                    appTheme === 'dark' ? 'border-slate-800 text-slate-400 hover:text-white' : 'border-slate-200 text-slate-600 hover:text-slate-900'
-                                  }`}
-                                  title="Revert to original element color"
-                                >
-                                  Revert Color
-                                </button>
-                              )}
-                            </div>
-
-                            {/* Quick Swatches */}
-                            <div className="grid grid-cols-6 gap-1.5">
-                              {colorPalette.map(color => (
-                                <button
-                                  key={color}
-                                  onClick={() => handleLayerColorChange(activeIds, color)}
-                                  style={{ backgroundColor: color }}
-                                  className={`h-6 rounded-lg border transition shadow-sm hover:scale-105 ${
-                                    currentColor.toLowerCase() === color.toLowerCase()
-                                      ? 'ring-2 ring-cyan-400 ring-offset-1 ring-offset-slate-900 border-white'
-                                      : 'border-slate-700/60'
-                                  }`}
-                                  title={`Apply ${color}`}
-                                />
-                              ))}
-                            </div>
-
-                            {/* Custom Color Input */}
-                            <div className="flex items-center gap-2 pt-0.5">
-                              <div className="relative flex-1">
-                                <input
-                                  type="color"
-                                  value={currentColor.startsWith('#') ? currentColor : '#38bdf8'}
-                                  onChange={(e) => handleLayerColorChange(activeIds, e.target.value)}
-                                  className="w-full h-8 rounded-lg cursor-pointer bg-transparent border border-slate-700/60 p-0.5"
-                                />
-                              </div>
-                              <input
-                                type="text"
-                                value={currentColor}
-                                onChange={(e) => handleLayerColorChange(activeIds, e.target.value)}
-                                className={`w-24 text-xs font-mono px-2 py-1.5 rounded-lg border transition ${
-                                  appTheme === 'dark'
-                                    ? 'bg-slate-950 border-slate-700 text-slate-200'
-                                    : 'bg-white border-slate-300 text-slate-800'
-                                }`}
-                                placeholder="#38bdf8"
-                              />
-                            </div>
-                          </div>
-
-                          {/* 2. SPECIAL EFFECTS SECTION (Glow Aura, Opacity, Blur, Brightness) */}
+                          {/* SPECIAL EFFECTS SECTION (Glow Aura, Opacity, Blur, Brightness) */}
                           <div className="space-y-3 pt-1 border-t border-slate-800/60">
                             <div className="flex items-center justify-between text-[11px] font-semibold">
                               <span className="flex items-center gap-1.5 text-cyan-400">
@@ -4508,9 +4381,8 @@ export default function App() {
                               {hasCustomEffects && (
                                 <button
                                   onClick={() => handleResetLayerEffects(activeIds)}
-                                  className={`text-[9px] px-1.5 py-0.5 rounded border transition ${
-                                    appTheme === 'dark' ? 'border-slate-800 text-slate-400 hover:text-white' : 'border-slate-200 text-slate-600 hover:text-slate-900'
-                                  }`}
+                                  className={`text-[9px] px-1.5 py-0.5 rounded border transition ${appTheme === 'dark' ? 'border-slate-800 text-slate-400 hover:text-white' : 'border-slate-200 text-slate-600 hover:text-slate-900'
+                                    }`}
                                 >
                                   Reset Effects
                                 </button>
@@ -4518,11 +4390,10 @@ export default function App() {
                             </div>
 
                             {/* Glow Aura Toggle & Controls */}
-                            <div className={`p-2.5 rounded-xl border space-y-2 ${
-                              glowEnabled
-                                ? appTheme === 'dark' ? 'bg-cyan-950/30 border-cyan-500/50' : 'bg-cyan-50 border-cyan-300'
-                                : appTheme === 'dark' ? 'bg-slate-950/50 border-slate-800' : 'bg-slate-50 border-slate-200'
-                            }`}>
+                            <div className={`p-2.5 rounded-xl border space-y-2 ${glowEnabled
+                              ? appTheme === 'dark' ? 'bg-cyan-950/30 border-cyan-500/50' : 'bg-cyan-50 border-cyan-300'
+                              : appTheme === 'dark' ? 'bg-slate-950/50 border-slate-800' : 'bg-slate-50 border-slate-200'
+                              }`}>
                               <div className="flex items-center justify-between">
                                 <span className="text-[11px] font-medium flex items-center gap-1.5">
                                   <span className={`w-2 h-2 rounded-full ${glowEnabled ? 'bg-cyan-400 animate-ping' : 'bg-slate-600'}`} />
@@ -4530,11 +4401,10 @@ export default function App() {
                                 </span>
                                 <button
                                   onClick={() => handleLayerEffectChange(activeIds, 'glow', { enabled: !glowEnabled, color: glowColor, radius: glowRadius })}
-                                  className={`px-2.5 py-0.5 rounded-md text-[10px] font-semibold transition ${
-                                    glowEnabled
-                                      ? 'bg-cyan-500 text-white shadow-md shadow-cyan-500/30'
-                                      : appTheme === 'dark' ? 'bg-slate-800 text-slate-400 hover:text-white' : 'bg-slate-200 text-slate-600'
-                                  }`}
+                                  className={`px-2.5 py-0.5 rounded-md text-[10px] font-semibold transition ${glowEnabled
+                                    ? 'bg-cyan-500 text-white shadow-md shadow-cyan-500/30'
+                                    : appTheme === 'dark' ? 'bg-slate-800 text-slate-400 hover:text-white' : 'bg-slate-200 text-slate-600'
+                                    }`}
                                 >
                                   {glowEnabled ? 'Enabled' : 'Enable'}
                                 </button>
@@ -4637,9 +4507,8 @@ export default function App() {
                                   handleLayerPositionChange(activeIds, 'x', 0);
                                   handleLayerPositionChange(activeIds, 'y', 0);
                                 }}
-                                className={`text-[9px] px-1.5 py-0.5 rounded border transition ${
-                                  appTheme === 'dark' ? 'border-slate-800 text-slate-400 hover:text-white' : 'border-slate-200 text-slate-600 hover:text-slate-900'
-                                }`}
+                                className={`text-[9px] px-1.5 py-0.5 rounded border transition ${appTheme === 'dark' ? 'border-slate-800 text-slate-400 hover:text-white' : 'border-slate-200 text-slate-600 hover:text-slate-900'
+                                  }`}
                               >
                                 Center (0, 0)
                               </button>
@@ -4708,11 +4577,10 @@ export default function App() {
                                   <button
                                     key={deg}
                                     onClick={() => handleLayerRotationChange(activeIds, deg)}
-                                    className={`px-2 py-0.5 rounded text-[10px] font-mono font-medium border transition ${
-                                      (firstTransform.rotate || 0) === deg
-                                        ? 'bg-cyan-500 text-white border-cyan-400'
-                                        : appTheme === 'dark' ? 'bg-slate-800 text-slate-300 border-slate-700 hover:text-white' : 'bg-slate-100 text-slate-700 border-slate-200'
-                                    }`}
+                                    className={`px-2 py-0.5 rounded text-[10px] font-mono font-medium border transition ${(firstTransform.rotate || 0) === deg
+                                      ? 'bg-cyan-500 text-white border-cyan-400'
+                                      : appTheme === 'dark' ? 'bg-slate-800 text-slate-300 border-slate-700 hover:text-white' : 'bg-slate-100 text-slate-700 border-slate-200'
+                                      }`}
                                   >
                                     {deg === 0 ? '0°' : `${deg > 0 ? '+' : ''}${deg}°`}
                                   </button>
@@ -4738,13 +4606,12 @@ export default function App() {
                                   onClick={() => handleBringToFront(cleanPrimaryId)}
                                   disabled={currentLayerIdx === totalLayers - 1}
                                   title="Bring this layer to the absolute front"
-                                  className={`py-2 px-1 rounded-xl text-[10px] font-semibold flex flex-col items-center gap-1 border transition ${
-                                    currentLayerIdx === totalLayers - 1
-                                      ? 'opacity-40 cursor-not-allowed border-transparent'
-                                      : appTheme === 'dark'
+                                  className={`py-2 px-1 rounded-xl text-[10px] font-semibold flex flex-col items-center gap-1 border transition ${currentLayerIdx === totalLayers - 1
+                                    ? 'opacity-40 cursor-not-allowed border-transparent'
+                                    : appTheme === 'dark'
                                       ? 'bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-200 hover:text-white'
                                       : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
-                                  }`}
+                                    }`}
                                 >
                                   <ChevronsUp className="w-3.5 h-3.5 text-cyan-400" />
                                   <span>To Front</span>
@@ -4754,13 +4621,12 @@ export default function App() {
                                   onClick={() => handleBringForward(cleanPrimaryId)}
                                   disabled={currentLayerIdx === totalLayers - 1}
                                   title="Move this layer 1 step forward"
-                                  className={`py-2 px-1 rounded-xl text-[10px] font-semibold flex flex-col items-center gap-1 border transition ${
-                                    currentLayerIdx === totalLayers - 1
-                                      ? 'opacity-40 cursor-not-allowed border-transparent'
-                                      : appTheme === 'dark'
+                                  className={`py-2 px-1 rounded-xl text-[10px] font-semibold flex flex-col items-center gap-1 border transition ${currentLayerIdx === totalLayers - 1
+                                    ? 'opacity-40 cursor-not-allowed border-transparent'
+                                    : appTheme === 'dark'
                                       ? 'bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-200 hover:text-white'
                                       : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
-                                  }`}
+                                    }`}
                                 >
                                   <ArrowUp className="w-3.5 h-3.5 text-cyan-400" />
                                   <span>Forward</span>
@@ -4770,13 +4636,12 @@ export default function App() {
                                   onClick={() => handleSendBackward(cleanPrimaryId)}
                                   disabled={currentLayerIdx <= 0}
                                   title="Move this layer 1 step backward"
-                                  className={`py-2 px-1 rounded-xl text-[10px] font-semibold flex flex-col items-center gap-1 border transition ${
-                                    currentLayerIdx <= 0
-                                      ? 'opacity-40 cursor-not-allowed border-transparent'
-                                      : appTheme === 'dark'
+                                  className={`py-2 px-1 rounded-xl text-[10px] font-semibold flex flex-col items-center gap-1 border transition ${currentLayerIdx <= 0
+                                    ? 'opacity-40 cursor-not-allowed border-transparent'
+                                    : appTheme === 'dark'
                                       ? 'bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-200 hover:text-white'
                                       : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
-                                  }`}
+                                    }`}
                                 >
                                   <ArrowDown className="w-3.5 h-3.5 text-cyan-400" />
                                   <span>Backward</span>
@@ -4786,13 +4651,12 @@ export default function App() {
                                   onClick={() => handleSendToBack(cleanPrimaryId)}
                                   disabled={currentLayerIdx <= 0}
                                   title="Send this layer to the absolute back"
-                                  className={`py-2 px-1 rounded-xl text-[10px] font-semibold flex flex-col items-center gap-1 border transition ${
-                                    currentLayerIdx <= 0
-                                      ? 'opacity-40 cursor-not-allowed border-transparent'
-                                      : appTheme === 'dark'
+                                  className={`py-2 px-1 rounded-xl text-[10px] font-semibold flex flex-col items-center gap-1 border transition ${currentLayerIdx <= 0
+                                    ? 'opacity-40 cursor-not-allowed border-transparent'
+                                    : appTheme === 'dark'
                                       ? 'bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-200 hover:text-white'
                                       : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
-                                  }`}
+                                    }`}
                                 >
                                   <ChevronsDown className="w-3.5 h-3.5 text-cyan-400" />
                                   <span>To Back</span>
@@ -4806,21 +4670,18 @@ export default function App() {
 
                     {/* Collapsible Dropdown for All Vector Layers & Colors */}
                     {(svgLayers.length > 0 || detectedColors.length > 0) && (
-                      <div className={`rounded-2xl border overflow-hidden shadow-md ${
-                        appTheme === 'dark' ? 'border-slate-800 bg-[#131b2e]/50' : 'border-slate-200 bg-slate-50'
-                      }`}>
+                      <div className={`rounded-2xl border overflow-hidden shadow-md ${appTheme === 'dark' ? 'border-slate-800 bg-[#131b2e]/50' : 'border-slate-200 bg-slate-50'
+                        }`}>
                         <button
                           onClick={() => setIsLayersListExpanded(!isLayersListExpanded)}
-                          className={`w-full p-3.5 flex items-center justify-between text-left transition text-xs font-semibold ${
-                            appTheme === 'dark' ? 'hover:bg-slate-900/60 text-slate-300' : 'hover:bg-slate-100 text-slate-700'
-                          }`}
+                          className={`w-full p-3.5 flex items-center justify-between text-left transition text-xs font-semibold ${appTheme === 'dark' ? 'hover:bg-slate-900/60 text-slate-300' : 'hover:bg-slate-100 text-slate-700'
+                            }`}
                         >
                           <div className="flex items-center gap-2">
                             <Layers className="w-4 h-4 text-cyan-500" />
                             <span>Vector Parts & Layers</span>
-                            <span className={`text-[10px] px-2 py-0.5 rounded-full ${
-                              appTheme === 'dark' ? 'bg-slate-800 text-slate-300' : 'bg-slate-200 text-slate-700'
-                            }`}>
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full ${appTheme === 'dark' ? 'bg-slate-800 text-slate-300' : 'bg-slate-200 text-slate-700'
+                              }`}>
                               {svgLayers.length || detectedColors.length}
                             </span>
                           </div>
@@ -4838,31 +4699,27 @@ export default function App() {
 
                         {/* Collapsible List Container with Tab Switch between Vector Parts and Unique Colors */}
                         {isLayersListExpanded && (
-                          <div className={`p-3.5 pt-2 space-y-3 border-t ${
-                            appTheme === 'dark' ? 'border-slate-800/60' : 'border-slate-200'
-                          }`}>
-                            {/* Switch tabs between Vector Layers and Colors */}
-                            <div className={`flex items-center p-1 rounded-xl border ${
-                              appTheme === 'dark' ? 'bg-slate-950/80 border-slate-800' : 'bg-slate-200/70 border-slate-300'
+                          <div className={`p-3.5 pt-2 space-y-3 border-t ${appTheme === 'dark' ? 'border-slate-800/60' : 'border-slate-200'
                             }`}>
+                            {/* Switch tabs between Vector Layers and Colors */}
+                            <div className={`flex items-center p-1 rounded-xl border ${appTheme === 'dark' ? 'bg-slate-950/80 border-slate-800' : 'bg-slate-200/70 border-slate-300'
+                              }`}>
                               <button
                                 onClick={() => setLayerListViewMode('layers')}
-                                className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 ${
-                                  layerListViewMode === 'layers'
-                                    ? 'bg-blue-600 text-white shadow-md'
-                                    : appTheme === 'dark' ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900'
-                                }`}
+                                className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 ${layerListViewMode === 'layers'
+                                  ? 'bg-blue-600 text-white shadow-md'
+                                  : appTheme === 'dark' ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900'
+                                  }`}
                               >
                                 <Shapes className="w-3.5 h-3.5" />
                                 <span>Vector Layers ({svgLayers.length})</span>
                               </button>
                               <button
                                 onClick={() => setLayerListViewMode('colors')}
-                                className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 ${
-                                  layerListViewMode === 'colors'
-                                    ? 'bg-blue-600 text-white shadow-md'
-                                    : appTheme === 'dark' ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900'
-                                }`}
+                                className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 ${layerListViewMode === 'colors'
+                                  ? 'bg-blue-600 text-white shadow-md'
+                                  : appTheme === 'dark' ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900'
+                                  }`}
                               >
                                 <Palette className="w-3.5 h-3.5" />
                                 <span>Colors ({detectedColors.length})</span>
@@ -4931,21 +4788,19 @@ export default function App() {
                                       onClick={() => {
                                         setSelectedLayerId(layerId);
                                         setSelectedLayerIds([layerId]);
-                                        setIsSelectionOutlineVisible(true);
                                       }}
-                                      className={`p-2.5 rounded-xl border transition-all cursor-grab active:cursor-grabbing flex items-center justify-between gap-2.5 select-none relative ${
-                                        isDragging
-                                          ? 'opacity-30 scale-[0.98] border-dashed border-cyan-400 bg-cyan-950/20'
-                                          : isDragOver
+                                      className={`p-2.5 rounded-xl border transition-all cursor-grab active:cursor-grabbing flex items-center justify-between gap-2.5 select-none relative ${isDragging
+                                        ? 'opacity-30 scale-[0.98] border-dashed border-cyan-400 bg-cyan-950/20'
+                                        : isDragOver
                                           ? 'ring-2 ring-cyan-400 bg-cyan-500/20 border-cyan-400 shadow-lg scale-[1.01]'
                                           : isSelected
-                                          ? appTheme === 'dark'
-                                            ? 'bg-slate-900 border-cyan-400 ring-2 ring-cyan-400/40 shadow-lg'
-                                            : 'bg-white border-cyan-500 ring-2 ring-cyan-500/30 shadow-md'
-                                          : isMoved || isRotated
-                                          ? appTheme === 'dark' ? 'bg-slate-900/80 border-cyan-500/40' : 'bg-cyan-50/50 border-cyan-300'
-                                          : appTheme === 'dark' ? 'bg-[#0b0f19]/70 border-slate-800/80 hover:border-slate-700' : 'bg-white border-slate-200 hover:border-slate-300'
-                                      }`}
+                                            ? appTheme === 'dark'
+                                              ? 'bg-slate-900 border-cyan-400 ring-2 ring-cyan-400/40 shadow-lg'
+                                              : 'bg-white border-cyan-500 ring-2 ring-cyan-500/30 shadow-md'
+                                            : isMoved || isRotated
+                                              ? appTheme === 'dark' ? 'bg-slate-900/80 border-cyan-500/40' : 'bg-cyan-50/50 border-cyan-300'
+                                              : appTheme === 'dark' ? 'bg-[#0b0f19]/70 border-slate-800/80 hover:border-slate-700' : 'bg-white border-slate-200 hover:border-slate-300'
+                                        }`}
                                     >
                                       <div className="flex items-center gap-2 min-w-0 pointer-events-none">
                                         <GripVertical className="w-4 h-4 text-slate-500 flex-shrink-0" />
@@ -5011,15 +4866,13 @@ export default function App() {
                                       key={origColor + idx}
                                       onClick={() => {
                                         setActiveSelectedColor(origColor);
-                                        setIsSelectionOutlineVisible(true);
                                       }}
-                                      className={`p-3 rounded-xl border transition-all cursor-pointer ${
-                                        isSelected
-                                          ? appTheme === 'dark' ? 'bg-slate-900 border-cyan-400 ring-2 ring-cyan-400/40 shadow-lg' : 'bg-white border-cyan-500 ring-2 ring-cyan-500/30 shadow-md'
-                                          : isModified 
+                                      className={`p-3 rounded-xl border transition-all cursor-pointer ${isSelected
+                                        ? appTheme === 'dark' ? 'bg-slate-900 border-cyan-400 ring-2 ring-cyan-400/40 shadow-lg' : 'bg-white border-cyan-500 ring-2 ring-cyan-500/30 shadow-md'
+                                        : isModified
                                           ? appTheme === 'dark' ? 'bg-slate-900/80 border-cyan-500/40' : 'bg-cyan-50/50 border-cyan-300'
                                           : appTheme === 'dark' ? 'bg-[#0b0f19]/70 border-slate-800/80 hover:border-slate-700' : 'bg-white border-slate-200 hover:border-slate-300'
-                                      }`}
+                                        }`}
                                     >
                                       <div className="flex items-center justify-between gap-3 mb-2">
                                         <div className="flex items-center gap-2.5">
@@ -5029,9 +4882,8 @@ export default function App() {
                                           />
                                           <div>
                                             <div className="flex items-center gap-1.5">
-                                              <span className={`font-mono text-xs font-bold uppercase ${
-                                                appTheme === 'dark' ? 'text-slate-200' : 'text-slate-800'
-                                              }`}>
+                                              <span className={`font-mono text-xs font-bold uppercase ${appTheme === 'dark' ? 'text-slate-200' : 'text-slate-800'
+                                                }`}>
                                                 {activeColor}
                                               </span>
                                               {isSelected && (
@@ -5051,14 +4903,11 @@ export default function App() {
                                             <input
                                               type="color"
                                               value={activeColor}
-                                              onFocus={() => setIsSelectionOutlineVisible(false)}
-                                              onInput={() => setIsSelectionOutlineVisible(false)}
                                               onChange={(e) => handleColorChange(origColor, e.target.value)}
                                               className="sr-only"
                                             />
-                                            <div className={`px-2 py-1 rounded-lg text-[11px] font-semibold transition ${
-                                              appTheme === 'dark' ? 'bg-slate-800 hover:bg-slate-700 text-slate-200' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                                            }`}>
+                                            <div className={`px-2 py-1 rounded-lg text-[11px] font-semibold transition ${appTheme === 'dark' ? 'bg-slate-800 hover:bg-slate-700 text-slate-200' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                                              }`}>
                                               Pick
                                             </div>
                                           </label>
@@ -5066,9 +4915,8 @@ export default function App() {
                                             <button
                                               onClick={() => handleResetSingleColor(origColor)}
                                               title="Reset layer"
-                                              className={`p-1 rounded-lg ${
-                                                appTheme === 'dark' ? 'bg-slate-800 text-slate-400 hover:text-white' : 'bg-slate-100 text-slate-500 hover:text-slate-900'
-                                              }`}
+                                              className={`p-1 rounded-lg ${appTheme === 'dark' ? 'bg-slate-800 text-slate-400 hover:text-white' : 'bg-slate-100 text-slate-500 hover:text-slate-900'
+                                                }`}
                                             >
                                               <Undo2 className="w-3 h-3" />
                                             </button>
@@ -5077,9 +4925,8 @@ export default function App() {
                                       </div>
 
                                       {/* Quick dots */}
-                                      <div className={`flex items-center gap-1 pt-1.5 border-t overflow-x-auto no-scrollbar ${
-                                        appTheme === 'dark' ? 'border-slate-800/40' : 'border-slate-100'
-                                      }`} onClick={(e) => e.stopPropagation()}>
+                                      <div className={`flex items-center gap-1 pt-1.5 border-t overflow-x-auto no-scrollbar ${appTheme === 'dark' ? 'border-slate-800/40' : 'border-slate-100'
+                                        }`} onClick={(e) => e.stopPropagation()}>
                                         {QUICK_SWATCHES.map((swatch) => (
                                           <button
                                             key={swatch.hex}
@@ -5101,9 +4948,8 @@ export default function App() {
                     )}
 
                     {/* Global Monotone Recolor Override */}
-                    <div className={`mt-4 p-3.5 rounded-2xl border ${
-                      appTheme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'
-                    }`}>
+                    <div className={`mt-4 p-3.5 rounded-2xl border ${appTheme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'
+                      }`}>
                       <div className="flex items-center justify-between">
                         <div>
                           <p className={`text-xs font-semibold ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-800'}`}>Global Monotone Recolor</p>
@@ -5120,9 +4966,8 @@ export default function App() {
                           {adjustments.customColor && (
                             <button
                               onClick={() => setAdjustments({ ...adjustments, customColor: '' })}
-                              className={`text-[10px] px-2 py-1 rounded ${
-                                appTheme === 'dark' ? 'text-slate-400 hover:text-white bg-slate-800' : 'text-slate-600 hover:text-slate-900 bg-slate-200'
-                              }`}
+                              className={`text-[10px] px-2 py-1 rounded ${appTheme === 'dark' ? 'text-slate-400 hover:text-white bg-slate-800' : 'text-slate-600 hover:text-slate-900 bg-slate-200'
+                                }`}
                             >
                               Clear
                             </button>
@@ -5139,9 +4984,8 @@ export default function App() {
                     {/* Header & Reset Button */}
                     <div className="flex items-center justify-between">
                       <div>
-                        <h4 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
-                          appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
-                        }`}>
+                        <h4 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
+                          }`}>
                           <Wand2 className="w-3.5 h-3.5 text-cyan-500" /> {EFFECT_PRESETS.length}+ Visual Color Filters
                         </h4>
                         <p className={`text-[11px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
@@ -5151,11 +4995,10 @@ export default function App() {
 
                       <button
                         onClick={handleResetEffectsPanel}
-                        className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition flex items-center gap-1.5 flex-shrink-0 ${
-                          appTheme === 'dark'
-                            ? 'text-slate-300 hover:text-white bg-slate-900 border-slate-800 hover:border-slate-700'
-                            : 'text-slate-700 hover:text-slate-900 bg-white border-slate-200 hover:bg-slate-50'
-                        }`}
+                        className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition flex items-center gap-1.5 flex-shrink-0 ${appTheme === 'dark'
+                          ? 'text-slate-300 hover:text-white bg-slate-900 border-slate-800 hover:border-slate-700'
+                          : 'text-slate-700 hover:text-slate-900 bg-white border-slate-200 hover:bg-slate-50'
+                          }`}
                         title="Reset all filters to original"
                       >
                         <Undo2 className="w-3 h-3 text-cyan-500" />
@@ -5164,38 +5007,34 @@ export default function App() {
                     </div>
 
                     {/* New vs Classic / Old Version Toggle Bar */}
-                    <div className={`p-1 rounded-xl border flex items-center gap-1 ${
-                      appTheme === 'dark' ? 'bg-slate-900/90 border-slate-800' : 'bg-slate-100 border-slate-200'
-                    }`}>
+                    <div className={`p-1 rounded-xl border flex items-center gap-1 ${appTheme === 'dark' ? 'bg-slate-900/90 border-slate-800' : 'bg-slate-100 border-slate-200'
+                      }`}>
                       <button
                         onClick={() => setFilterVersionFilter('all')}
-                        className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-semibold transition flex items-center justify-center gap-1 ${
-                          filterVersionFilter === 'all'
-                            ? (appTheme === 'dark' ? 'bg-cyan-500 text-slate-950 shadow-sm font-bold' : 'bg-blue-600 text-white shadow-sm font-bold')
-                            : (appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900')
-                        }`}
+                        className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-semibold transition flex items-center justify-center gap-1 ${filterVersionFilter === 'all'
+                          ? (appTheme === 'dark' ? 'bg-cyan-500 text-slate-950 shadow-sm font-bold' : 'bg-blue-600 text-white shadow-sm font-bold')
+                          : (appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900')
+                          }`}
                       >
                         <span>All ({EFFECT_PRESETS.length})</span>
                       </button>
 
                       <button
                         onClick={() => setFilterVersionFilter('new')}
-                        className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-semibold transition flex items-center justify-center gap-1 ${
-                          filterVersionFilter === 'new'
-                            ? 'bg-gradient-to-r from-amber-400 via-rose-400 to-pink-500 text-slate-950 shadow-md font-bold'
-                            : (appTheme === 'dark' ? 'text-amber-300 hover:text-white' : 'text-amber-700 hover:text-slate-900')
-                        }`}
+                        className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-semibold transition flex items-center justify-center gap-1 ${filterVersionFilter === 'new'
+                          ? 'bg-gradient-to-r from-amber-400 via-rose-400 to-pink-500 text-slate-950 shadow-md font-bold'
+                          : (appTheme === 'dark' ? 'text-amber-300 hover:text-white' : 'text-amber-700 hover:text-slate-900')
+                          }`}
                       >
                         <span>✨ New ({EFFECT_PRESETS.filter(p => p.isNew).length})</span>
                       </button>
 
                       <button
                         onClick={() => setFilterVersionFilter('old')}
-                        className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-semibold transition flex items-center justify-center gap-1 ${
-                          filterVersionFilter === 'old'
-                            ? (appTheme === 'dark' ? 'bg-slate-800 text-slate-200 border border-slate-700 shadow-sm font-bold' : 'bg-white text-slate-900 border border-slate-300 shadow-sm font-bold')
-                            : (appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900')
-                        }`}
+                        className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-semibold transition flex items-center justify-center gap-1 ${filterVersionFilter === 'old'
+                          ? (appTheme === 'dark' ? 'bg-slate-800 text-slate-200 border border-slate-700 shadow-sm font-bold' : 'bg-white text-slate-900 border border-slate-300 shadow-sm font-bold')
+                          : (appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900')
+                          }`}
                       >
                         <span>📦 Classic</span>
                       </button>
@@ -5209,11 +5048,10 @@ export default function App() {
                         placeholder="Search filters (e.g. Matrix, Sunset, Prism, Vintage, Gold)..."
                         value={filterSearchTerm}
                         onChange={(e) => setFilterSearchTerm(e.target.value)}
-                        className={`w-full pl-9 pr-8 py-2 rounded-xl text-xs border focus:outline-none focus:border-cyan-500 transition ${
-                          appTheme === 'dark'
-                            ? 'bg-slate-900 border-slate-800 text-slate-200 placeholder-slate-500'
-                            : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400'
-                        }`}
+                        className={`w-full pl-9 pr-8 py-2 rounded-xl text-xs border focus:outline-none focus:border-cyan-500 transition ${appTheme === 'dark'
+                          ? 'bg-slate-900 border-slate-800 text-slate-200 placeholder-slate-500'
+                          : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400'
+                          }`}
                       />
                       {filterSearchTerm && (
                         <button
@@ -5234,11 +5072,10 @@ export default function App() {
                           <button
                             key={cat}
                             onClick={() => setFilterCategory(cat)}
-                            className={`px-2.5 py-1 rounded-full text-[10px] font-semibold transition whitespace-nowrap ${
-                              isCatActive
-                                ? (appTheme === 'dark' ? 'bg-cyan-500 text-slate-950 shadow-sm font-bold' : 'bg-blue-600 text-white shadow-sm font-bold')
-                                : (appTheme === 'dark' ? 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800' : 'bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200')
-                            }`}
+                            className={`px-2.5 py-1 rounded-full text-[10px] font-semibold transition whitespace-nowrap ${isCatActive
+                              ? (appTheme === 'dark' ? 'bg-cyan-500 text-slate-950 shadow-sm font-bold' : 'bg-blue-600 text-white shadow-sm font-bold')
+                              : (appTheme === 'dark' ? 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800' : 'bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200')
+                              }`}
                           >
                             {cat}
                           </button>
@@ -5254,35 +5091,32 @@ export default function App() {
                           <button
                             key={pst.id || pst.name}
                             onClick={() => applyPreset(pst)}
-                            className={`p-2.5 rounded-2xl border text-left transition-all duration-300 ease-out hover:-translate-y-1 flex flex-col justify-between relative overflow-hidden group ${
-                              isCurrentActive
-                                ? (appTheme === 'dark'
-                                    ? 'border-cyan-400 bg-cyan-500/10 shadow-[0_0_18px_rgba(6,182,212,0.3)] ring-2 ring-cyan-400'
-                                    : 'border-blue-600 bg-blue-50 shadow-md ring-2 ring-blue-600')
-                                : (appTheme === 'dark'
-                                    ? 'bg-slate-900/90 border-slate-800 hover:border-slate-700/80 hover:bg-slate-900 shadow-sm hover:shadow-[0_12px_24px_-4px_rgba(255,255,255,0.07)]'
-                                    : 'bg-white border-slate-200 hover:border-slate-300/80 hover:shadow-lg hover:shadow-black/10 shadow-sm')
-                            }`}
+                            className={`p-2.5 rounded-2xl border text-left transition-all duration-300 ease-out hover:-translate-y-1 flex flex-col justify-between relative overflow-hidden group ${isCurrentActive
+                              ? (appTheme === 'dark'
+                                ? 'border-cyan-400 bg-cyan-500/10 shadow-[0_0_18px_rgba(6,182,212,0.3)] ring-2 ring-cyan-400'
+                                : 'border-blue-600 bg-blue-50 shadow-md ring-2 ring-blue-600')
+                              : (appTheme === 'dark'
+                                ? 'bg-slate-900/90 border-slate-800 hover:border-slate-700/80 hover:bg-slate-900 shadow-sm hover:shadow-[0_12px_24px_-4px_rgba(255,255,255,0.07)]'
+                                : 'bg-white border-slate-200 hover:border-slate-300/80 hover:shadow-lg hover:shadow-black/10 shadow-sm')
+                              }`}
                           >
                             {/* Live Visual Filter Preview Box */}
                             <FilterCardThumbnail preset={pst} />
 
                             <div className="w-full">
                               <div className="flex items-center justify-between gap-1 mb-1">
-                                <span className={`text-xs font-bold truncate ${
-                                  isCurrentActive
-                                    ? (appTheme === 'dark' ? 'text-cyan-300' : 'text-blue-700')
-                                    : (appTheme === 'dark' ? 'text-slate-200 group-hover:text-cyan-400' : 'text-slate-900 group-hover:text-blue-600')
-                                }`}>
+                                <span className={`text-xs font-bold truncate ${isCurrentActive
+                                  ? (appTheme === 'dark' ? 'text-cyan-300' : 'text-blue-700')
+                                  : (appTheme === 'dark' ? 'text-slate-200 group-hover:text-cyan-400' : 'text-slate-900 group-hover:text-blue-600')
+                                  }`}>
                                   {pst.name}
                                 </span>
                                 {isCurrentActive && (
                                   <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
                                 )}
                               </div>
-                              <p className={`text-[10px] leading-tight line-clamp-2 ${
-                                appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'
-                              }`}>
+                              <p className={`text-[10px] leading-tight line-clamp-2 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'
+                                }`}>
                                 {pst.desc}
                               </p>
                             </div>
@@ -5297,13 +5131,11 @@ export default function App() {
                     </div>
 
                     {/* Quick Fine-Tuning Mini-Sliders under Filters */}
-                    <div className={`p-3.5 rounded-2xl border space-y-3 ${
-                      appTheme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'
-                    }`}>
+                    <div className={`p-3.5 rounded-2xl border space-y-3 ${appTheme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'
+                      }`}>
                       <div className="flex items-center justify-between">
-                        <span className={`text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${
-                          appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
-                        }`}>
+                        <span className={`text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
+                          }`}>
                           <Sliders className="w-3 h-3 text-cyan-500" /> Quick Fine-Tune
                         </span>
                         <button
@@ -5352,16 +5184,14 @@ export default function App() {
                 {studioTab === 'effects' && (
                   <div className="space-y-4">
                     {/* 2 Sub-Tabs Switcher: [ ✨ Effects ] | [ 🎛️ Gradient Adjustment ] */}
-                    <div className={`p-1 rounded-xl border flex items-center gap-1 ${
-                      appTheme === 'dark' ? 'bg-slate-900/90 border-slate-800' : 'bg-slate-100 border-slate-200'
-                    }`}>
+                    <div className={`p-1 rounded-xl border flex items-center gap-1 ${appTheme === 'dark' ? 'bg-slate-900/90 border-slate-800' : 'bg-slate-100 border-slate-200'
+                      }`}>
                       <button
                         onClick={() => setEffectSubTab('effects')}
-                        className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 ${
-                          effectSubTab === 'effects'
-                            ? (appTheme === 'dark' ? 'bg-cyan-500 text-slate-950 shadow-md font-bold' : 'bg-blue-600 text-white shadow-md font-bold')
-                            : (appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900')
-                        }`}
+                        className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 ${effectSubTab === 'effects'
+                          ? (appTheme === 'dark' ? 'bg-cyan-500 text-slate-950 shadow-md font-bold' : 'bg-blue-600 text-white shadow-md font-bold')
+                          : (appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900')
+                          }`}
                       >
                         <Sparkles className="w-3.5 h-3.5" />
                         <span>Effects</span>
@@ -5369,11 +5199,10 @@ export default function App() {
 
                       <button
                         onClick={() => setEffectSubTab('adjustment')}
-                        className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 ${
-                          effectSubTab === 'adjustment'
-                            ? (appTheme === 'dark' ? 'bg-cyan-500 text-slate-950 shadow-md font-bold' : 'bg-blue-600 text-white shadow-md font-bold')
-                            : (appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900')
-                        }`}
+                        className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 ${effectSubTab === 'adjustment'
+                          ? (appTheme === 'dark' ? 'bg-cyan-500 text-slate-950 shadow-md font-bold' : 'bg-blue-600 text-white shadow-md font-bold')
+                          : (appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900')
+                          }`}
                       >
                         <Sliders className="w-3.5 h-3.5" />
                         <span>Gradient Adjustment</span>
@@ -5386,9 +5215,8 @@ export default function App() {
                         {/* Header with count and reset */}
                         <div className="flex items-center justify-between">
                           <div>
-                            <h4 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
-                              appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
-                            }`}>
+                            <h4 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
+                              }`}>
                               <Sparkles className="w-3.5 h-3.5 text-cyan-500" /> {STYLE_RENDER_MODES.length}+ 3D Material Styles &amp; FX
                             </h4>
                             <p className={`text-[11px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
@@ -5398,11 +5226,10 @@ export default function App() {
 
                           <button
                             onClick={handleResetEffectsPanel}
-                            className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition flex items-center gap-1.5 flex-shrink-0 ${
-                              appTheme === 'dark'
-                                ? 'text-slate-300 hover:text-white bg-slate-900 border-slate-800 hover:border-slate-700'
-                                : 'text-slate-700 hover:text-slate-900 bg-white border-slate-200 hover:bg-slate-50'
-                            }`}
+                            className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition flex items-center gap-1.5 flex-shrink-0 ${appTheme === 'dark'
+                              ? 'text-slate-300 hover:text-white bg-slate-900 border-slate-800 hover:border-slate-700'
+                              : 'text-slate-700 hover:text-slate-900 bg-white border-slate-200 hover:bg-slate-50'
+                              }`}
                             title="Reset all effects to original"
                           >
                             <Undo2 className="w-3 h-3 text-cyan-500" />
@@ -5411,38 +5238,34 @@ export default function App() {
                         </div>
 
                         {/* New vs Classic / Old Version Toggle Bar for Effects */}
-                        <div className={`p-1 rounded-xl border flex items-center gap-1 ${
-                          appTheme === 'dark' ? 'bg-slate-900/90 border-slate-800' : 'bg-slate-100 border-slate-200'
-                        }`}>
+                        <div className={`p-1 rounded-xl border flex items-center gap-1 ${appTheme === 'dark' ? 'bg-slate-900/90 border-slate-800' : 'bg-slate-100 border-slate-200'
+                          }`}>
                           <button
                             onClick={() => setEffectVersionFilter('all')}
-                            className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-semibold transition flex items-center justify-center gap-1 ${
-                              effectVersionFilter === 'all'
-                                ? (appTheme === 'dark' ? 'bg-cyan-500 text-slate-950 shadow-sm font-bold' : 'bg-blue-600 text-white shadow-sm font-bold')
-                                : (appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900')
-                            }`}
+                            className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-semibold transition flex items-center justify-center gap-1 ${effectVersionFilter === 'all'
+                              ? (appTheme === 'dark' ? 'bg-cyan-500 text-slate-950 shadow-sm font-bold' : 'bg-blue-600 text-white shadow-sm font-bold')
+                              : (appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900')
+                              }`}
                           >
                             <span>All ({STYLE_RENDER_MODES.length})</span>
                           </button>
 
                           <button
                             onClick={() => setEffectVersionFilter('new')}
-                            className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-semibold transition flex items-center justify-center gap-1 ${
-                              effectVersionFilter === 'new'
-                                ? 'bg-gradient-to-r from-amber-400 via-rose-400 to-pink-500 text-slate-950 shadow-md font-bold'
-                                : (appTheme === 'dark' ? 'text-amber-300 hover:text-white' : 'text-amber-700 hover:text-slate-900')
-                            }`}
+                            className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-semibold transition flex items-center justify-center gap-1 ${effectVersionFilter === 'new'
+                              ? 'bg-gradient-to-r from-amber-400 via-rose-400 to-pink-500 text-slate-950 shadow-md font-bold'
+                              : (appTheme === 'dark' ? 'text-amber-300 hover:text-white' : 'text-amber-700 hover:text-slate-900')
+                              }`}
                           >
                             <span>✨ New ({STYLE_RENDER_MODES.filter(m => m.isNew || NEW_EFFECT_IDS.has(m.id)).length})</span>
                           </button>
 
                           <button
                             onClick={() => setEffectVersionFilter('old')}
-                            className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-semibold transition flex items-center justify-center gap-1 ${
-                              effectVersionFilter === 'old'
-                                ? (appTheme === 'dark' ? 'bg-slate-800 text-slate-200 border border-slate-700 shadow-sm font-bold' : 'bg-white text-slate-900 border border-slate-300 shadow-sm font-bold')
-                                : (appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900')
-                            }`}
+                            className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-semibold transition flex items-center justify-center gap-1 ${effectVersionFilter === 'old'
+                              ? (appTheme === 'dark' ? 'bg-slate-800 text-slate-200 border border-slate-700 shadow-sm font-bold' : 'bg-white text-slate-900 border border-slate-300 shadow-sm font-bold')
+                              : (appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900')
+                              }`}
                           >
                             <span>📦 Classic</span>
                           </button>
@@ -5456,11 +5279,10 @@ export default function App() {
                             placeholder="Search material effects (e.g. Gold, Glass, Neon, Metal)..."
                             value={effectSearchTerm}
                             onChange={(e) => setEffectSearchTerm(e.target.value)}
-                            className={`w-full pl-9 pr-8 py-2 rounded-xl text-xs border focus:outline-none focus:border-cyan-500 transition ${
-                              appTheme === 'dark'
-                                ? 'bg-slate-900 border-slate-800 text-slate-200 placeholder-slate-500'
-                                : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400'
-                            }`}
+                            className={`w-full pl-9 pr-8 py-2 rounded-xl text-xs border focus:outline-none focus:border-cyan-500 transition ${appTheme === 'dark'
+                              ? 'bg-slate-900 border-slate-800 text-slate-200 placeholder-slate-500'
+                              : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400'
+                              }`}
                           />
                           {effectSearchTerm && (
                             <button
@@ -5481,11 +5303,10 @@ export default function App() {
                               <button
                                 key={cat}
                                 onClick={() => setEffectCategory(cat)}
-                                className={`px-2.5 py-1 rounded-full text-[10px] font-semibold transition whitespace-nowrap ${
-                                  isCatActive
-                                    ? (appTheme === 'dark' ? 'bg-cyan-500 text-slate-950 shadow-sm font-bold' : 'bg-blue-600 text-white shadow-sm font-bold')
-                                    : (appTheme === 'dark' ? 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800' : 'bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200')
-                                }`}
+                                className={`px-2.5 py-1 rounded-full text-[10px] font-semibold transition whitespace-nowrap ${isCatActive
+                                  ? (appTheme === 'dark' ? 'bg-cyan-500 text-slate-950 shadow-sm font-bold' : 'bg-blue-600 text-white shadow-sm font-bold')
+                                  : (appTheme === 'dark' ? 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800' : 'bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200')
+                                  }`}
                               >
                                 {cat}
                               </button>
@@ -5502,34 +5323,31 @@ export default function App() {
                               <button
                                 key={preset.id}
                                 onClick={() => handleSelectStyleLook(preset)}
-                                className={`p-2.5 rounded-2xl border text-left transition-all duration-300 ease-out hover:-translate-y-1 flex flex-col justify-between relative overflow-hidden group ${
-                                  isCurrentActive
-                                    ? (appTheme === 'dark'
-                                        ? 'border-cyan-400 bg-cyan-500/10 shadow-[0_0_18px_rgba(6,182,212,0.3)] ring-2 ring-cyan-400'
-                                        : 'border-blue-600 bg-blue-50 shadow-md ring-2 ring-blue-600')
-                                    : (appTheme === 'dark'
-                                        ? 'bg-slate-900/90 border-slate-800 hover:border-slate-700/80 hover:bg-slate-900 shadow-sm hover:shadow-[0_12px_24px_-4px_rgba(255,255,255,0.07)]'
-                                        : 'bg-white border-slate-200 hover:border-slate-300/80 hover:shadow-lg hover:shadow-black/10 shadow-sm')
-                                }`}
+                                className={`p-2.5 rounded-2xl border text-left transition-all duration-300 ease-out hover:-translate-y-1 flex flex-col justify-between relative overflow-hidden group ${isCurrentActive
+                                  ? (appTheme === 'dark'
+                                    ? 'border-cyan-400 bg-cyan-500/10 shadow-[0_0_18px_rgba(6,182,212,0.3)] ring-2 ring-cyan-400'
+                                    : 'border-blue-600 bg-blue-50 shadow-md ring-2 ring-blue-600')
+                                  : (appTheme === 'dark'
+                                    ? 'bg-slate-900/90 border-slate-800 hover:border-slate-700/80 hover:bg-slate-900 shadow-sm hover:shadow-[0_12px_24px_-4px_rgba(255,255,255,0.07)]'
+                                    : 'bg-white border-slate-200 hover:border-slate-300/80 hover:shadow-lg hover:shadow-black/10 shadow-sm')
+                                  }`}
                               >
                                 <EffectCardThumbnail preset={preset} />
 
                                 <div className="w-full">
                                   <div className="flex items-center justify-between gap-1 mb-1">
-                                    <span className={`text-xs font-bold truncate ${
-                                      isCurrentActive
-                                        ? (appTheme === 'dark' ? 'text-cyan-300' : 'text-blue-700')
-                                        : (appTheme === 'dark' ? 'text-slate-200 group-hover:text-cyan-400' : 'text-slate-900 group-hover:text-blue-600')
-                                    }`}>
+                                    <span className={`text-xs font-bold truncate ${isCurrentActive
+                                      ? (appTheme === 'dark' ? 'text-cyan-300' : 'text-blue-700')
+                                      : (appTheme === 'dark' ? 'text-slate-200 group-hover:text-cyan-400' : 'text-slate-900 group-hover:text-blue-600')
+                                      }`}>
                                       {preset.name}
                                     </span>
                                     {isCurrentActive && (
                                       <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
                                     )}
                                   </div>
-                                  <p className={`text-[10px] leading-tight line-clamp-2 ${
-                                    appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'
-                                  }`}>
+                                  <p className={`text-[10px] leading-tight line-clamp-2 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'
+                                    }`}>
                                     {preset.desc}
                                   </p>
                                 </div>
@@ -5547,23 +5365,20 @@ export default function App() {
 
                     {/* SUB-TAB 2: GRADIENT ADJUSTMENT (GRANULAR SLIDERS) */}
                     {effectSubTab === 'adjustment' && (
-                      <div className={`p-4 rounded-2xl border space-y-4 ${
-                        appTheme === 'dark' ? 'bg-[#131b2e]/40 border-slate-800' : 'bg-slate-50 border-slate-200'
-                      }`}>
+                      <div className={`p-4 rounded-2xl border space-y-4 ${appTheme === 'dark' ? 'bg-[#131b2e]/40 border-slate-800' : 'bg-slate-50 border-slate-200'
+                        }`}>
                         <div className="flex items-center justify-between">
-                          <h5 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
-                            appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
-                          }`}>
+                          <h5 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
+                            }`}>
                             <Sliders className="w-3.5 h-3.5 text-cyan-500" /> Gradient &amp; Filter Grading Sliders
                           </h5>
 
                           <button
                             onClick={handleResetEffectsPanel}
-                            className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition flex items-center gap-1.5 flex-shrink-0 ${
-                              appTheme === 'dark'
-                                ? 'text-slate-300 hover:text-white bg-slate-900 border-slate-800 hover:border-slate-700'
-                                : 'text-slate-700 hover:text-slate-900 bg-white border-slate-200 hover:bg-slate-50'
-                            }`}
+                            className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition flex items-center gap-1.5 flex-shrink-0 ${appTheme === 'dark'
+                              ? 'text-slate-300 hover:text-white bg-slate-900 border-slate-800 hover:border-slate-700'
+                              : 'text-slate-700 hover:text-slate-900 bg-white border-slate-200 hover:bg-slate-50'
+                              }`}
                             title="Reset all grading sliders to default"
                           >
                             <Undo2 className="w-3 h-3 text-cyan-500" />
@@ -5687,9 +5502,8 @@ export default function App() {
                         </div>
 
                         {/* Edge-Conforming Glow / Shadow */}
-                        <div className={`p-3.5 rounded-2xl border space-y-2 ${
-                          appTheme === 'dark' ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
-                        }`}>
+                        <div className={`p-3.5 rounded-2xl border space-y-2 ${appTheme === 'dark' ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
+                          }`}>
                           <div className="flex justify-between text-xs items-center">
                             <span className={`font-semibold flex items-center gap-1.5 ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-800'}`}>
                               <Sparkles className="w-3.5 h-3.5 text-cyan-500" /> Vector Edge Glow Aura
@@ -5744,9 +5558,8 @@ export default function App() {
                   <div className="space-y-5">
                     <div className="flex items-center justify-between gap-2">
                       <div>
-                        <h4 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
-                          appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
-                        }`}>
+                        <h4 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
+                          }`}>
                           <Maximize2 className="w-3.5 h-3.5 text-cyan-500" /> Icon Dimensions &amp; Scaling
                         </h4>
                         <p className={`text-[11px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
@@ -5756,11 +5569,10 @@ export default function App() {
 
                       <button
                         onClick={handleResetDimensionsPanel}
-                        className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition flex items-center gap-1.5 flex-shrink-0 ${
-                          appTheme === 'dark'
-                            ? 'text-slate-300 hover:text-white bg-slate-900 border-slate-800 hover:border-slate-700'
-                            : 'text-slate-700 hover:text-slate-900 bg-white border-slate-200 hover:bg-slate-50'
-                        }`}
+                        className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition flex items-center gap-1.5 flex-shrink-0 ${appTheme === 'dark'
+                          ? 'text-slate-300 hover:text-white bg-slate-900 border-slate-800 hover:border-slate-700'
+                          : 'text-slate-700 hover:text-slate-900 bg-white border-slate-200 hover:bg-slate-50'
+                          }`}
                         title="Reset dimensions to default (384x384)"
                       >
                         <Undo2 className="w-3 h-3 text-cyan-500" />
@@ -5769,19 +5581,17 @@ export default function App() {
                     </div>
 
                     {/* Width and Height Controls Card */}
-                    <div className={`p-4 rounded-2xl border space-y-4 ${
-                      appTheme === 'dark' ? 'bg-[#131b2e]/60 border-slate-800' : 'bg-slate-50 border-slate-200'
-                    }`}>
+                    <div className={`p-4 rounded-2xl border space-y-4 ${appTheme === 'dark' ? 'bg-[#131b2e]/60 border-slate-800' : 'bg-slate-50 border-slate-200'
+                      }`}>
                       {/* Aspect Ratio Lock Banner */}
                       <div className="flex items-center justify-between pb-2 border-b border-slate-700/40">
                         <div className="flex items-center gap-2">
                           <button
                             onClick={toggleAspectRatioLock}
-                            className={`p-2 rounded-xl border transition flex items-center gap-1.5 text-xs font-semibold ${
-                              lockAspectRatio
-                                ? 'bg-blue-600 text-white border-blue-500 shadow-md shadow-blue-600/20'
-                                : appTheme === 'dark' ? 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white' : 'bg-white border-slate-300 text-slate-600 hover:text-slate-900'
-                            }`}
+                            className={`p-2 rounded-xl border transition flex items-center gap-1.5 text-xs font-semibold ${lockAspectRatio
+                              ? 'bg-blue-600 text-white border-blue-500 shadow-md shadow-blue-600/20'
+                              : appTheme === 'dark' ? 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white' : 'bg-white border-slate-300 text-slate-600 hover:text-slate-900'
+                              }`}
                             title={lockAspectRatio ? 'Unlock Aspect Ratio (Freeform sizing)' : 'Lock Aspect Ratio (Proportional sizing)'}
                           >
                             {lockAspectRatio ? <Link2 className="w-3.5 h-3.5" /> : <Unlink2 className="w-3.5 h-3.5" />}
@@ -5805,9 +5615,8 @@ export default function App() {
                               max="4096"
                               value={iconWidth}
                               onChange={(e) => handleWidthChange(e.target.value)}
-                              className={`w-20 px-2 py-1 rounded-lg text-xs font-mono text-center border focus:outline-none focus:border-cyan-500 ${
-                                appTheme === 'dark' ? 'bg-slate-950 border-slate-800 text-slate-200' : 'bg-white border-slate-300 text-slate-800'
-                              }`}
+                              className={`w-20 px-2 py-1 rounded-lg text-xs font-mono text-center border focus:outline-none focus:border-cyan-500 ${appTheme === 'dark' ? 'bg-slate-950 border-slate-800 text-slate-200' : 'bg-white border-slate-300 text-slate-800'
+                                }`}
                             />
                             <span className={`text-[10px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>px</span>
                           </div>
@@ -5834,9 +5643,8 @@ export default function App() {
                               max="4096"
                               value={iconHeight}
                               onChange={(e) => handleHeightChange(e.target.value)}
-                              className={`w-20 px-2 py-1 rounded-lg text-xs font-mono text-center border focus:outline-none focus:border-cyan-500 ${
-                                appTheme === 'dark' ? 'bg-slate-950 border-slate-800 text-slate-200' : 'bg-white border-slate-300 text-slate-800'
-                              }`}
+                              className={`w-20 px-2 py-1 rounded-lg text-xs font-mono text-center border focus:outline-none focus:border-cyan-500 ${appTheme === 'dark' ? 'bg-slate-950 border-slate-800 text-slate-200' : 'bg-white border-slate-300 text-slate-800'
+                                }`}
                             />
                             <span className={`text-[10px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>px</span>
                           </div>
@@ -5865,19 +5673,17 @@ export default function App() {
                             <button
                               key={preset.label}
                               onClick={() => handleApplySizePreset(preset)}
-                              className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between ${
-                                isCurrent
-                                  ? 'bg-blue-600 text-white border-blue-500 shadow-md'
-                                  : appTheme === 'dark'
+                              className={`p-2.5 rounded-xl border text-left transition flex flex-col justify-between ${isCurrent
+                                ? 'bg-blue-600 text-white border-blue-500 shadow-md'
+                                : appTheme === 'dark'
                                   ? 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300'
                                   : 'bg-white border-slate-200 hover:border-slate-300 text-slate-700 shadow-sm'
-                              }`}
+                                }`}
                             >
                               <div className="flex items-center justify-between">
                                 <span className="font-mono text-xs font-bold">{preset.label}</span>
-                                <span className={`text-[9px] px-1 rounded ${
-                                  isCurrent ? 'bg-blue-700 text-white' : appTheme === 'dark' ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-600'
-                                }`}>
+                                <span className={`text-[9px] px-1 rounded ${isCurrent ? 'bg-blue-700 text-white' : appTheme === 'dark' ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-600'
+                                  }`}>
                                   {preset.w}&times;{preset.h}
                                 </span>
                               </div>
@@ -5894,9 +5700,8 @@ export default function App() {
                     <div className="flex items-center gap-2 pt-1">
                       <button
                         onClick={handleResetDimensionsPanel}
-                        className={`flex-1 py-2 rounded-xl border text-xs font-medium transition ${
-                          appTheme === 'dark' ? 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white' : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
-                        }`}
+                        className={`flex-1 py-2 rounded-xl border text-xs font-medium transition ${appTheme === 'dark' ? 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white' : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
+                          }`}
                       >
                         Reset to 384&times;384
                       </button>
@@ -5909,22 +5714,19 @@ export default function App() {
                           setLockAspectRatio(true);
                           setAspectRatio(1);
                         }}
-                        className={`flex-1 py-2 rounded-xl border text-xs font-medium transition ${
-                          appTheme === 'dark' ? 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white' : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
-                        }`}
+                        className={`flex-1 py-2 rounded-xl border text-xs font-medium transition ${appTheme === 'dark' ? 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white' : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
+                          }`}
                       >
                         Make Square (1:1)
                       </button>
                     </div>
 
                     {/* Outline Stroke & Contour Thickness (Universal Vector Line Weight) */}
-                    <div className={`p-4 rounded-2xl border space-y-3.5 ${
-                      appTheme === 'dark' ? 'bg-[#131b2e]/60 border-slate-800' : 'bg-slate-50 border-slate-200'
-                    }`}>
+                    <div className={`p-4 rounded-2xl border space-y-3.5 ${appTheme === 'dark' ? 'bg-[#131b2e]/60 border-slate-800' : 'bg-slate-50 border-slate-200'
+                      }`}>
                       <div className="flex items-center justify-between">
-                        <label className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
-                          appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
-                        }`}>
+                        <label className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
+                          }`}>
                           <SlidersHorizontal className="w-3.5 h-3.5 text-cyan-500" /> Vector Stroke & Contour
                         </label>
                         <div className="flex items-center gap-2">
@@ -5946,11 +5748,10 @@ export default function App() {
                       </div>
 
                       {/* Vector Type Status Badge */}
-                      <div className={`flex items-center justify-between px-2.5 py-1.5 rounded-xl text-[11px] font-medium border ${
-                        isStrokeIcon 
-                          ? (appTheme === 'dark' ? 'bg-cyan-950/40 border-cyan-800/50 text-cyan-300' : 'bg-cyan-50 border-cyan-200 text-cyan-800')
-                          : (appTheme === 'dark' ? 'bg-amber-950/30 border-amber-800/40 text-amber-300' : 'bg-amber-50 border-amber-200 text-amber-800')
-                      }`}>
+                      <div className={`flex items-center justify-between px-2.5 py-1.5 rounded-xl text-[11px] font-medium border ${isStrokeIcon
+                        ? (appTheme === 'dark' ? 'bg-cyan-950/40 border-cyan-800/50 text-cyan-300' : 'bg-cyan-50 border-cyan-200 text-cyan-800')
+                        : (appTheme === 'dark' ? 'bg-amber-950/30 border-amber-800/40 text-amber-300' : 'bg-amber-50 border-amber-200 text-amber-800')
+                        }`}>
                         <span className="flex items-center gap-1.5">
                           {isStrokeIcon ? '✏️ Outline Vector' : '🎨 Solid Filled Shape'}
                         </span>
@@ -5975,13 +5776,12 @@ export default function App() {
                               recordUndo();
                               setStrokeMultiplier(s.val);
                             }}
-                            className={`px-2.5 py-1 rounded-xl text-[11px] font-semibold whitespace-nowrap transition ${
-                              strokeMultiplier === s.val
-                                ? 'bg-cyan-500 text-slate-950 font-bold shadow-sm'
-                                : appTheme === 'dark'
-                                  ? 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'
-                                  : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900 shadow-sm'
-                            }`}
+                            className={`px-2.5 py-1 rounded-xl text-[11px] font-semibold whitespace-nowrap transition ${strokeMultiplier === s.val
+                              ? 'bg-cyan-500 text-slate-950 font-bold shadow-sm'
+                              : appTheme === 'dark'
+                                ? 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-white'
+                                : 'bg-white border border-slate-200 text-slate-600 hover:text-slate-900 shadow-sm'
+                              }`}
                           >
                             {s.label}
                           </button>
@@ -6001,9 +5801,8 @@ export default function App() {
 
                       {/* Contour options for Solid Filled Shapes when thickened */}
                       {!isStrokeIcon && strokeMultiplier > 1 && (
-                        <div className={`mt-2 pt-2.5 border-t space-y-2 ${
-                          appTheme === 'dark' ? 'border-slate-800/80' : 'border-slate-200'
-                        }`}>
+                        <div className={`mt-2 pt-2.5 border-t space-y-2 ${appTheme === 'dark' ? 'border-slate-800/80' : 'border-slate-200'
+                          }`}>
                           <div className="flex items-center justify-between text-[11px]">
                             <span className={appTheme === 'dark' ? 'text-slate-400 font-medium' : 'text-slate-600 font-medium'}>
                               Contour Color:
@@ -6021,13 +5820,12 @@ export default function App() {
                                     recordUndo();
                                     setStrokeColorMode(opt.id);
                                   }}
-                                  className={`px-2 py-0.5 rounded-lg text-[10px] font-semibold transition ${
-                                    strokeColorMode === opt.id
-                                      ? 'bg-cyan-500 text-slate-950 shadow-sm'
-                                      : appTheme === 'dark'
-                                        ? 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
-                                        : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
-                                  }`}
+                                  className={`px-2 py-0.5 rounded-lg text-[10px] font-semibold transition ${strokeColorMode === opt.id
+                                    ? 'bg-cyan-500 text-slate-950 shadow-sm'
+                                    : appTheme === 'dark'
+                                      ? 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                                      : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                                    }`}
                                 >
                                   {opt.label}
                                 </button>
@@ -6050,13 +5848,11 @@ export default function App() {
                     </div>
 
                     {/* App Icon Badge & Background Container */}
-                    <div className={`p-4 rounded-2xl border space-y-4 ${
-                      appTheme === 'dark' ? 'bg-[#131b2e]/60 border-slate-800' : 'bg-slate-50 border-slate-200'
-                    }`}>
+                    <div className={`p-4 rounded-2xl border space-y-4 ${appTheme === 'dark' ? 'bg-[#131b2e]/60 border-slate-800' : 'bg-slate-50 border-slate-200'
+                      }`}>
                       <div className="flex items-center justify-between">
-                        <label className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
-                          appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
-                        }`}>
+                        <label className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
+                          }`}>
                           <Shapes className="w-3.5 h-3.5 text-cyan-500" /> App Icon Badge &amp; Tile Shape
                         </label>
                         {bgShape !== 'none' && (
@@ -6087,13 +5883,12 @@ export default function App() {
                               recordUndo();
                               setBgShape(sh.id);
                             }}
-                            className={`py-2 px-1 rounded-xl text-center border text-[11px] font-semibold transition ${
-                              bgShape === sh.id
-                                ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-md font-bold'
-                                : appTheme === 'dark'
-                                  ? 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
-                                  : 'bg-white border-slate-200 text-slate-700 hover:text-slate-900 shadow-sm'
-                            }`}
+                            className={`py-2 px-1 rounded-xl text-center border text-[11px] font-semibold transition ${bgShape === sh.id
+                              ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-md font-bold'
+                              : appTheme === 'dark'
+                                ? 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                                : 'bg-white border-slate-200 text-slate-700 hover:text-slate-900 shadow-sm'
+                              }`}
                           >
                             {sh.label}
                           </button>
@@ -6195,9 +5990,8 @@ export default function App() {
                     {/* Header */}
                     <div className="flex items-center justify-between gap-2">
                       <div>
-                        <h4 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
-                          appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
-                        }`}>
+                        <h4 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
+                          }`}>
                           <Move3d className="w-3.5 h-3.5 text-cyan-500" /> 3D Perspective &amp; Transforms
                         </h4>
                         <p className={`text-[11px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
@@ -6207,11 +6001,10 @@ export default function App() {
 
                       <button
                         onClick={handleResetTransformPanel}
-                        className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition flex items-center gap-1.5 flex-shrink-0 ${
-                          appTheme === 'dark'
-                            ? 'text-slate-300 hover:text-white bg-slate-900 border-slate-800 hover:border-slate-700'
-                            : 'text-slate-700 hover:text-slate-900 bg-white border-slate-200 hover:bg-slate-50'
-                        }`}
+                        className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition flex items-center gap-1.5 flex-shrink-0 ${appTheme === 'dark'
+                          ? 'text-slate-300 hover:text-white bg-slate-900 border-slate-800 hover:border-slate-700'
+                          : 'text-slate-700 hover:text-slate-900 bg-white border-slate-200 hover:bg-slate-50'
+                          }`}
                         title="Reset all 3D and 2D transforms"
                       >
                         <Undo2 className="w-3 h-3 text-cyan-500" />
@@ -6220,16 +6013,14 @@ export default function App() {
                     </div>
 
                     {/* Sub-Navigation: 3D Perspective | 2D Angle & Flips | Skew & Shear */}
-                    <div className={`grid grid-cols-3 gap-1 p-1 rounded-xl border ${
-                      appTheme === 'dark' ? 'bg-slate-900 border-slate-800' : 'bg-slate-200/80 border-slate-300'
-                    }`}>
+                    <div className={`grid grid-cols-3 gap-1 p-1 rounded-xl border ${appTheme === 'dark' ? 'bg-slate-900 border-slate-800' : 'bg-slate-200/80 border-slate-300'
+                      }`}>
                       <button
                         onClick={() => setTransformSubTab('3d')}
-                        className={`py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition ${
-                          transformSubTab === '3d'
-                            ? 'bg-blue-600 text-white shadow'
-                            : appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
-                        }`}
+                        className={`py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition ${transformSubTab === '3d'
+                          ? 'bg-blue-600 text-white shadow'
+                          : appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                          }`}
                       >
                         <Box className="w-3.5 h-3.5" />
                         <span>3D Rotate</span>
@@ -6237,11 +6028,10 @@ export default function App() {
 
                       <button
                         onClick={() => setTransformSubTab('2d')}
-                        className={`py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition ${
-                          transformSubTab === '2d'
-                            ? 'bg-blue-600 text-white shadow'
-                            : appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
-                        }`}
+                        className={`py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition ${transformSubTab === '2d'
+                          ? 'bg-blue-600 text-white shadow'
+                          : appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                          }`}
                       >
                         <RotateCw className="w-3.5 h-3.5" />
                         <span>2D Angle</span>
@@ -6249,11 +6039,10 @@ export default function App() {
 
                       <button
                         onClick={() => setTransformSubTab('skew')}
-                        className={`py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition ${
-                          transformSubTab === 'skew'
-                            ? 'bg-blue-600 text-white shadow'
-                            : appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
-                        }`}
+                        className={`py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition ${transformSubTab === 'skew'
+                          ? 'bg-blue-600 text-white shadow'
+                          : appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                          }`}
                       >
                         <SlidersHorizontal className="w-3.5 h-3.5" />
                         <span>Skew &amp; Shear</span>
@@ -6283,9 +6072,8 @@ export default function App() {
 
                         {/* 1-Click 3D Angle Presets */}
                         <div>
-                          <div className={`text-xs font-semibold mb-2 flex items-center justify-between ${
-                            appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
-                          }`}>
+                          <div className={`text-xs font-semibold mb-2 flex items-center justify-between ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
+                            }`}>
                             <span>1-Click 3D Angle Presets</span>
                             <span className="text-[10px] text-cyan-500 font-normal">8 Angles</span>
                           </div>
@@ -6306,13 +6094,12 @@ export default function App() {
                                     }));
                                   }}
                                   title={`${p.name}: ${p.desc} (X: ${p.rx}°, Y: ${p.ry}°)`}
-                                  className={`p-2 rounded-xl border text-center transition flex flex-col items-center justify-center gap-1 ${
-                                    isActive
-                                      ? 'bg-blue-600 text-white border-blue-400 shadow-md ring-1 ring-blue-400'
-                                      : appTheme === 'dark'
+                                  className={`p-2 rounded-xl border text-center transition flex flex-col items-center justify-center gap-1 ${isActive
+                                    ? 'bg-blue-600 text-white border-blue-400 shadow-md ring-1 ring-blue-400'
+                                    : appTheme === 'dark'
                                       ? 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300'
                                       : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700 shadow-sm'
-                                  }`}
+                                    }`}
                                 >
                                   <span className="text-base leading-none">{p.icon}</span>
                                   <span className="text-[10px] font-medium truncate w-full">{p.name}</span>
@@ -6433,9 +6220,8 @@ export default function App() {
                         </div>
 
                         {/* 3D Elevation / Depth Shadow */}
-                        <div className={`p-3 rounded-2xl border ${
-                          appTheme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'
-                        }`}>
+                        <div className={`p-3 rounded-2xl border ${appTheme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'
+                          }`}>
                           <div className="flex items-center justify-between mb-1.5">
                             <span className={`text-xs font-semibold ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
                               3D Elevation &amp; Cast Shadow
@@ -6457,17 +6243,15 @@ export default function App() {
                         </div>
 
                         {/* 3D Motion, Levitation & Animated GIF Studio */}
-                        <div className={`p-3.5 rounded-2xl border transition space-y-3 ${
-                          adjustments.is3DFloating
-                            ? 'bg-blue-600/10 border-blue-500/40 shadow-lg shadow-blue-500/5'
-                            : appTheme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'
-                        }`}>
+                        <div className={`p-3.5 rounded-2xl border transition space-y-3 ${adjustments.is3DFloating
+                          ? 'bg-blue-600/10 border-blue-500/40 shadow-lg shadow-blue-500/5'
+                          : appTheme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'
+                          }`}>
                           {/* Top Header & Live Toggle */}
                           <div className="flex items-center justify-between">
                             <div>
-                              <span className={`text-xs font-semibold flex items-center gap-1.5 ${
-                                appTheme === 'dark' ? 'text-slate-200' : 'text-slate-800'
-                              }`}>
+                              <span className={`text-xs font-semibold flex items-center gap-1.5 ${appTheme === 'dark' ? 'text-slate-200' : 'text-slate-800'
+                                }`}>
                                 <Sparkles className="w-3.5 h-3.5 text-cyan-400" /> 3D Motion & Levitation
                               </span>
                               <p className={`text-[10px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
@@ -6477,11 +6261,10 @@ export default function App() {
 
                             <button
                               onClick={() => setAdjustments(prev => ({ ...prev, is3DFloating: !prev.is3DFloating }))}
-                              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 ${
-                                adjustments.is3DFloating
-                                  ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                                  : appTheme === 'dark' ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
-                              }`}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 ${adjustments.is3DFloating
+                                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                                : appTheme === 'dark' ? 'bg-slate-800 text-slate-300 hover:bg-slate-700' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                                }`}
                             >
                               <span className={`w-2 h-2 rounded-full ${adjustments.is3DFloating ? 'bg-emerald-400 animate-pulse' : 'bg-slate-400'}`} />
                               <span>{adjustments.is3DFloating ? 'Live Active' : 'Off'}</span>
@@ -6491,9 +6274,8 @@ export default function App() {
                           {/* Motion Presets (5 dynamic motion types) */}
                           <div>
                             <div className="flex items-center justify-between mb-1.5">
-                              <span className={`text-[11px] font-semibold uppercase tracking-wider ${
-                                appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'
-                              }`}>
+                              <span className={`text-[11px] font-semibold uppercase tracking-wider ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'
+                                }`}>
                                 Motion Preset
                               </span>
                               <span className="text-[10px] font-mono text-cyan-400 font-semibold">
@@ -6513,13 +6295,12 @@ export default function App() {
                                   <button
                                     key={preset.id}
                                     onClick={() => setAdjustments(prev => ({ ...prev, animPreset: preset.id, is3DFloating: true }))}
-                                    className={`p-1.5 rounded-xl text-center border transition flex flex-col items-center gap-0.5 ${
-                                      isSel
-                                        ? 'bg-blue-600 text-white border-blue-400 shadow-md shadow-blue-600/20'
-                                        : appTheme === 'dark'
-                                          ? 'bg-slate-800/80 border-slate-700/60 text-slate-300 hover:border-slate-600'
-                                          : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
-                                    }`}
+                                    className={`p-1.5 rounded-xl text-center border transition flex flex-col items-center gap-0.5 ${isSel
+                                      ? 'bg-blue-600 text-white border-blue-400 shadow-md shadow-blue-600/20'
+                                      : appTheme === 'dark'
+                                        ? 'bg-slate-800/80 border-slate-700/60 text-slate-300 hover:border-slate-600'
+                                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                                      }`}
                                   >
                                     <span className="text-sm">{preset.icon}</span>
                                     <span className="text-[9px] font-semibold truncate w-full">{preset.name}</span>
@@ -6584,11 +6365,10 @@ export default function App() {
                             <button
                               onClick={handleExportAnimatedGif}
                               disabled={downloading}
-                              className={`w-full py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition shadow-md ${
-                                downloading
-                                  ? 'bg-slate-700 text-slate-400 cursor-not-allowed'
-                                  : 'bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white shadow-blue-500/25 active:scale-[0.99]'
-                              }`}
+                              className={`w-full py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition shadow-md ${downloading
+                                ? 'bg-slate-700 text-slate-400 cursor-not-allowed'
+                                : 'bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-white shadow-blue-500/25 active:scale-[0.99]'
+                                }`}
                             >
                               <Film className={`w-3.5 h-3.5 ${downloading ? 'animate-spin' : ''}`} />
                               <span>{downloading ? 'Rendering Looping GIF...' : '✨ Export Animated .GIF (Looping)'}</span>
@@ -6634,13 +6414,12 @@ export default function App() {
                                   recordUndo();
                                   setAdjustments({ ...adjustments, rotation: deg });
                                 }}
-                                className={`py-1.5 rounded-lg border text-xs font-mono font-semibold transition ${
-                                  adjustments.rotation === deg
-                                    ? 'bg-blue-600 text-white border-blue-400 shadow'
-                                    : appTheme === 'dark'
+                                className={`py-1.5 rounded-lg border text-xs font-mono font-semibold transition ${adjustments.rotation === deg
+                                  ? 'bg-blue-600 text-white border-blue-400 shadow'
+                                  : appTheme === 'dark'
                                     ? 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700'
                                     : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-                                }`}
+                                  }`}
                               >
                                 {deg}&deg;
                               </button>
@@ -6655,11 +6434,10 @@ export default function App() {
                               recordUndo();
                               setAdjustments(prev => ({ ...prev, rotation: (prev.rotation + 90) % 360 }));
                             }}
-                            className={`py-3 rounded-2xl border text-xs font-medium flex flex-col items-center justify-center gap-1.5 transition ${
-                              appTheme === 'dark'
-                                ? 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300'
-                                : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700 shadow-sm'
-                            }`}
+                            className={`py-3 rounded-2xl border text-xs font-medium flex flex-col items-center justify-center gap-1.5 transition ${appTheme === 'dark'
+                              ? 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300'
+                              : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700 shadow-sm'
+                              }`}
                           >
                             <RotateCw className="w-4 h-4 text-cyan-500" />
                             <span>Rotate 90&deg; CW</span>
@@ -6670,11 +6448,10 @@ export default function App() {
                               recordUndo();
                               setAdjustments(prev => ({ ...prev, rotation: (prev.rotation - 90 + 360) % 360 }));
                             }}
-                            className={`py-3 rounded-2xl border text-xs font-medium flex flex-col items-center justify-center gap-1.5 transition ${
-                              appTheme === 'dark'
-                                ? 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300'
-                                : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700 shadow-sm'
-                            }`}
+                            className={`py-3 rounded-2xl border text-xs font-medium flex flex-col items-center justify-center gap-1.5 transition ${appTheme === 'dark'
+                              ? 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300'
+                              : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700 shadow-sm'
+                              }`}
                           >
                             <RotateCcw className="w-4 h-4 text-cyan-500" />
                             <span>Rotate 90&deg; CCW</span>
@@ -6685,11 +6462,10 @@ export default function App() {
                               recordUndo();
                               setAdjustments(prev => ({ ...prev, rotation: (prev.rotation + 180) % 360 }));
                             }}
-                            className={`py-3 rounded-2xl border text-xs font-medium flex flex-col items-center justify-center gap-1.5 transition ${
-                              appTheme === 'dark'
-                                ? 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300'
-                                : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700 shadow-sm'
-                            }`}
+                            className={`py-3 rounded-2xl border text-xs font-medium flex flex-col items-center justify-center gap-1.5 transition ${appTheme === 'dark'
+                              ? 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300'
+                              : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700 shadow-sm'
+                              }`}
                           >
                             <RefreshCw className="w-4 h-4 text-cyan-500" />
                             <span>Invert 180&deg;</span>
@@ -6703,11 +6479,10 @@ export default function App() {
                               recordUndo();
                               setAdjustments(prev => ({ ...prev, flipH: !prev.flipH }));
                             }}
-                            className={`py-3.5 rounded-2xl border text-xs font-medium flex items-center justify-center gap-2 transition ${
-                              adjustments.flipH 
-                                ? 'bg-blue-600 text-white border-blue-500 shadow-md ring-1 ring-blue-400' 
-                                : appTheme === 'dark' ? 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700' : 'bg-white border-slate-200 text-slate-700'
-                            }`}
+                            className={`py-3.5 rounded-2xl border text-xs font-medium flex items-center justify-center gap-2 transition ${adjustments.flipH
+                              ? 'bg-blue-600 text-white border-blue-500 shadow-md ring-1 ring-blue-400'
+                              : appTheme === 'dark' ? 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700' : 'bg-white border-slate-200 text-slate-700'
+                              }`}
                           >
                             <FlipHorizontal className="w-4 h-4 text-cyan-500" />
                             <span>Flip Horizontal {adjustments.flipH ? '(On)' : ''}</span>
@@ -6718,11 +6493,10 @@ export default function App() {
                               recordUndo();
                               setAdjustments(prev => ({ ...prev, flipV: !prev.flipV }));
                             }}
-                            className={`py-3.5 rounded-2xl border text-xs font-medium flex items-center justify-center gap-2 transition ${
-                              adjustments.flipV 
-                                ? 'bg-blue-600 text-white border-blue-500 shadow-md ring-1 ring-blue-400' 
-                                : appTheme === 'dark' ? 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700' : 'bg-white border-slate-200 text-slate-700'
-                            }`}
+                            className={`py-3.5 rounded-2xl border text-xs font-medium flex items-center justify-center gap-2 transition ${adjustments.flipV
+                              ? 'bg-blue-600 text-white border-blue-500 shadow-md ring-1 ring-blue-400'
+                              : appTheme === 'dark' ? 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700' : 'bg-white border-slate-200 text-slate-700'
+                              }`}
                           >
                             <FlipVertical className="w-4 h-4 text-cyan-500" />
                             <span>Flip Vertical {adjustments.flipV ? '(On)' : ''}</span>
@@ -6752,13 +6526,12 @@ export default function App() {
                                   recordUndo();
                                   setAdjustments(prev => ({ ...prev, skewX: p.sx, skewY: p.sy }));
                                 }}
-                                className={`p-2 rounded-xl border text-[10px] font-semibold transition ${
-                                  (adjustments.skewX || 0) === p.sx && (adjustments.skewY || 0) === p.sy
-                                    ? 'bg-blue-600 text-white border-blue-400 shadow'
-                                    : appTheme === 'dark'
+                                className={`p-2 rounded-xl border text-[10px] font-semibold transition ${(adjustments.skewX || 0) === p.sx && (adjustments.skewY || 0) === p.sy
+                                  ? 'bg-blue-600 text-white border-blue-400 shadow'
+                                  : appTheme === 'dark'
                                     ? 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300'
                                     : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'
-                                }`}
+                                  }`}
                               >
                                 {p.label}
                               </button>
@@ -6829,9 +6602,8 @@ export default function App() {
                   <div className="space-y-5">
                     <div className="flex items-center justify-between gap-2">
                       <div>
-                        <h4 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
-                          appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
-                        }`}>
+                        <h4 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
+                          }`}>
                           <Download className="w-3.5 h-3.5 text-cyan-500" /> Export Configuration
                         </h4>
                         <p className={`text-[11px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
@@ -6841,11 +6613,10 @@ export default function App() {
 
                       <button
                         onClick={handleResetExportPanel}
-                        className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition flex items-center gap-1.5 flex-shrink-0 ${
-                          appTheme === 'dark'
-                            ? 'text-slate-300 hover:text-white bg-slate-900 border-slate-800 hover:border-slate-700'
-                            : 'text-slate-700 hover:text-slate-900 bg-white border-slate-200 hover:bg-slate-50'
-                        }`}
+                        className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition flex items-center gap-1.5 flex-shrink-0 ${appTheme === 'dark'
+                          ? 'text-slate-300 hover:text-white bg-slate-900 border-slate-800 hover:border-slate-700'
+                          : 'text-slate-700 hover:text-slate-900 bg-white border-slate-200 hover:bg-slate-50'
+                          }`}
                         title="Reset export configuration"
                       >
                         <Undo2 className="w-3 h-3 text-cyan-500" />
@@ -6862,13 +6633,12 @@ export default function App() {
                           <button
                             key={fmt}
                             onClick={() => setExportFormat(fmt)}
-                            className={`py-2 rounded-xl uppercase text-xs font-bold transition border text-center ${
-                              exportFormat === fmt
-                                ? 'bg-blue-600 text-white border-blue-500 shadow-md'
-                                : appTheme === 'dark'
-                                  ? 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700'
-                                  : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                            }`}
+                            className={`py-2 rounded-xl uppercase text-xs font-bold transition border text-center ${exportFormat === fmt
+                              ? 'bg-blue-600 text-white border-blue-500 shadow-md'
+                              : appTheme === 'dark'
+                                ? 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700'
+                                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                              }`}
                           >
                             {fmt}
                           </button>
@@ -6894,13 +6664,12 @@ export default function App() {
                           <button
                             key={sz}
                             onClick={() => setExportSize(sz)}
-                            className={`py-2 rounded-xl text-xs font-semibold transition border text-center ${
-                              exportSize === sz
-                                ? 'bg-blue-600 text-white border-blue-500 shadow-md'
-                                : appTheme === 'dark'
-                                  ? 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700'
-                                  : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                            }`}
+                            className={`py-2 rounded-xl text-xs font-semibold transition border text-center ${exportSize === sz
+                              ? 'bg-blue-600 text-white border-blue-500 shadow-md'
+                              : appTheme === 'dark'
+                                ? 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700'
+                                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                              }`}
                           >
                             {sz >= 1024 ? `${sz / 1024}K` : `${sz}px`}
                           </button>
@@ -6909,14 +6678,13 @@ export default function App() {
                     </div>
 
                     {/* Transparency Toggle */}
-                    <div className={`flex items-center justify-between p-3.5 rounded-2xl border ${
-                      appTheme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'
-                    }`}>
+                    <div className={`flex items-center justify-between p-3.5 rounded-2xl border ${appTheme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'
+                      }`}>
                       <div>
                         <p className={`text-xs font-semibold ${appTheme === 'dark' ? 'text-slate-200' : 'text-slate-800'}`}>Transparent Background</p>
                         <p className={`text-[11px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                          {exportFormat === 'jpeg' 
-                            ? 'JPEG transparency support nahi karta (Solid White apply hoga).' 
+                          {exportFormat === 'jpeg'
+                            ? 'JPEG transparency support nahi karta (Solid White apply hoga).'
                             : 'Background transparent rahega bina solid color ke.'}
                         </p>
                       </div>
@@ -6944,15 +6712,14 @@ export default function App() {
                       <button
                         type="button"
                         onClick={() => setIsAdvancedExportOpen(prev => !prev)}
-                        className={`w-full flex items-center justify-between p-3.5 rounded-2xl border transition-all ${
-                          isAdvancedExportOpen
-                            ? appTheme === 'dark'
-                              ? 'bg-slate-900 border-cyan-500/50 text-cyan-400 shadow-lg shadow-cyan-950/30'
-                              : 'bg-white border-cyan-500/50 text-cyan-700 shadow-md'
-                            : appTheme === 'dark'
+                        className={`w-full flex items-center justify-between p-3.5 rounded-2xl border transition-all ${isAdvancedExportOpen
+                          ? appTheme === 'dark'
+                            ? 'bg-slate-900 border-cyan-500/50 text-cyan-400 shadow-lg shadow-cyan-950/30'
+                            : 'bg-white border-cyan-500/50 text-cyan-700 shadow-md'
+                          : appTheme === 'dark'
                             ? 'bg-slate-900/60 border-slate-800 text-slate-300 hover:bg-slate-900 hover:border-slate-700'
                             : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                        }`}
+                          }`}
                       >
                         <div className="flex items-center gap-2">
                           <SlidersHorizontal className="w-4 h-4 text-cyan-500" />
@@ -6965,15 +6732,13 @@ export default function App() {
                       </button>
 
                       {isAdvancedExportOpen && (
-                        <div className={`mt-3 p-4 rounded-2xl border space-y-5 animate-in fade-in zoom-in-95 duration-150 ${
-                          appTheme === 'dark' ? 'bg-[#090d16] border-slate-800' : 'bg-slate-50/90 border-slate-200'
-                        }`}>
+                        <div className={`mt-3 p-4 rounded-2xl border space-y-5 animate-in fade-in zoom-in-95 duration-150 ${appTheme === 'dark' ? 'bg-[#090d16] border-slate-800' : 'bg-slate-50/90 border-slate-200'
+                          }`}>
                           {/* 1. CUSTOM FILE NAME & AUTO-TAGGING */}
                           <div className="space-y-2">
                             <div className="flex items-center justify-between">
-                              <label className={`text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${
-                                appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
-                              }`}>
+                              <label className={`text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
+                                }`}>
                                 <FileText className="w-3.5 h-3.5 text-cyan-500" />
                                 <span>Custom File Name</span>
                               </label>
@@ -6988,11 +6753,10 @@ export default function App() {
                                 value={exportCustomFilename}
                                 onChange={(e) => setExportCustomFilename(e.target.value)}
                                 placeholder={selectedAsset?.title || 'my-custom-icon'}
-                                className={`w-full py-2 pl-3 pr-8 rounded-xl text-xs font-medium border transition outline-none ${
-                                  appTheme === 'dark'
-                                    ? 'bg-slate-900 border-slate-700 text-slate-100 placeholder-slate-500 focus:border-cyan-500'
-                                    : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400 focus:border-cyan-500'
-                                }`}
+                                className={`w-full py-2 pl-3 pr-8 rounded-xl text-xs font-medium border transition outline-none ${appTheme === 'dark'
+                                  ? 'bg-slate-900 border-slate-700 text-slate-100 placeholder-slate-500 focus:border-cyan-500'
+                                  : 'bg-white border-slate-300 text-slate-900 placeholder-slate-400 focus:border-cyan-500'
+                                  }`}
                               />
                               {exportCustomFilename && (
                                 <button
@@ -7008,9 +6772,8 @@ export default function App() {
 
                             {/* Auto Tag Dimensions Toggle */}
                             <div className="flex items-center justify-between pt-1">
-                              <label className={`text-[11px] flex items-center gap-2 cursor-pointer ${
-                                appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'
-                              }`}>
+                              <label className={`text-[11px] flex items-center gap-2 cursor-pointer ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'
+                                }`}>
                                 <input
                                   type="checkbox"
                                   checked={exportAutoTagDimensions}
@@ -7022,9 +6785,8 @@ export default function App() {
                             </div>
 
                             {/* Live Name Preview */}
-                            <div className={`p-2 rounded-xl border text-[11px] font-mono break-all flex items-center gap-1.5 ${
-                              appTheme === 'dark' ? 'bg-slate-900/90 border-slate-800 text-slate-400' : 'bg-white border-slate-200 text-slate-600'
-                            }`}>
+                            <div className={`p-2 rounded-xl border text-[11px] font-mono break-all flex items-center gap-1.5 ${appTheme === 'dark' ? 'bg-slate-900/90 border-slate-800 text-slate-400' : 'bg-white border-slate-200 text-slate-600'
+                              }`}>
                               <span className="text-cyan-500 font-bold shrink-0">Output:</span>
                               <span className="text-slate-200 font-semibold truncate">
                                 {((exportCustomFilename.trim() || selectedAsset?.title || 'icon')
@@ -7037,9 +6799,8 @@ export default function App() {
                           {/* 2. FILE SIZE & QUALITY COMPRESSION */}
                           <div className="space-y-2.5 pt-1 border-t border-slate-800/60">
                             <div className="flex items-center justify-between">
-                              <label className={`text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${
-                                appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
-                              }`}>
+                              <label className={`text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
+                                }`}>
                                 <Zap className="w-3.5 h-3.5 text-amber-400" />
                                 <span>Compression &amp; Quality</span>
                               </label>
@@ -7070,13 +6831,12 @@ export default function App() {
                                   key={preset.label}
                                   type="button"
                                   onClick={() => setExportQuality(preset.q)}
-                                  className={`py-1 rounded-lg text-[10px] font-semibold border transition ${
-                                    exportQuality === preset.q
-                                      ? 'bg-blue-600 border-blue-400 text-white shadow'
-                                      : appTheme === 'dark'
+                                  className={`py-1 rounded-lg text-[10px] font-semibold border transition ${exportQuality === preset.q
+                                    ? 'bg-blue-600 border-blue-400 text-white shadow'
+                                    : appTheme === 'dark'
                                       ? 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
                                       : 'bg-white border-slate-200 text-slate-600 hover:text-slate-900'
-                                  }`}
+                                    }`}
                                 >
                                   {preset.label}
                                 </button>
@@ -7084,9 +6844,8 @@ export default function App() {
                             </div>
 
                             {/* Estimated File Size Indicator */}
-                            <div className={`p-2.5 rounded-xl border flex items-center justify-between text-[11px] ${
-                              appTheme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'
-                            }`}>
+                            <div className={`p-2.5 rounded-xl border flex items-center justify-between text-[11px] ${appTheme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'
+                              }`}>
                               <span className={appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}>
                                 Estimated Size:
                               </span>
@@ -7112,9 +6871,8 @@ export default function App() {
                           {/* 3. SOLID / GRADIENT BACKGROUND SELECTOR */}
                           <div className="space-y-3 pt-1 border-t border-slate-800/60">
                             <div className="flex items-center justify-between">
-                              <label className={`text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${
-                                appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
-                              }`}>
+                              <label className={`text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
+                                }`}>
                                 <Palette className="w-3.5 h-3.5 text-cyan-500" />
                                 <span>Export Background Fill</span>
                               </label>
@@ -7126,7 +6884,7 @@ export default function App() {
                             </div>
 
                             <p className={`text-[10px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                              {isTransparent 
+                              {isTransparent
                                 ? 'Notice: Upar "Transparent Background" uncheck karne par ye background render hoga.'
                                 : 'Active background: Download hone wali file me ye background apply hoga.'}
                             </p>
@@ -7139,11 +6897,10 @@ export default function App() {
                                   setExportBgType('solid');
                                   if (isTransparent) setIsTransparent(false);
                                 }}
-                                className={`py-1.5 rounded-lg text-xs font-semibold transition ${
-                                  exportBgType === 'solid'
-                                    ? 'bg-blue-600 text-white shadow'
-                                    : 'text-slate-400 hover:text-white'
-                                }`}
+                                className={`py-1.5 rounded-lg text-xs font-semibold transition ${exportBgType === 'solid'
+                                  ? 'bg-blue-600 text-white shadow'
+                                  : 'text-slate-400 hover:text-white'
+                                  }`}
                               >
                                 Solid Color
                               </button>
@@ -7153,11 +6910,10 @@ export default function App() {
                                   setExportBgType('gradient');
                                   if (isTransparent) setIsTransparent(false);
                                 }}
-                                className={`py-1.5 rounded-lg text-xs font-semibold transition ${
-                                  exportBgType === 'gradient'
-                                    ? 'bg-blue-600 text-white shadow'
-                                    : 'text-slate-400 hover:text-white'
-                                }`}
+                                className={`py-1.5 rounded-lg text-xs font-semibold transition ${exportBgType === 'gradient'
+                                  ? 'bg-blue-600 text-white shadow'
+                                  : 'text-slate-400 hover:text-white'
+                                  }`}
                               >
                                 Gradient Fill
                               </button>
@@ -7168,7 +6924,7 @@ export default function App() {
                               <div className="space-y-2">
                                 <div className="flex items-center gap-1.5 flex-wrap">
                                   {[
-                                    '#FFFFFF', '#0b0f19', '#000000', '#082f49', 
+                                    '#FFFFFF', '#0b0f19', '#000000', '#082f49',
                                     '#1e1b4b', '#064e3b', '#4c0519', '#7c2d12'
                                   ].map((c) => (
                                     <button
@@ -7179,11 +6935,10 @@ export default function App() {
                                         if (isTransparent) setIsTransparent(false);
                                       }}
                                       title={c}
-                                      className={`w-7 h-7 rounded-full border-2 transition-transform hover:scale-110 relative ${
-                                        exportBgSolidColor.toLowerCase() === c.toLowerCase()
-                                          ? 'border-cyan-400 ring-2 ring-cyan-400/40 scale-110'
-                                          : 'border-slate-700'
-                                      }`}
+                                      className={`w-7 h-7 rounded-full border-2 transition-transform hover:scale-110 relative ${exportBgSolidColor.toLowerCase() === c.toLowerCase()
+                                        ? 'border-cyan-400 ring-2 ring-cyan-400/40 scale-110'
+                                        : 'border-slate-700'
+                                        }`}
                                       style={{ backgroundColor: c }}
                                     />
                                   ))}
@@ -7206,9 +6961,8 @@ export default function App() {
                                       setExportBgSolidColor(e.target.value);
                                       if (isTransparent) setIsTransparent(false);
                                     }}
-                                    className={`w-28 py-1 px-2.5 rounded-lg text-xs font-mono font-bold uppercase border ${
-                                      appTheme === 'dark' ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-300 text-slate-900'
-                                    }`}
+                                    className={`w-28 py-1 px-2.5 rounded-lg text-xs font-mono font-bold uppercase border ${appTheme === 'dark' ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-300 text-slate-900'
+                                      }`}
                                   />
                                 </div>
                               </div>
@@ -7235,16 +6989,14 @@ export default function App() {
                                           setExportBgGradient(prev => ({ ...prev, from: g.from, to: g.to, preset: g.id }));
                                           if (isTransparent) setIsTransparent(false);
                                         }}
-                                        className={`h-12 rounded-xl border p-1 text-left flex flex-col justify-end transition-transform hover:scale-105 ${
-                                          isSelected
-                                            ? 'border-cyan-400 ring-2 ring-cyan-400/40 shadow-lg'
-                                            : 'border-slate-800'
-                                        }`}
+                                        className={`h-12 rounded-xl border p-1 text-left flex flex-col justify-end transition-transform hover:scale-105 ${isSelected
+                                          ? 'border-cyan-400 ring-2 ring-cyan-400/40 shadow-lg'
+                                          : 'border-slate-800'
+                                          }`}
                                         style={{ background: `linear-gradient(135deg, ${g.from}, ${g.to})` }}
                                       >
-                                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded backdrop-blur-md ${
-                                          g.id === 'frost' ? 'bg-black/60 text-white' : 'bg-black/50 text-white'
-                                        }`}>
+                                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded backdrop-blur-md ${g.id === 'frost' ? 'bg-black/60 text-white' : 'bg-black/50 text-white'
+                                          }`}>
                                           {g.name}
                                         </span>
                                       </button>
@@ -7265,13 +7017,12 @@ export default function App() {
                                         key={a.angle}
                                         type="button"
                                         onClick={() => setExportBgGradient(prev => ({ ...prev, angle: a.angle }))}
-                                        className={`px-2 py-0.5 rounded border text-[10px] font-semibold transition ${
-                                          exportBgGradient.angle === a.angle
-                                            ? 'bg-cyan-600 text-white border-cyan-400'
-                                            : appTheme === 'dark'
+                                        className={`px-2 py-0.5 rounded border text-[10px] font-semibold transition ${exportBgGradient.angle === a.angle
+                                          ? 'bg-cyan-600 text-white border-cyan-400'
+                                          : appTheme === 'dark'
                                             ? 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'
                                             : 'bg-white text-slate-600 border-slate-200 hover:text-slate-900'
-                                        }`}
+                                          }`}
                                       >
                                         {a.label}
                                       </button>
@@ -7288,11 +7039,10 @@ export default function App() {
                 )}
               </div>
 
-              {/* Bottom Fixed Export Bar (Always accessible) */}
+              {/* Bottom Fixed Export Bar (Always accessible on Desktop) */}
               {studioTab !== 'export' && (
-                <div className={`p-4 border-t flex items-center justify-between gap-3 ${
-                  appTheme === 'dark' ? 'border-slate-800 bg-[#0b0f19]' : 'border-slate-200 bg-slate-50 shadow-inner'
-                }`}>
+                <div className={`hidden lg:flex p-4 border-t items-center justify-between gap-3 ${appTheme === 'dark' ? 'border-slate-800 bg-[#0b0f19]' : 'border-slate-200 bg-slate-50 shadow-inner'
+                  }`}>
                   <div className={`text-xs ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                     <span className={`font-semibold ${appTheme === 'dark' ? 'text-slate-200' : 'text-slate-900'}`}>.{exportFormat.toUpperCase()}</span> &bull; {exportSize >= 1024 ? `${exportSize / 1024}K` : `${exportSize}px`}
                   </div>
@@ -7313,27 +7063,25 @@ export default function App() {
 
       {/* App Settings Modal Panel */}
       {isSettingsOpen && (
-        <div 
+        <div
           className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200"
           onClick={() => setIsSettingsOpen(false)}
         >
-          <div 
-            className={`w-full max-w-lg rounded-2xl sm:rounded-3xl border shadow-2xl p-4 sm:p-7 relative transition-all duration-200 max-h-[90vh] overflow-y-auto ${
-              appTheme === 'dark' 
-                ? 'bg-[#0f172a] border-slate-800 text-slate-100' 
-                : 'bg-white border-slate-200 text-slate-900 shadow-2xl'
-            }`}
+          <div
+            className={`w-full max-w-lg rounded-2xl sm:rounded-3xl border shadow-2xl p-4 sm:p-7 relative transition-all duration-200 max-h-[90vh] overflow-y-auto ${appTheme === 'dark'
+              ? 'bg-[#0f172a] border-slate-800 text-slate-100'
+              : 'bg-white border-slate-200 text-slate-900 shadow-2xl'
+              }`}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className={`flex items-center justify-between pb-3.5 sm:pb-4 border-b mb-4 sm:mb-5 ${
-              appTheme === 'dark' ? 'border-slate-800' : 'border-slate-100'
-            }`}>
+            <div className={`flex items-center justify-between pb-3.5 sm:pb-4 border-b mb-4 sm:mb-5 ${appTheme === 'dark' ? 'border-slate-800' : 'border-slate-100'
+              }`}>
               <div className="flex items-center gap-2.5 sm:gap-3">
-                <img 
-                  src="/app-icon.png" 
-                  alt="Iconderry Icon" 
-                  className="w-10 h-10 rounded-xl object-cover shadow-md shadow-purple-600/30 border border-white/20 flex-shrink-0" 
+                <img
+                  src="/app-icon.png"
+                  alt="Iconderry Icon"
+                  className="w-10 h-10 rounded-xl object-cover shadow-md shadow-purple-600/30 border border-white/20 flex-shrink-0"
                 />
                 <div>
                   <h2 className="text-base sm:text-lg font-bold tracking-tight">App Settings</h2>
@@ -7344,9 +7092,8 @@ export default function App() {
               </div>
               <button
                 onClick={() => setIsSettingsOpen(false)}
-                className={`p-1.5 sm:p-2 rounded-xl transition ${
-                  appTheme === 'dark' ? 'hover:bg-slate-800 text-slate-400 hover:text-white' : 'hover:bg-slate-100 text-slate-500 hover:text-slate-900'
-                }`}
+                className={`p-1.5 sm:p-2 rounded-xl transition ${appTheme === 'dark' ? 'hover:bg-slate-800 text-slate-400 hover:text-white' : 'hover:bg-slate-100 text-slate-500 hover:text-slate-900'
+                  }`}
                 title="Close"
               >
                 <X className="w-5 h-5" />
@@ -7363,9 +7110,8 @@ export default function App() {
 
             <div className="space-y-4 sm:space-y-5">
               {/* 1. DARK MODE ON / OFF TOGGLE */}
-              <div className={`p-3.5 sm:p-4 rounded-2xl border ${
-                appTheme === 'dark' ? 'bg-slate-900/90 border-slate-800' : 'bg-slate-50 border-slate-200'
-              }`}>
+              <div className={`p-3.5 sm:p-4 rounded-2xl border ${appTheme === 'dark' ? 'bg-slate-900/90 border-slate-800' : 'bg-slate-50 border-slate-200'
+                }`}>
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2.5">
                     <div className={`p-2 rounded-xl ${appTheme === 'dark' ? 'bg-slate-800 text-cyan-400' : 'bg-amber-100 text-amber-600'}`}>
@@ -7385,15 +7131,13 @@ export default function App() {
                       const next = appTheme === 'dark' ? 'light' : 'dark';
                       setAppTheme(next);
                     }}
-                    className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors focus:outline-none shadow-inner flex-shrink-0 ${
-                      appTheme === 'dark' ? 'bg-cyan-500' : 'bg-slate-300'
-                    }`}
+                    className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors focus:outline-none shadow-inner flex-shrink-0 ${appTheme === 'dark' ? 'bg-cyan-500' : 'bg-slate-300'
+                      }`}
                     title="Toggle Dark Mode On / Off"
                   >
                     <span
-                      className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-md ${
-                        appTheme === 'dark' ? 'translate-x-8' : 'translate-x-1'
-                      }`}
+                      className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-md ${appTheme === 'dark' ? 'translate-x-8' : 'translate-x-1'
+                        }`}
                     />
                   </button>
                 </div>
@@ -7404,11 +7148,10 @@ export default function App() {
                     onClick={() => {
                       setAppTheme('dark');
                     }}
-                    className={`p-2.5 sm:p-3 rounded-xl border text-left flex items-center justify-between transition ${
-                      appTheme === 'dark'
-                        ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400 ring-2 ring-cyan-500/20'
-                        : 'border-slate-300 bg-white text-slate-700 hover:border-slate-400'
-                    }`}
+                    className={`p-2.5 sm:p-3 rounded-xl border text-left flex items-center justify-between transition ${appTheme === 'dark'
+                      ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400 ring-2 ring-cyan-500/20'
+                      : 'border-slate-300 bg-white text-slate-700 hover:border-slate-400'
+                      }`}
                   >
                     <div className="flex items-center gap-2">
                       <Moon className="w-4 h-4 flex-shrink-0" />
@@ -7424,11 +7167,10 @@ export default function App() {
                     onClick={() => {
                       setAppTheme('light');
                     }}
-                    className={`p-2.5 sm:p-3 rounded-xl border text-left flex items-center justify-between transition ${
-                      appTheme === 'light'
-                        ? 'border-blue-600 bg-blue-50 text-blue-600 ring-2 ring-blue-600/20'
-                        : 'border-slate-800 bg-slate-900 text-slate-400 hover:text-slate-200'
-                    }`}
+                    className={`p-2.5 sm:p-3 rounded-xl border text-left flex items-center justify-between transition ${appTheme === 'light'
+                      ? 'border-blue-600 bg-blue-50 text-blue-600 ring-2 ring-blue-600/20'
+                      : 'border-slate-800 bg-slate-900 text-slate-400 hover:text-slate-200'
+                      }`}
                   >
                     <div className="flex items-center gap-2">
                       <Sun className="w-4 h-4 text-amber-500 flex-shrink-0" />
@@ -7443,12 +7185,10 @@ export default function App() {
               </div>
 
               {/* 3. DEFAULT EXPORT CONFIGURATION */}
-              <div className={`p-4 rounded-2xl border ${
-                appTheme === 'dark' ? 'bg-slate-900/90 border-slate-800' : 'bg-slate-50 border-slate-200'
-              }`}>
-                <h3 className={`text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-2 ${
-                  appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'
+              <div className={`p-4 rounded-2xl border ${appTheme === 'dark' ? 'bg-slate-900/90 border-slate-800' : 'bg-slate-50 border-slate-200'
                 }`}>
+                <h3 className={`text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-2 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'
+                  }`}>
                   <Download className="w-3.5 h-3.5 text-cyan-400" /> Default Export Format
                 </h3>
                 <div className="grid grid-cols-5 gap-1.5">
@@ -7461,13 +7201,12 @@ export default function App() {
                         setSettingsToast(`Default format set to .${fmt.toUpperCase()}`);
                         setTimeout(() => setSettingsToast(''), 2500);
                       }}
-                      className={`py-2 rounded-xl text-xs font-semibold uppercase transition border ${
-                        exportFormat === fmt
-                          ? 'bg-blue-600 text-white border-blue-500 shadow-sm'
-                          : appTheme === 'dark'
-                            ? 'bg-slate-800/80 border-slate-800 text-slate-400 hover:text-white'
-                            : 'bg-white border-slate-200 text-slate-600 hover:text-slate-900'
-                      }`}
+                      className={`py-2 rounded-xl text-xs font-semibold uppercase transition border ${exportFormat === fmt
+                        ? 'bg-blue-600 text-white border-blue-500 shadow-sm'
+                        : appTheme === 'dark'
+                          ? 'bg-slate-800/80 border-slate-800 text-slate-400 hover:text-white'
+                          : 'bg-white border-slate-200 text-slate-600 hover:text-slate-900'
+                        }`}
                     >
                       .{fmt}
                     </button>
@@ -7476,15 +7215,13 @@ export default function App() {
               </div>
 
               {/* 4. DATA & STORAGE MANAGEMENT */}
-              <div className={`p-4 rounded-2xl border ${
-                appTheme === 'dark' ? 'bg-slate-900/90 border-slate-800' : 'bg-slate-50 border-slate-200'
-              }`}>
+              <div className={`p-4 rounded-2xl border ${appTheme === 'dark' ? 'bg-slate-900/90 border-slate-800' : 'bg-slate-50 border-slate-200'
+                }`}>
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <HardDrive className="w-4 h-4 text-cyan-400" />
-                    <span className={`text-xs font-bold uppercase tracking-wider ${
-                      appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'
-                    }`}>
+                    <span className={`text-xs font-bold uppercase tracking-wider ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'
+                      }`}>
                       Library Storage
                     </span>
                   </div>
@@ -7505,11 +7242,10 @@ export default function App() {
                       setTimeout(() => setSettingsToast(''), 3000);
                     }
                   }}
-                  className={`w-full py-2.5 rounded-xl text-xs font-semibold border flex items-center justify-center gap-2 transition ${
-                    appTheme === 'dark'
-                      ? 'border-slate-800 bg-slate-800 hover:bg-slate-700 text-slate-200'
-                      : 'border-slate-200 bg-white hover:bg-slate-100 text-slate-700 shadow-sm'
-                  }`}
+                  className={`w-full py-2.5 rounded-xl text-xs font-semibold border flex items-center justify-center gap-2 transition ${appTheme === 'dark'
+                    ? 'border-slate-800 bg-slate-800 hover:bg-slate-700 text-slate-200'
+                    : 'border-slate-200 bg-white hover:bg-slate-100 text-slate-700 shadow-sm'
+                    }`}
                 >
                   <RotateCcw className="w-3.5 h-3.5 text-cyan-400" />
                   <span>Reset / Reload Default Icon Library</span>
@@ -7518,9 +7254,8 @@ export default function App() {
             </div>
 
             {/* Footer */}
-            <div className={`mt-6 pt-4 border-t flex items-center justify-between ${
-              appTheme === 'dark' ? 'border-slate-800' : 'border-slate-100'
-            }`}>
+            <div className={`mt-6 pt-4 border-t flex items-center justify-between ${appTheme === 'dark' ? 'border-slate-800' : 'border-slate-100'
+              }`}>
               <span className={`text-[11px] ${appTheme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
                 Iconderry Studio &bull; Pro Suite v2.4
               </span>
@@ -7538,9 +7273,8 @@ export default function App() {
       {/* Legal & Feedback Modals */}
       {activeLegalModal && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
-          <div className={`border rounded-2xl sm:rounded-3xl p-5 sm:p-7 max-w-lg w-full shadow-2xl relative max-h-[85vh] overflow-y-auto ${
-            appTheme === 'dark' ? 'bg-[#0f172a] border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-900 shadow-2xl'
-          }`}>
+          <div className={`border rounded-2xl sm:rounded-3xl p-5 sm:p-7 max-w-lg w-full shadow-2xl relative max-h-[85vh] overflow-y-auto ${appTheme === 'dark' ? 'bg-[#0f172a] border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-900 shadow-2xl'
+            }`}>
             <button
               onClick={() => setActiveLegalModal(null)}
               className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-slate-800/40 text-slate-400 hover:text-white transition"
@@ -7554,9 +7288,8 @@ export default function App() {
                 <div className="flex items-center gap-2 text-emerald-400 font-bold text-base">
                   <Shield className="w-5 h-5" /> Commercial &amp; Personal License
                 </div>
-                <div className={`p-3 rounded-xl border text-xs leading-relaxed space-y-2 ${
-                  appTheme === 'dark' ? 'bg-slate-900/80 border-slate-800 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
-                }`}>
+                <div className={`p-3 rounded-xl border text-xs leading-relaxed space-y-2 ${appTheme === 'dark' ? 'bg-slate-900/80 border-slate-800 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
+                  }`}>
                   <p><strong>100% Free &amp; Royalty-Free:</strong> All icons customized or downloaded on Iconderry can be used freely in personal and commercial projects without any license fee.</p>
                   <p><strong>Allowed:</strong> Websites, web apps, iOS/Android mobile apps, marketing graphics, presentations, social media, printed merchandise, and UI design kits.</p>
                   <p><strong>Attribution:</strong> Attribution is appreciated but not mandatory.</p>
@@ -7569,11 +7302,10 @@ export default function App() {
                 <div className="flex items-center gap-2 text-cyan-400 font-bold text-base">
                   <Shield className="w-5 h-5" /> Privacy Policy
                 </div>
-                <div className={`p-3 rounded-xl border text-xs leading-relaxed space-y-2 ${
-                  appTheme === 'dark' ? 'bg-slate-900/80 border-slate-800 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
-                }`}>
+                <div className={`p-3 rounded-xl border text-xs leading-relaxed space-y-2 ${appTheme === 'dark' ? 'bg-slate-900/80 border-slate-800 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
+                  }`}>
                   <p><strong>Zero Tracking:</strong> Iconderry does not sell personal data, inject third-party ad trackers, or log your vector designs.</p>
-                  <p><strong>Local Storage:</strong> Your preferences, recently opened icons, and favorite items are stored securely inside your browser's local storage.</p>
+                  <p><strong>Local Storage:</strong> Your preferences and favorite items are stored securely inside your browser's local storage.</p>
                   <p><strong>Cloud Assets:</strong> Community assets are served securely via cloud storage for fast global performance.</p>
                 </div>
               </div>
@@ -7584,9 +7316,8 @@ export default function App() {
                 <div className="flex items-center gap-2 text-cyan-400 font-bold text-base">
                   <FileText className="w-5 h-5" /> Terms of Service
                 </div>
-                <div className={`p-3 rounded-xl border text-xs leading-relaxed space-y-2 ${
-                  appTheme === 'dark' ? 'bg-slate-900/80 border-slate-800 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
-                }`}>
+                <div className={`p-3 rounded-xl border text-xs leading-relaxed space-y-2 ${appTheme === 'dark' ? 'bg-slate-900/80 border-slate-800 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
+                  }`}>
                   <p>Iconderry provides vector icon generation, styling, and export tools "as is".</p>
                   <p>Users are responsible for ensuring any custom SVG assets uploaded do not violate third-party trademarks or copyrights.</p>
                 </div>
@@ -7598,9 +7329,8 @@ export default function App() {
                 <div className="flex items-center gap-2 text-cyan-400 font-bold text-base">
                   <Info className="w-5 h-5" /> About Iconderry
                 </div>
-                <div className={`p-3 rounded-xl border text-xs leading-relaxed space-y-2 ${
-                  appTheme === 'dark' ? 'bg-slate-900/80 border-slate-800 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
-                }`}>
+                <div className={`p-3 rounded-xl border text-xs leading-relaxed space-y-2 ${appTheme === 'dark' ? 'bg-slate-900/80 border-slate-800 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
+                  }`}>
                   <p><strong>Iconderry</strong> is built for creators, software engineers, and product designers who need fast, pixel-perfect, and customizable vector graphics.</p>
                   <p>Unlike traditional static icon libraries, Iconderry provides a full-featured real-time vector studio with 29+ material shaders, granular filter color grading, custom stroke weights, and app icon squircle badges.</p>
                 </div>
@@ -7638,9 +7368,8 @@ export default function App() {
                         placeholder="e.g. Sahil"
                         value={feedbackForm.name}
                         onChange={(e) => setFeedbackForm({ ...feedbackForm, name: e.target.value })}
-                        className={`w-full px-3 py-2 rounded-xl border focus:outline-none focus:border-cyan-500 ${
-                          appTheme === 'dark' ? 'bg-slate-900 border-slate-800 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
-                        }`}
+                        className={`w-full px-3 py-2 rounded-xl border focus:outline-none focus:border-cyan-500 ${appTheme === 'dark' ? 'bg-slate-900 border-slate-800 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
+                          }`}
                       />
                     </div>
                     <div>
@@ -7650,9 +7379,8 @@ export default function App() {
                         placeholder="name@example.com"
                         value={feedbackForm.email}
                         onChange={(e) => setFeedbackForm({ ...feedbackForm, email: e.target.value })}
-                        className={`w-full px-3 py-2 rounded-xl border focus:outline-none focus:border-cyan-500 ${
-                          appTheme === 'dark' ? 'bg-slate-900 border-slate-800 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
-                        }`}
+                        className={`w-full px-3 py-2 rounded-xl border focus:outline-none focus:border-cyan-500 ${appTheme === 'dark' ? 'bg-slate-900 border-slate-800 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
+                          }`}
                       />
                     </div>
                     <div>
@@ -7663,9 +7391,8 @@ export default function App() {
                         placeholder="e.g. Please add an e-commerce shopping bag or crypto token icons pack..."
                         value={feedbackForm.message}
                         onChange={(e) => setFeedbackForm({ ...feedbackForm, message: e.target.value })}
-                        className={`w-full px-3 py-2 rounded-xl border focus:outline-none focus:border-cyan-500 ${
-                          appTheme === 'dark' ? 'bg-slate-900 border-slate-800 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
-                        }`}
+                        className={`w-full px-3 py-2 rounded-xl border focus:outline-none focus:border-cyan-500 ${appTheme === 'dark' ? 'bg-slate-900 border-slate-800 text-white' : 'bg-slate-50 border-slate-300 text-slate-900'
+                          }`}
                       />
                     </div>
                     <button
