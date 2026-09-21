@@ -150,11 +150,15 @@ export async function downloadAsset({
         drawCanvasBgShape(ctx, targetWidth, targetHeight, adjustments);
       }
 
-      // 3. Scale blur and glow relative to preview baseline (384px) for exact visual parity at any resolution (1K to 8K)
+      // 3. Scale blur and glow relative to preview baseline (384px) with safe hardware kernel caps
+      // Massive unconstrained blur kernels at 8K crash Chromium/Safari's Skia 2D rasterizer due to OOM
       const scaleFactor = Math.max(targetWidth, targetHeight) / 384;
+      const maxGlowRadius = Math.min(72, 18 + scaleFactor * 2.5);
       const scaledGlow = adjustments.shadowBlur > 0 
-        ? adjustments.shadowBlur * scaleFactor 
+        ? Math.min(adjustments.shadowBlur * scaleFactor, maxGlowRadius)
         : 0;
+      const maxBlurRadius = Math.min(48, (adjustments.blur || 0) * scaleFactor);
+      const scaledBlur = adjustments.blur > 0 ? maxBlurRadius : 0;
 
       const filterRules = [
         `hue-rotate(${adjustments.hue}deg)`,
@@ -164,7 +168,7 @@ export async function downloadAsset({
         `sepia(${adjustments.sepia}%)`,
         `invert(${adjustments.invert}%)`,
         `opacity(${adjustments.opacity}%)`,
-        adjustments.blur > 0 ? `blur(${adjustments.blur * scaleFactor}px)` : '',
+        scaledBlur > 0 ? `blur(${scaledBlur}px)` : '',
         scaledGlow > 0 
           ? `drop-shadow(0px 0px ${scaledGlow}px ${adjustments.shadowColor || '#38bdf8'}) drop-shadow(0px 0px ${Math.max(1, Math.round(scaledGlow * 0.4))}px ${adjustments.shadowColor || '#38bdf8'})` 
           : ''
@@ -220,11 +224,19 @@ export async function downloadAsset({
         ctx.restore();
       } else {
         // True 3D Hardware Perspective Path:
-        // Provide generous glowPad margin (30% of dimension) around img in offCanvas so diffuse glow fades completely to 0 alpha before reaching texture edges.
-        // This eliminates the square card / clipped bounding box artifact in 3D exports.
-        const glowPad = Math.round(Math.max(drawWidth, drawHeight) * 0.32);
-        const texW = Math.round(drawWidth + glowPad * 2);
-        const texH = Math.round(drawHeight + glowPad * 2);
+        // Provide generous glowPad margin (28% of dimension) around img in offCanvas so diffuse glow fades completely to 0 alpha before reaching texture edges.
+        // Cap intermediate offCanvas to max 3072 to avoid GPU VRAM exhaustion at 8K while retaining razor-sharp bicubic 8K output.
+        const glowPad = Math.round(Math.max(drawWidth, drawHeight) * 0.28);
+        const rawTexW = Math.round(drawWidth + glowPad * 2);
+        const rawTexH = Math.round(drawHeight + glowPad * 2);
+
+        const maxIntermediate = 3072;
+        const texScale = Math.min(1, maxIntermediate / Math.max(rawTexW, rawTexH));
+        const texW = Math.round(rawTexW * texScale);
+        const texH = Math.round(rawTexH * texScale);
+        const innerDrawW = Math.round(drawWidth * texScale);
+        const innerDrawH = Math.round(drawHeight * texScale);
+        const innerPad = Math.round(glowPad * texScale);
 
         const offCanvas = document.createElement('canvas');
         offCanvas.width = texW;
@@ -234,11 +246,11 @@ export async function downloadAsset({
           offCtx.imageSmoothingEnabled = true;
           offCtx.imageSmoothingQuality = 'high';
           offCtx.filter = filterRules || 'none';
-          offCtx.drawImage(img, glowPad, glowPad, drawWidth, drawHeight);
+          offCtx.drawImage(img, innerPad, innerPad, innerDrawW, innerDrawH);
         }
 
         // Render 3D perspective quad via WebGL with zero slicing and seamless borderless glow
-        const webglCanvas = render3DWithWebGL(offCtx ? offCanvas : img, targetWidth, targetHeight, adjustments, texW, texH);
+        const webglCanvas = render3DWithWebGL(offCtx ? offCanvas : img, targetWidth, targetHeight, adjustments, rawTexW, rawTexH);
 
         if (webglCanvas) {
           // 3. Optional 3D elevation shadow (single-pass continuous blur, zero streaks)
@@ -251,14 +263,23 @@ export async function downloadAsset({
             const sColor = adjustments.depth3DColor || 'rgba(0,0,0,0.55)';
 
             ctx.save();
-            ctx.filter = `blur(${Math.max(2, Math.round(depth * 0.5))}px) drop-shadow(0 0 ${Math.round(depth * 0.4)}px ${sColor})`;
+            const safeShadowBlur = Math.min(36, Math.max(2, Math.round(depth * 0.5)));
+            ctx.filter = `blur(${safeShadowBlur}px) drop-shadow(0 0 ${Math.min(32, Math.round(depth * 0.4))}px ${sColor})`;
             ctx.globalAlpha = 0.55;
-            ctx.drawImage(webglCanvas, offX, offY);
+            ctx.drawImage(webglCanvas, offX, offY, targetWidth, targetHeight);
             ctx.restore();
           }
 
           // 4. Draw pristine 3D icon
-          ctx.drawImage(webglCanvas, 0, 0);
+          ctx.drawImage(webglCanvas, 0, 0, targetWidth, targetHeight);
+
+          // Free intermediate textures immediately from GPU memory
+          try {
+            webglCanvas.width = 0;
+            webglCanvas.height = 0;
+            offCanvas.width = 0;
+            offCanvas.height = 0;
+          } catch (_) {}
         } else {
           // Fallback if WebGL unavailable: 2D affine perspective (zero slices)
           ctx.save();
@@ -537,9 +558,23 @@ function mat4Multiply(out, a, b) {
 }
 
 function render3DWithWebGL(imageSource, targetWidth, targetHeight, adjustments, drawWidth, drawHeight) {
+  // Cap WebGL canvas to max 3840 (or device MAX_TEXTURE_SIZE) for rock-solid stability and zero memory overflow at 8K
+  let maxTexSize = 4096;
+  try {
+    const testC = document.createElement('canvas');
+    const testGl = testC.getContext('webgl');
+    if (testGl) {
+      maxTexSize = testGl.getParameter(testGl.MAX_TEXTURE_SIZE) || 4096;
+    }
+  } catch (_) {}
+
+  const renderW = Math.min(targetWidth, maxTexSize, 3840);
+  const renderH = Math.min(targetHeight, maxTexSize, 3840);
+  const scale = renderW / targetWidth;
+
   const canvas = document.createElement('canvas');
-  canvas.width = targetWidth;
-  canvas.height = targetHeight;
+  canvas.width = renderW;
+  canvas.height = renderH;
   const gl = canvas.getContext('webgl', { 
     antialias: true, 
     alpha: true, 
@@ -548,7 +583,7 @@ function render3DWithWebGL(imageSource, targetWidth, targetHeight, adjustments, 
   });
   if (!gl) return null;
 
-  gl.viewport(0, 0, targetWidth, targetHeight);
+  gl.viewport(0, 0, renderW, renderH);
   gl.clearColor(0, 0, 0, 0);
   gl.clear(gl.COLOR_BUFFER_BIT);
 
@@ -587,9 +622,9 @@ function render3DWithWebGL(imageSource, targetWidth, targetHeight, adjustments, 
   gl.linkProgram(program);
   gl.useProgram(program);
 
-  // Quad geometry (2 triangles)
-  const hw = drawWidth / 2;
-  const hh = drawHeight / 2;
+  // Quad geometry (2 triangles) scaled to WebGL buffer
+  const hw = (drawWidth * scale) / 2;
+  const hh = (drawHeight * scale) / 2;
 
   const positions = new Float32Array([
     -hw, -hh,
@@ -641,7 +676,7 @@ function render3DWithWebGL(imageSource, targetWidth, targetHeight, adjustments, 
   const tanSkY = Math.tan(((adjustments.skewY || 0) * Math.PI) / 180);
   const scaleX = adjustments.flipH ? -1 : 1;
   const scaleY = adjustments.flipV ? -1 : 1;
-  const persp = (adjustments.perspective || 800) * (targetWidth / 384);
+  const persp = (adjustments.perspective || 800) * (renderW / 384);
 
   // Flip
   const Sflip = new Float32Array([

@@ -53,3 +53,23 @@ createRoot(document.getElementById('root')).render(
   </StrictMode>,
 )
 
+// Register service worker for PWA browser installation & offline asset caching
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch((err) => {
+      console.debug('ServiceWorker registration optional:', err);
+    });
+  });
+}
+
+// Add native capacitor flag class to root element for status bar safe-area insets (ONLY IN NATIVE APK)
+if (typeof window !== 'undefined') {
+  const isNative = window.Capacitor?.isNativePlatform?.() || (window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform());
+  if (isNative) {
+    document.documentElement.classList.add('is-native-capacitor');
+  }
+}
+
+
+
+

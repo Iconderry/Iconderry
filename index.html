@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Iconderry - Free Vector Icons, SVG Studio & Custom Asset Generator</title>
     <meta name="description" content="Discover, customize, and export thousands of high-quality vector icons with live 3D effects, gradient filters, colors, and background badges." />
     <meta name="keywords" content="icons, vector icons, svg editor, flaticon alternative, app icon generator, free svgs, icon studio, graphic assets" />
@@ -21,8 +21,23 @@
     <meta property="twitter:description" content="Customize, style, and download production-ready SVG & PNG vector icons with live material effects, filters, and background tiles." />
     <meta property="twitter:image" content="/app-icon.png" />
 
-    <link rel="icon" type="image/png" href="/favicon.png" />
-    <link rel="apple-touch-icon" href="/app-icon.png" />
+    <!-- Web App Manifest for Browser App Download & Home Screen Icon -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="application-name" content="Iconderry" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Iconderry" />
+
+    <!-- Favicons and Installed App Icons -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/pwa-192x192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/pwa-512x512.png" />
+    <link rel="shortcut icon" href="/pwa-192x192.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="apple-touch-icon" sizes="192x192" href="/pwa-192x192.png" />
+    <link rel="apple-touch-icon" sizes="512x512" href="/pwa-512x512.png" />
   </head>
   <body>
     <div id="root"></div>

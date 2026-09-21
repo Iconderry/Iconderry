@@ -1374,6 +1374,13 @@ export default function App() {
           layerDragStartPosRef.current = { x: e.clientX, y: e.clientY };
           dragInitialSnapshotRef.current = getStudioSnapshotRef.current ? getStudioSnapshotRef.current() : null;
 
+          // Capture pointer so dragging continues smoothly on mobile touch screens
+          try {
+            if (e.pointerId !== undefined && targetLayerEl.setPointerCapture) {
+              targetLayerEl.setPointerCapture(e.pointerId);
+            }
+          } catch (_) {}
+
           // Store initial transforms for all active layers so they move together in sync
           const initialTransforms = {};
           activeIds.forEach(id => {
@@ -1390,39 +1397,55 @@ export default function App() {
           const scaleY = (svgRect && svgRect.height > 0) ? (vbHeight / svgRect.height) : 1;
 
           let hasActuallyMoved = false;
-          const DRAG_THRESHOLD = 5; // px: require distinct drag motion before mutating transforms so plain clicks/selections never modify rotation or coordinates
+          const DRAG_THRESHOLD = 3; // px: lowered for responsive mobile finger touch dragging
+          let dragRafId = null;
 
           const handleLayerMove = (moveEvt) => {
             if (!isDraggingLayerRef.current) return;
-            const rawDx = moveEvt.clientX - layerDragStartPosRef.current.x;
-            const rawDy = moveEvt.clientY - layerDragStartPosRef.current.y;
+            const clientX = moveEvt.clientX ?? moveEvt.touches?.[0]?.clientX ?? 0;
+            const clientY = moveEvt.clientY ?? moveEvt.touches?.[0]?.clientY ?? 0;
+            const rawDx = clientX - layerDragStartPosRef.current.x;
+            const rawDy = clientY - layerDragStartPosRef.current.y;
 
             if (!hasActuallyMoved) {
               if (Math.hypot(rawDx, rawDy) < DRAG_THRESHOLD) {
-                return; // Plain click or tap to select: do NOT touch transforms!
+                return; // Plain tap: do NOT touch transforms!
               }
               hasActuallyMoved = true;
             }
 
-            moveEvt.preventDefault();
-            const svgDx = Math.round(rawDx * scaleX);
-            const svgDy = Math.round(rawDy * scaleY);
+            if (moveEvt.preventDefault) moveEvt.preventDefault();
+            if (dragRafId) return;
+            dragRafId = requestAnimationFrame(() => {
+              dragRafId = null;
+              const svgDx = Math.round(rawDx * scaleX);
+              const svgDy = Math.round(rawDy * scaleY);
 
-            setLayerTransforms(prev => {
-              const updated = { ...prev };
-              activeIds.forEach(id => {
-                const init = initialTransforms[id] || { x: 0, y: 0, rotate: 0 };
-                updated[id] = {
-                  ...(prev[id] || { rotate: 0 }),
-                  x: init.x + svgDx,
-                  y: init.y + svgDy
-                };
+              setLayerTransforms(prev => {
+                const updated = { ...prev };
+                activeIds.forEach(id => {
+                  const init = initialTransforms[id] || { x: 0, y: 0, rotate: 0 };
+                  updated[id] = {
+                    ...(prev[id] || { rotate: 0 }),
+                    x: init.x + svgDx,
+                    y: init.y + svgDy
+                  };
+                });
+                return updated;
               });
-              return updated;
             });
           };
 
           const handleLayerUp = () => {
+            if (dragRafId) {
+              cancelAnimationFrame(dragRafId);
+              dragRafId = null;
+            }
+            try {
+              if (e.pointerId !== undefined && targetLayerEl.releasePointerCapture) {
+                targetLayerEl.releasePointerCapture(e.pointerId);
+              }
+            } catch (_) {}
             if (isDraggingLayerRef.current) {
               isDraggingLayerRef.current = false;
               if (hasActuallyMoved && dragInitialSnapshotRef.current) {
@@ -1438,11 +1461,17 @@ export default function App() {
             window.removeEventListener('pointermove', handleLayerMove);
             window.removeEventListener('pointerup', handleLayerUp);
             window.removeEventListener('pointercancel', handleLayerUp);
+            window.removeEventListener('touchmove', handleLayerMove);
+            window.removeEventListener('touchend', handleLayerUp);
+            window.removeEventListener('touchcancel', handleLayerUp);
           };
 
           window.addEventListener('pointermove', handleLayerMove);
           window.addEventListener('pointerup', handleLayerUp);
           window.addEventListener('pointercancel', handleLayerUp);
+          window.addEventListener('touchmove', handleLayerMove, { passive: false });
+          window.addEventListener('touchend', handleLayerUp);
+          window.addEventListener('touchcancel', handleLayerUp);
           return;
         }
       }
@@ -1897,6 +1926,82 @@ export default function App() {
         cancelAnimationFrame(animFrameIdRef.current);
         animFrameIdRef.current = null;
       }
+    };
+  }, [selectedAsset]);
+
+  // Native two-finger Pinch-to-Zoom & Fluid Pan Gesture Handler for Mobile Canvas
+  useEffect(() => {
+    const wsEl = canvasWorkspaceRef.current;
+    if (!wsEl || !selectedAsset) return;
+
+    let initialPinchDist = 0;
+    let initialZoom = 1;
+    let initialPan = { x: 0, y: 0 };
+    let initialMid = { x: 0, y: 0 };
+    let isPinching = false;
+
+    const handleTouchStart = (e) => {
+      if (e.touches.length === 2) {
+        e.preventDefault();
+        isPinching = true;
+        const t1 = e.touches[0];
+        const t2 = e.touches[1];
+        initialPinchDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+        initialZoom = currentZoomRef.current;
+        initialPan = { ...canvasPanRef.current };
+        initialMid = {
+          x: (t1.clientX + t2.clientX) / 2,
+          y: (t1.clientY + t2.clientY) / 2
+        };
+      }
+    };
+
+    const handleTouchMove = (e) => {
+      if (e.touches.length === 2 && isPinching) {
+        e.preventDefault();
+        const t1 = e.touches[0];
+        const t2 = e.touches[1];
+        const dist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+        if (initialPinchDist > 0) {
+          const scale = dist / initialPinchDist;
+          const nextZoom = Math.min(5, Math.max(0.15, Number((initialZoom * scale).toFixed(3))));
+          targetZoomRef.current = nextZoom;
+          currentZoomRef.current = nextZoom;
+          setZoomLevel(nextZoom);
+
+          // Simultaneous two-finger fluid pan
+          const midX = (t1.clientX + t2.clientX) / 2;
+          const midY = (t1.clientY + t2.clientY) / 2;
+          const deltaX = midX - initialMid.x;
+          const deltaY = midY - initialMid.y;
+          const nextPan = {
+            x: Math.round(initialPan.x + deltaX),
+            y: Math.round(initialPan.y + deltaY)
+          };
+          canvasPanRef.current = nextPan;
+          targetPanRef.current = nextPan;
+          setCanvasPan(nextPan);
+        }
+      }
+    };
+
+    const handleTouchEnd = (e) => {
+      if (e.touches.length < 2) {
+        isPinching = false;
+        initialPinchDist = 0;
+      }
+    };
+
+    wsEl.addEventListener('touchstart', handleTouchStart, { passive: false });
+    wsEl.addEventListener('touchmove', handleTouchMove, { passive: false });
+    wsEl.addEventListener('touchend', handleTouchEnd);
+    wsEl.addEventListener('touchcancel', handleTouchEnd);
+
+    return () => {
+      wsEl.removeEventListener('touchstart', handleTouchStart);
+      wsEl.removeEventListener('touchmove', handleTouchMove);
+      wsEl.removeEventListener('touchend', handleTouchEnd);
+      wsEl.removeEventListener('touchcancel', handleTouchEnd);
     };
   }, [selectedAsset]);
 
@@ -2939,7 +3044,7 @@ export default function App() {
     <div className={`min-h-screen flex flex-col font-sans transition-colors duration-200 selection:bg-blue-500 selection:text-white ${appTheme === 'dark' ? 'bg-[#0b0f19] text-slate-100' : 'bg-slate-50 text-slate-900'
       }`}>
       {/* Top Bar */}
-      <header className={`border-b sticky top-0 z-40 px-3 sm:px-6 py-3 sm:py-4 flex items-center justify-between backdrop-blur transition-colors ${appTheme === 'dark' ? 'border-slate-800 bg-[#0d1424]/90' : 'border-slate-200 bg-white/90 shadow-sm'
+      <header className={`app-header-main border-b sticky top-0 z-40 px-3 sm:px-6 py-3 sm:py-4 flex items-center justify-between backdrop-blur transition-colors ${appTheme === 'dark' ? 'border-slate-800 bg-[#0d1424]/90' : 'border-slate-200 bg-white/90 shadow-sm'
         }`}>
         <div className="flex items-center gap-2.5 sm:gap-3">
           <div
@@ -3364,7 +3469,7 @@ export default function App() {
         <div className={`fixed inset-0 z-50 flex flex-col w-full h-full max-w-full max-h-full overflow-hidden font-sans studio-workspace select-none transition-colors duration-200 ${appTheme === 'dark' ? 'bg-[#060a12] text-slate-100' : 'bg-slate-100 text-slate-900'
           }`}>
           {/* Top Navigation Bar */}
-          <header className={`h-14 sm:h-16 px-2 sm:px-6 border-b flex items-center justify-between z-30 flex-shrink-0 transition-colors ${appTheme === 'dark' ? 'bg-[#0d1424] border-slate-800' : 'bg-white border-slate-200 shadow-sm'
+          <header className={`app-studio-header h-14 sm:h-16 px-2 sm:px-6 border-b flex items-center justify-between z-30 flex-shrink-0 transition-colors ${appTheme === 'dark' ? 'bg-[#0d1424] border-slate-800' : 'bg-white border-slate-200 shadow-sm'
             }`}>
             {/* Left: Back & Asset Details */}
             <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink min-w-0">
@@ -3626,7 +3731,7 @@ export default function App() {
                 setActiveSelectedColor(null);
               }}
               style={!isDesktopScreen ? { height: `${Number(mobileCanvasHeight) || 40}vh`, minHeight: '120px', maxHeight: '75vh' } : undefined}
-              className={`w-full flex-shrink-0 lg:flex-shrink lg:h-full lg:flex-1 min-w-0 relative flex flex-col items-center justify-center p-3 sm:p-6 select-none overflow-hidden transition-colors border-b lg:border-b-0 ${isPanning
+              className={`w-full flex-shrink-0 lg:flex-shrink lg:h-full lg:flex-1 min-w-0 relative flex flex-col items-center justify-center p-3 sm:p-6 select-none overflow-hidden transition-colors border-b lg:border-b-0 touch-none ${isPanning
                 ? 'cursor-grabbing select-none'
                 : isCtrlShiftDown
                   ? 'cursor-grab'
