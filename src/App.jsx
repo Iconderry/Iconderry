@@ -1094,6 +1094,8 @@ export default function App() {
   const [tags, setTags] = useState('');
   const [svgInput, setSvgInput] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
+  const [formError, setFormError] = useState('');
+  const [isPublishing, setIsPublishing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef(null);
 
@@ -3823,34 +3825,88 @@ export default function App() {
     }
   };
 
-  // Load & sync icons from Supabase if configured
+  // Load & sync icons from Supabase cloud database with Realtime updates
   useEffect(() => {
     if (!supabase) return;
     async function fetchSupabaseIcons() {
       try {
-        const { data, error } = await supabase.from('icons').select('*').order('created_at', { ascending: false });
-        if (data && data.length > 0 && !error) {
+        const { data, error } = await supabase
+          .from('icons')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Supabase fetch error:', error);
+          return;
+        }
+
+        if (data) {
           const mapped = data.map(item => ({
             id: item.id,
             title: item.title,
             category: item.category,
             tags: item.tags || '',
             svgCode: item.svg_code,
-            downloads: item.downloads || 0
+            downloads: item.downloads || 0,
+            isCloud: true
           }));
-          setElements(mapped);
-          localStorage.setItem('iconderry_assets', JSON.stringify(mapped));
+
+          // Merge cloud icons with default INITIAL_ELEMENTS so all icons are available to everyone
+          setElements(prev => {
+            const cloudIds = new Set(mapped.map(m => m.id));
+            const defaultNonDuplicates = INITIAL_ELEMENTS.filter(d => !cloudIds.has(d.id));
+            const combined = [...mapped, ...defaultNonDuplicates];
+            localStorage.setItem('iconderry_assets', JSON.stringify(combined));
+            return combined;
+          });
         }
       } catch (err) {
-        console.log('Supabase sync notice:', err);
+        console.error('Supabase sync notice:', err);
       }
     }
+
     fetchSupabaseIcons();
+
+    // Supabase Realtime subscription so new uploads appear on all devices instantly
+    try {
+      const channel = supabase
+        .channel('public:icons')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'icons' }, (payload) => {
+          if (payload.new) {
+            const newItem = {
+              id: payload.new.id,
+              title: payload.new.title,
+              category: payload.new.category,
+              tags: payload.new.tags || '',
+              svgCode: payload.new.svg_code,
+              downloads: payload.new.downloads || 0,
+              isCloud: true
+            };
+            setElements(prev => [newItem, ...prev.filter(x => x.id !== newItem.id)]);
+          }
+        })
+        .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'icons' }, (payload) => {
+          if (payload.old?.id) {
+            setElements(prev => prev.filter(x => x.id !== payload.old.id));
+          }
+        })
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    } catch (e) {
+      console.warn('Realtime subscription not active:', e);
+    }
   }, []);
 
   const handlePublishSvg = async (e) => {
     e.preventDefault();
     if (!title.trim() || !svgInput.trim()) return;
+
+    setIsPublishing(true);
+    setFormSuccess('');
+    setFormError('');
 
     const newElement = {
       id: 'elem-' + Date.now(),
@@ -3858,43 +3914,54 @@ export default function App() {
       category: category.trim() || 'General',
       tags: tags.trim(),
       svgCode: svgInput.trim(),
-      downloads: 0
+      downloads: 0,
+      isCloud: true
     };
 
-    setElements(prev => [newElement, ...prev]);
-
-    // Save to Supabase DB if client is active
-    if (supabase) {
-      try {
-        await supabase.from('icons').insert([{
+    try {
+      if (supabase) {
+        const { error } = await supabase.from('icons').insert([{
           id: newElement.id,
           title: newElement.title,
           category: newElement.category,
           tags: newElement.tags,
           svg_code: newElement.svgCode,
           downloads: 0
-        }]);
-      } catch (err) {
-        console.log('Supabase insert notice:', err);
-      }
-    }
+        }]).select();
 
-    setTitle('');
-    setSvgInput('');
-    setTags('');
-    setFormSuccess('Asset Iconderry gallery me publish ho gaya!');
-    setTimeout(() => setFormSuccess(''), 3000);
+        if (error) {
+          console.error('Supabase insert error:', error);
+          setFormError(`Supabase par upload nahi ho paya: ${error.message || 'Error occurred'}`);
+          setIsPublishing(false);
+          return;
+        }
+      }
+
+      setElements(prev => [newElement, ...prev.filter(x => x.id !== newElement.id)]);
+
+      setTitle('');
+      setSvgInput('');
+      setTags('');
+      setFormSuccess('SVG Supabase Cloud par live publish ho gaya! Ab website par sabhi log isko access kar sakte hain.');
+      setTimeout(() => setFormSuccess(''), 5000);
+    } catch (err) {
+      console.error('Publish error:', err);
+      setFormError('Upload error: ' + (err.message || String(err)));
+    } finally {
+      setIsPublishing(false);
+    }
   };
 
   const handleDelete = async (id) => {
     if (window.confirm('Kya aap is element ko delete karna chahte hain?')) {
-      setElements(elements.filter(el => el.id !== id));
+      setElements(prev => prev.filter(el => el.id !== id));
       if (selectedAsset?.id === id) setSelectedAsset(null);
       if (supabase) {
         try {
-          await supabase.from('icons').delete().eq('id', id);
+          const { error } = await supabase.from('icons').delete().eq('id', id);
+          if (error) console.error('Supabase delete error:', error);
         } catch (err) {
-          console.log('Supabase delete notice:', err);
+          console.error('Supabase delete notice:', err);
         }
       }
     }
@@ -4245,15 +4312,28 @@ export default function App() {
           /* Admin Upload Panel */
           <div className={`max-w-3xl mx-auto border rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-xl transition ${appTheme === 'dark' ? 'bg-[#131b2e] border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-900 shadow-xl'
             }`}>
-            <h2 className="text-lg sm:text-xl font-bold mb-1">Add New Element</h2>
+            <div className="flex items-center justify-between flex-wrap gap-2 mb-1">
+              <h2 className="text-lg sm:text-xl font-bold">Add New Element</h2>
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[11px] font-semibold">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Supabase Cloud Connected</span>
+              </div>
+            </div>
             <p className={`text-xs sm:text-sm mb-5 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-              Drop `.svg` file or paste XML markup. Users can only download finalized customized images.
+              SVG upload karein. Ye Supabase cloud database me save hoga aur poori website par sabhi users ko instant dikhega.
             </p>
 
             {formSuccess && (
-              <div className="mb-5 p-3 sm:p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 flex items-center gap-2.5 font-medium text-xs sm:text-sm">
+              <div className="mb-5 p-3 sm:p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center gap-2.5 font-medium text-xs sm:text-sm">
                 <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
                 <span>{formSuccess}</span>
+              </div>
+            )}
+
+            {formError && (
+              <div className="mb-5 p-3 sm:p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 flex items-center gap-2.5 font-medium text-xs sm:text-sm">
+                <X className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+                <span>{formError}</span>
               </div>
             )}
 
@@ -4369,9 +4449,17 @@ export default function App() {
 
               <button
                 type="submit"
-                className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 sm:py-3.5 rounded-xl font-medium text-sm transition shadow-lg shadow-blue-600/30"
+                disabled={isPublishing}
+                className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white py-3 sm:py-3.5 rounded-xl font-medium text-sm transition shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2 cursor-pointer"
               >
-                Publish to Iconderry
+                {isPublishing ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Uploading to Supabase Cloud...</span>
+                  </>
+                ) : (
+                  <span>Publish to Supabase Cloud</span>
+                )}
               </button>
             </form>
           </div>
