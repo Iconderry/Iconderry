@@ -732,7 +732,7 @@ export const STYLE_RENDER_MODES = [
 /**
  * Transforms an SVG markup string into one of the specialized visual render modes.
  */
-export function transformSvgStyle(svgCode, styleMode) {
+export function transformSvgStyle(svgCode, styleMode, targetLayerIds = null) {
   if (!svgCode) return '';
   if (!styleMode || styleMode === 'original' || styleMode === 'default') {
     return svgCode;
@@ -756,11 +756,35 @@ export function transformSvgStyle(svgCode, styleMode) {
 
     const uniqueId = 'pf_style_' + Math.random().toString(36).substring(2, 7);
 
+    // Build target layer ID filter set if specified
+    const targetSet = targetLayerIds && (Array.isArray(targetLayerIds) ? targetLayerIds.length > 0 : Boolean(targetLayerIds))
+      ? new Set((Array.isArray(targetLayerIds) ? targetLayerIds : [targetLayerIds]).map(id => String(id).replace(/^pf_studio_/i, '').trim()))
+      : null;
+
     // Collect all direct rendering nodes
-    const elements = Array.from(svg.querySelectorAll('*')).filter(el => {
+    let elements = Array.from(svg.querySelectorAll('*')).filter(el => {
       const tag = el.tagName.toLowerCase();
       return !['svg', 'defs', 'lineargradient', 'radialgradient', 'filter', 'clippath', 'mask', 'pattern', 'metadata', 'desc', 'title', 'stop', 'feblend', 'fecolormatrix', 'fecomponenttransfer', 'fecomposite', 'feconvolvematrix', 'fediffuselighting', 'fedisplacementmap', 'fedropshadow', 'feflood', 'fegaussianblur', 'feimage', 'femerge', 'femergenode', 'femorphology', 'feoffset', 'fespecularlighting', 'fetile', 'feturbulence'].includes(tag);
     });
+
+    // If targeted to specific layer(s), filter down to only matching elements
+    if (targetSet && targetSet.size > 0) {
+      elements = elements.filter(el => {
+        let cur = el;
+        while (cur && cur !== svg) {
+          const rawId = cur.getAttribute('data-layer-id');
+          if (rawId) {
+            const cleanId = String(rawId).replace(/^pf_studio_/i, '').trim();
+            const numOnly = cleanId.replace(/\D/g, '');
+            if (targetSet.has(cleanId) || (numOnly && (targetSet.has(numOnly) || targetSet.has(`layer_${numOnly}`)))) {
+              return true;
+            }
+          }
+          cur = cur.parentElement;
+        }
+        return false;
+      });
+    }
 
     if (elements.length === 0) return svgCode;
 

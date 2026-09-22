@@ -227,20 +227,30 @@ input[type="range"].hue-slider::-webkit-slider-thumb:hover {
   touch-action: none !important;
 }
 
-/* 1. MOUSE HOVER: Crisp, subtle outline highlight (zero GPU ghosting/glitch) */
+/* 1. MOUSE HOVER: Crisp, subtle outline highlight (preserves true element opacity) */
 .interactive-svg-canvas svg *:hover {
-  outline: 1.5px dashed #38bdf8 !important;
-  outline-offset: 2px !important;
-  opacity: 1 !important;
+  outline: var(--hover-outline-w, 1.5px) dashed #38bdf8 !important;
+  outline-offset: var(--hover-outline-off, 2px) !important;
 }
 
-/* 2. ACTIVE SELECTED: Clean, professional Figma-style solid cyan selection outline */
+/* 2. ACTIVE SELECTED: Unified single sky-blue line is rendered by transform bounding box with handles */
 .svg-element-selected,
 .interactive-svg-canvas svg .svg-element-selected,
 .interactive-svg-canvas svg .svg-element-selected:hover {
-  outline: 2px solid #38bdf8 !important;
-  outline-offset: 2px !important;
-  opacity: 1 !important;
+  outline: none !important;
+  outline-offset: 0 !important;
+}
+
+/* 3. ACTIVE DRAGGING / TRANSFORMING: Completely disable all hover outlines and pointer interference during dragging */
+body.is-dragging-layer,
+body.is-dragging-layer * {
+  cursor: grabbing !important;
+  user-select: none !important;
+}
+
+body.is-dragging-layer .interactive-svg-canvas svg *,
+body.is-dragging-layer .interactive-svg-canvas svg *:hover {
+  outline: none !important;
 }
 
 /* Universal Mobile & Tablet Touch Ergonomics */

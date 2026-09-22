@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   Download, PlusCircle, LayoutGrid, Search, Trash2, CheckCircle2,
   Zap, UploadCloud, Sliders, Palette, RotateCw,
@@ -8,13 +8,13 @@ import {
   ZoomIn, ZoomOut, Maximize2, Link2, Unlink2, Wand2, Scan,
   Heart, Shapes, MessageSquarePlus, Shield, FileText, Info,
   Box, Compass, Move3d, Film, Play, Activity, GripVertical,
-  Move, ArrowUp, ArrowDown, ChevronsUp, ChevronsDown
+  Move, ArrowUp, ArrowDown, ChevronsUp, ChevronsDown, Copy
 } from 'lucide-react';
 import { INITIAL_ELEMENTS } from './initialData';
 import { downloadAsset } from './converter';
-import { extractSvgColors, replaceSvgColors, scopeSvgIds, normalizeColor, getLinkedGradientColors, adjustColorBrightness, applyUniversalStroke } from './colorUtils';
+import { extractSvgColors, replaceSvgColors, scopeSvgIds, normalizeColor, getLinkedGradientColors, adjustColorBrightness, applyUniversalStroke, hslToHex, hexToHsl } from './colorUtils';
 import { STYLE_RENDER_MODES, transformSvgStyle } from './styleTransformer';
-import { extractSvgLayers, applyLayerTransforms } from './layerUtils';
+import { extractSvgLayers, applyLayerTransforms, calculateArtworkBounds } from './layerUtils';
 import { supabase } from './supabaseClient';
 
 const DEFAULT_ADJUSTMENTS = {
@@ -1120,6 +1120,8 @@ export default function App() {
   const [exportFormat, setExportFormat] = useState(() => localStorage.getItem('iconderry_default_format') || 'png');
   const [exportSize, setExportSize] = useState(() => Number(localStorage.getItem('iconderry_default_size')) || 1024);
   const [isTransparent, setIsTransparent] = useState(true);
+  const [autoFitToElements, setAutoFitToElements] = useState(() => localStorage.getItem('iconderry_autofit_elements') !== 'false');
+  const [autoFitFrameMode, setAutoFitFrameMode] = useState(() => localStorage.getItem('iconderry_autofit_mode') || 'tight');
   const [downloading, setDownloading] = useState(false);
   const [previewBg, setPreviewBg] = useState(() => localStorage.getItem('iconderry_default_bg') || 'dark');
   const [zoomLevel, setZoomLevel] = useState(1);
@@ -1143,7 +1145,11 @@ export default function App() {
 
   // Vector Layers & Part Transforms & Multi-Selection & Layer Styles
   const [selectedLayerId, setSelectedLayerId] = useState(null);
+  const selectedLayerIdRef = useRef(null);
+  selectedLayerIdRef.current = selectedLayerId;
   const [selectedLayerIds, setSelectedLayerIds] = useState([]);
+  const selectedLayerIdsRef = useRef([]);
+  selectedLayerIdsRef.current = selectedLayerIds;
   const [layerTransforms, setLayerTransforms] = useState({});
   const layerTransformsRef = useRef({});
   layerTransformsRef.current = layerTransforms;
@@ -1154,6 +1160,10 @@ export default function App() {
   const layerOrderRef = useRef([]);
   layerOrderRef.current = layerOrder;
   const [svgLayers, setSvgLayers] = useState([]);
+  const [layerGroups, setLayerGroups] = useState({}); // { [groupId]: string[] }
+  const layerGroupsRef = useRef({});
+  layerGroupsRef.current = layerGroups;
+  const prevAssetIdRef = useRef(null);
   const [layerListViewMode, setLayerListViewMode] = useState('layers'); // 'layers' | 'colors'
   const [draggedLayerIdx, setDraggedLayerIdx] = useState(null);
   const [dragOverLayerIdx, setDragOverLayerIdx] = useState(null);
@@ -1171,6 +1181,26 @@ export default function App() {
 
   // Marquee Selection Box State (Click & Drag over Canvas)
   const [marqueeBox, setMarqueeBox] = useState(null);
+
+  // Multi-Touch & Pinch-Zoom Protection Refs
+  const isPinchingRef = useRef(false);
+  const activePointersRef = useRef(new Map());
+  const activeTargetLayerElRef = useRef(null);
+  const activePointerIdRef = useRef(null);
+
+  // Deleted & Duplicated Layers State
+  const [deletedLayerIds, setDeletedLayerIds] = useState([]);
+  const deletedLayerIdsRef = useRef([]);
+  deletedLayerIdsRef.current = deletedLayerIds;
+
+  const [duplicatedLayers, setDuplicatedLayers] = useState([]);
+  const duplicatedLayersRef = useRef([]);
+  duplicatedLayersRef.current = duplicatedLayers;
+
+  // Interactive Transform Bounding Box State (8 Resize handles & Rotation handle)
+  const [transformBox, setTransformBox] = useState(null);
+  const transformBoxRef = useRef(null);
+  const lastCanvasClickRef = useRef({ time: 0, layerId: null, x: 0, y: 0 });
 
   // Sync refs when zoomLevel is updated externally
   useEffect(() => {
@@ -1281,6 +1311,38 @@ export default function App() {
 
   // Pointer down handler to initiate canvas pan (Ctrl+Shift / Middle click) or Vector Part Drag-to-Move (Left click)
   const handleCanvasPointerDown = (e) => {
+    // Multi-touch tracking to prevent dual-finger gestures from dragging vector parts
+    activePointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const onGlobalPointerRelease = (releaseEvt) => {
+      activePointersRef.current.delete(releaseEvt.pointerId);
+      if (activePointersRef.current.size < 2) {
+        isPinchingRef.current = false;
+      }
+    };
+    window.addEventListener('pointerup', onGlobalPointerRelease, { once: true });
+    window.addEventListener('pointercancel', onGlobalPointerRelease, { once: true });
+
+    // If 2 or more touches/fingers detected or pinch active on mobile, abort layer dragging immediately
+    if (activePointersRef.current.size >= 2 || isPinchingRef.current) {
+      if (isDraggingLayerRef.current) {
+        isDraggingLayerRef.current = false;
+        if (layerDragInitialTransformsRef.current) {
+          setLayerTransforms(prev => ({
+            ...prev,
+            ...layerDragInitialTransformsRef.current
+          }));
+        }
+        try {
+          if (activeTargetLayerElRef.current?.releasePointerCapture && activePointerIdRef.current !== null) {
+            activeTargetLayerElRef.current.releasePointerCapture(activePointerIdRef.current);
+          }
+        } catch (_) {}
+        activeTargetLayerElRef.current = null;
+        activePointerIdRef.current = null;
+      }
+      return;
+    }
+
     // 1. Canvas Viewport Pan mode: Ctrl + Shift or Middle mouse button
     if ((e.ctrlKey && e.shiftKey) || e.button === 1) {
       e.preventDefault();
@@ -1341,158 +1403,346 @@ export default function App() {
 
     // 2. Direct Left Click on Canvas: Vector Part Drag OR Marquee Drag-to-Select
     if (e.button === 0) {
+      // 1. If clicked on a button or UI control, ignore canvas pointer down completely
+      if (e.target.closest('button') || e.target.closest('.pointer-events-auto') || e.target.closest('[data-no-canvas-click]')) {
+        return;
+      }
+
+      // If dual fingers or pinch active, do not select or drag
+      if (e.pointerType === 'touch' && (activePointersRef.current.size >= 2 || isPinchingRef.current)) {
+        return;
+      }
+
       const targetLayerEl = e.target.closest('[data-layer-id]');
+      const currentSelected = selectedLayerIdsRef.current || [];
 
-      // Case A: Clicked directly on a Vector Shape / Part
-      if (targetLayerEl) {
-        const rawLayerId = targetLayerEl.getAttribute('data-layer-id');
+      // Check if clicked anywhere inside the active Transform Bounding Box of selected elements
+      const isInsideTransformBox = Boolean(
+        transformBox &&
+        currentSelected.length > 0 &&
+        e.clientX >= (transformBox.minLeft - 4) &&
+        e.clientX <= (transformBox.maxRight + 4) &&
+        e.clientY >= (transformBox.minTop - 4) &&
+        e.clientY <= (transformBox.maxBottom + 4)
+      );
+
+      // Case A: Clicked directly on a Vector Shape / Part OR inside the active Bounding Box of selected elements
+      if (targetLayerEl || isInsideTransformBox) {
+        const rawLayerId = targetLayerEl?.getAttribute('data-layer-id');
         const layerId = rawLayerId ? rawLayerId.replace(/^pf_studio_/i, '') : null;
-        if (layerId) {
-          e.preventDefault();
-          e.stopPropagation();
 
-          let activeIds;
-          if (e.shiftKey) {
-            // Shift + Click: Toggle element in/out of multi-selection
-            activeIds = selectedLayerIds.includes(layerId)
-              ? selectedLayerIds.filter(id => id !== layerId)
-              : [...selectedLayerIds, layerId];
-            setSelectedLayerIds(activeIds);
-            setSelectedLayerId(layerId);
-          } else {
-            // Normal Click: If already part of multi-select, keep group; otherwise select only this element
-            if (selectedLayerIds.includes(layerId) && selectedLayerIds.length > 1) {
-              activeIds = selectedLayerIds;
-            } else {
+        // Double-click / double-tap detection on specific layer part
+        const now = Date.now();
+        const lastClick = lastCanvasClickRef.current;
+        const isDoubleClickOnLayer = Boolean(
+          layerId && (
+            e.detail >= 2 ||
+            (lastClick &&
+             lastClick.layerId === layerId &&
+             now - lastClick.time < 380 &&
+             Math.hypot(e.clientX - lastClick.x, e.clientY - lastClick.y) < 25)
+          )
+        );
+        lastCanvasClickRef.current = { time: now, layerId, x: e.clientX, y: e.clientY };
+
+        let activeIds = currentSelected;
+
+        if (layerId) {
+          const currentGroups = layerGroupsRef.current || {};
+          const belongingGroup = Object.values(currentGroups).find(ids => ids.includes(layerId));
+
+          if (belongingGroup) {
+            if (isDoubleClickOnLayer) {
+              // DOUBLE CLICK ON ELEMENT INSIDE GROUP:
+              // Sub-select ONLY this individual element part so it can be dragged separately anywhere!
+              // The group itself in layerGroups remains intact until explicitly ungrouped.
               activeIds = [layerId];
               setSelectedLayerIds([layerId]);
+              setSelectedLayerId(layerId);
+            } else if (e.shiftKey || e.ctrlKey || e.metaKey) {
+              const allSelected = belongingGroup.every(id => currentSelected.includes(id));
+              if (allSelected) {
+                activeIds = currentSelected.filter(id => !belongingGroup.includes(id));
+              } else {
+                activeIds = Array.from(new Set([...currentSelected, ...belongingGroup]));
+              }
+              setSelectedLayerIds(activeIds);
+              setSelectedLayerId(activeIds[activeIds.length - 1] || null);
+            } else {
+              // Normal Click on grouped item:
+              // If this individual element was ALREADY sub-selected inside the group, keep dragging it separately!
+              if (currentSelected.length === 1 && currentSelected[0] === layerId) {
+                activeIds = [layerId];
+              } else {
+                // Otherwise, normal single click selects the entire group
+                activeIds = belongingGroup;
+                setSelectedLayerIds(belongingGroup);
+                setSelectedLayerId(belongingGroup[0]);
+              }
             }
-            setSelectedLayerId(layerId);
+          } else {
+            if (e.shiftKey || e.ctrlKey || e.metaKey) {
+              // Shift / Ctrl / Cmd + Click: Toggle element in/out of multi-selection
+              activeIds = currentSelected.includes(layerId)
+                ? currentSelected.filter(id => id !== layerId)
+                : [...currentSelected, layerId];
+              setSelectedLayerIds(activeIds);
+              setSelectedLayerId(activeIds[activeIds.length - 1] || null);
+            } else {
+              // Normal Click: If already part of multi-select, keep group; otherwise select only this element
+              if (currentSelected.includes(layerId) && currentSelected.length > 1) {
+                activeIds = currentSelected;
+              } else {
+                activeIds = [layerId];
+                setSelectedLayerIds([layerId]);
+              }
+              setSelectedLayerId(layerId);
+            }
+          }
+        } else if (isInsideTransformBox) {
+          // Grabbed empty space inside the bounding box of selected elements: drag ALL currently selected parts!
+          activeIds = currentSelected;
+        }
+
+        if (activeIds.length === 0) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        isDraggingLayerRef.current = true;
+        layerDragStartPosRef.current = { x: e.clientX, y: e.clientY };
+        dragInitialSnapshotRef.current = getStudioSnapshotRef.current ? getStudioSnapshotRef.current() : null;
+        activeTargetLayerElRef.current = targetLayerEl;
+        activePointerIdRef.current = e.pointerId;
+
+        // Capture pointer on canvasWorkspaceRef (guaranteed stable in DOM, never destroyed by React re-renders)
+        try {
+          const captureEl = canvasWorkspaceRef.current;
+          if (e.pointerId !== undefined && captureEl?.setPointerCapture) {
+            captureEl.setPointerCapture(e.pointerId);
+          }
+        } catch (_) {}
+
+        // Store initial transforms for all active layers so they move together in sync
+        const initialTransforms = {};
+        activeIds.forEach(id => {
+          initialTransforms[id] = layerTransformsRef.current[id] || { x: 0, y: 0, rotate: 0 };
+        });
+        layerDragInitialTransformsRef.current = initialTransforms;
+
+        const svgEl = canvasSvgContainerRef.current?.querySelector('svg');
+        const vb = svgEl?.viewBox?.baseVal;
+        const svgRect = svgEl?.getBoundingClientRect();
+        const vbWidth = (vb && vb.width > 0) ? vb.width : (svgRect?.width || 100);
+        const vbHeight = (vb && vb.height > 0) ? vb.height : (svgRect?.height || 100);
+        const scaleX = (svgRect && svgRect.width > 0) ? (vbWidth / svgRect.width) : 1;
+        const scaleY = (svgRect && svgRect.height > 0) ? (vbHeight / svgRect.height) : 1;
+        const ctm = svgEl?.getScreenCTM ? svgEl.getScreenCTM() : null;
+        const dragScaleX = ctm && ctm.a ? (1 / ctm.a) : scaleX;
+        const dragScaleY = ctm && ctm.d ? (1 / ctm.d) : scaleY;
+
+        const wsEl = canvasWorkspaceRef.current;
+        const wsRect = wsEl ? wsEl.getBoundingClientRect() : null;
+        const zoomScaleX = wsEl?.offsetWidth > 0 ? (wsRect.width / wsEl.offsetWidth) : 1;
+        const zoomScaleY = wsEl?.offsetHeight > 0 ? (wsRect.height / wsEl.offsetHeight) : 1;
+        const startTransformBox = transformBox ? { ...transformBox } : null;
+
+        // Query active DOM nodes once at start so we can update them directly during drag with 0 SVG re-parsing
+        const svgContainer = canvasSvgContainerRef.current;
+        const activeDomNodes = activeIds.map(id => {
+          const cleanId = String(id).replace(/^pf_studio_/i, '');
+          const numOnly = cleanId.replace(/\D/g, '');
+          const node = svgContainer?.querySelector(`[data-layer-id="${id}"]`) ||
+                       svgContainer?.querySelector(`[data-layer-id="${cleanId}"]`) ||
+                       (numOnly ? svgContainer?.querySelector(`[data-layer-id="layer_${numOnly}"]`) : null);
+          const origAttr = node?.getAttribute('data-orig-transform') || node?.getAttribute('transform') || '';
+          return { id, node, origAttr };
+        }).filter(item => item.node);
+
+        let hasActuallyMoved = false;
+        // Threshold: 12px for finger touch on mobile to prevent accidental dragging during pinch zoom; 3px for mouse
+        const DRAG_THRESHOLD = e.pointerType === 'touch' ? 12 : 3;
+        let dragRafId = null;
+
+        const handleLayerMove = (moveEvt) => {
+          if (!isDraggingLayerRef.current) return;
+
+          // If user begins two-finger pinch/pan or multiple touches detected, immediately abort layer drag!
+          if (isPinchingRef.current || activePointersRef.current.size >= 2 || (moveEvt.touches && moveEvt.touches.length >= 2)) {
+            isDraggingLayerRef.current = false;
+            document.body.classList.remove('is-dragging-layer');
+            if (transformBoxRef.current) {
+              transformBoxRef.current.style.transform = '';
+            }
+            if (layerDragInitialTransformsRef.current && hasActuallyMoved) {
+              setLayerTransforms(prev => ({
+                ...prev,
+                ...layerDragInitialTransformsRef.current
+              }));
+            }
+            try {
+              if (canvasWorkspaceRef.current?.releasePointerCapture && e.pointerId !== undefined) {
+                canvasWorkspaceRef.current.releasePointerCapture(e.pointerId);
+              }
+            } catch (_) {}
+            activeTargetLayerElRef.current = null;
+            activePointerIdRef.current = null;
+            return;
           }
 
-          isDraggingLayerRef.current = true;
-          layerDragStartPosRef.current = { x: e.clientX, y: e.clientY };
-          dragInitialSnapshotRef.current = getStudioSnapshotRef.current ? getStudioSnapshotRef.current() : null;
+          const clientX = moveEvt.clientX ?? moveEvt.touches?.[0]?.clientX ?? 0;
+          const clientY = moveEvt.clientY ?? moveEvt.touches?.[0]?.clientY ?? 0;
+          const rawDx = clientX - layerDragStartPosRef.current.x;
+          const rawDy = clientY - layerDragStartPosRef.current.y;
 
-          // Capture pointer so dragging continues smoothly on mobile touch screens
+          if (!hasActuallyMoved) {
+            if (Math.hypot(rawDx, rawDy) < DRAG_THRESHOLD) {
+              return; // Plain tap: do NOT touch transforms!
+            }
+            hasActuallyMoved = true;
+            document.body.classList.add('is-dragging-layer');
+          }
+
+          if (moveEvt.preventDefault) moveEvt.preventDefault();
+          if (dragRafId) return;
+          dragRafId = requestAnimationFrame(() => {
+            dragRafId = null;
+            const svgDx = Math.round(rawDx * dragScaleX);
+            const svgDy = Math.round(rawDy * dragScaleY);
+
+            // 1. Direct smooth DOM updates on active SVG nodes - zero DOM destruction, zero flickering!
+            activeDomNodes.forEach(({ id, node, origAttr }) => {
+              const init = initialTransforms[id] || { x: 0, y: 0, rotate: 0, scaleX: 1, scaleY: 1 };
+              const targetX = init.x + svgDx;
+              const targetY = init.y + svgDy;
+
+              const parts = [];
+              if (targetX !== 0 || targetY !== 0) {
+                parts.push(`translate(${targetX} ${targetY})`);
+              }
+              const hasRotate = init.rotate && init.rotate !== 0;
+              const hasScale = (init.scaleX !== undefined && init.scaleX !== 1) || (init.scaleY !== undefined && init.scaleY !== 1);
+              if (hasRotate || hasScale) {
+                const cx = init.cx || 0;
+                const cy = init.cy || 0;
+                if (cx !== 0 || cy !== 0) {
+                  parts.push(`translate(${cx} ${cy})`);
+                  if (hasRotate) parts.push(`rotate(${init.rotate})`);
+                  if (hasScale) parts.push(`scale(${init.scaleX || 1} ${init.scaleY || 1})`);
+                  parts.push(`translate(${-cx} ${-cy})`);
+                } else {
+                  if (hasRotate) parts.push(`rotate(${init.rotate})`);
+                  if (hasScale) parts.push(`scale(${init.scaleX || 1} ${init.scaleY || 1})`);
+                }
+              }
+              if (origAttr) parts.push(origAttr);
+              node.setAttribute('transform', parts.join(' '));
+            });
+
+            // 2. Direct transform on Transform Bounding Box for 60/120fps tracking
+            if (transformBoxRef.current && startTransformBox && zoomScaleX > 0 && zoomScaleY > 0) {
+              const boxDx = rawDx / zoomScaleX;
+              const boxDy = rawDy / zoomScaleY;
+              transformBoxRef.current.style.transform = `translate3d(${boxDx}px, ${boxDy}px, 0px)`;
+            }
+          });
+        };
+
+        const handleLayerUp = (upEvt) => {
+          document.body.classList.remove('is-dragging-layer');
+          activePointersRef.current.delete(e.pointerId);
+          activeTargetLayerElRef.current = null;
+          activePointerIdRef.current = null;
+
+          if (dragRafId) {
+            cancelAnimationFrame(dragRafId);
+            dragRafId = null;
+          }
           try {
-            if (e.pointerId !== undefined && targetLayerEl.setPointerCapture) {
-              targetLayerEl.setPointerCapture(e.pointerId);
+            const captureEl = canvasWorkspaceRef.current;
+            if (e.pointerId !== undefined && captureEl?.releasePointerCapture) {
+              captureEl.releasePointerCapture(e.pointerId);
             }
           } catch (_) {}
 
-          // Store initial transforms for all active layers so they move together in sync
-          const initialTransforms = {};
-          activeIds.forEach(id => {
-            initialTransforms[id] = layerTransformsRef.current[id] || { x: 0, y: 0, rotate: 0 };
-          });
-          layerDragInitialTransformsRef.current = initialTransforms;
+          if (isDraggingLayerRef.current) {
+            isDraggingLayerRef.current = false;
+            if (hasActuallyMoved) {
+              const clientX = upEvt?.clientX ?? layerDragStartPosRef.current.x;
+              const clientY = upEvt?.clientY ?? layerDragStartPosRef.current.y;
+              const rawDx = clientX - layerDragStartPosRef.current.x;
+              const rawDy = clientY - layerDragStartPosRef.current.y;
+              const finalSvgDx = Math.round(rawDx * dragScaleX);
+              const finalSvgDy = Math.round(rawDy * dragScaleY);
 
-          const svgEl = canvasSvgContainerRef.current?.querySelector('svg');
-          const vb = svgEl?.viewBox?.baseVal;
-          const svgRect = svgEl?.getBoundingClientRect();
-          const vbWidth = (vb && vb.width > 0) ? vb.width : (svgRect?.width || 100);
-          const vbHeight = (vb && vb.height > 0) ? vb.height : (svgRect?.height || 100);
-          const scaleX = (svgRect && svgRect.width > 0) ? (vbWidth / svgRect.width) : 1;
-          const scaleY = (svgRect && svgRect.height > 0) ? (vbHeight / svgRect.height) : 1;
-
-          let hasActuallyMoved = false;
-          const DRAG_THRESHOLD = 3; // px: lowered for responsive mobile finger touch dragging
-          let dragRafId = null;
-
-          const handleLayerMove = (moveEvt) => {
-            if (!isDraggingLayerRef.current) return;
-            const clientX = moveEvt.clientX ?? moveEvt.touches?.[0]?.clientX ?? 0;
-            const clientY = moveEvt.clientY ?? moveEvt.touches?.[0]?.clientY ?? 0;
-            const rawDx = clientX - layerDragStartPosRef.current.x;
-            const rawDy = clientY - layerDragStartPosRef.current.y;
-
-            if (!hasActuallyMoved) {
-              if (Math.hypot(rawDx, rawDy) < DRAG_THRESHOLD) {
-                return; // Plain tap: do NOT touch transforms!
+              // Reset transformBox translate3d style so React's setTransformBox controls it cleanly
+              if (transformBoxRef.current) {
+                transformBoxRef.current.style.transform = '';
               }
-              hasActuallyMoved = true;
-            }
 
-            if (moveEvt.preventDefault) moveEvt.preventDefault();
-            if (dragRafId) return;
-            dragRafId = requestAnimationFrame(() => {
-              dragRafId = null;
-              const svgDx = Math.round(rawDx * scaleX);
-              const svgDy = Math.round(rawDy * scaleY);
-
+              // Commit new transforms to React state
               setLayerTransforms(prev => {
                 const updated = { ...prev };
                 activeIds.forEach(id => {
                   const init = initialTransforms[id] || { x: 0, y: 0, rotate: 0 };
                   updated[id] = {
                     ...(prev[id] || { rotate: 0 }),
-                    x: init.x + svgDx,
-                    y: init.y + svgDy
+                    x: init.x + finalSvgDx,
+                    y: init.y + finalSvgDy
                   };
                 });
                 return updated;
               });
-            });
-          };
 
-          const handleLayerUp = () => {
-            if (dragRafId) {
-              cancelAnimationFrame(dragRafId);
-              dragRafId = null;
-            }
-            try {
-              if (e.pointerId !== undefined && targetLayerEl.releasePointerCapture) {
-                targetLayerEl.releasePointerCapture(e.pointerId);
-              }
-            } catch (_) {}
-            if (isDraggingLayerRef.current) {
-              isDraggingLayerRef.current = false;
-              if (hasActuallyMoved && dragInitialSnapshotRef.current) {
-                // Record undo using the snapshot from BEFORE the movement started
+              justFinishedLayerDragRef.current = true;
+              setTimeout(() => {
+                justFinishedLayerDragRef.current = false;
+              }, 80);
+              if (dragInitialSnapshotRef.current) {
                 setUndoStack(prev => [...prev.slice(-30), dragInitialSnapshotRef.current]);
                 setRedoStack([]);
-                justFinishedLayerDragRef.current = true;
-                setTimeout(() => {
-                  justFinishedLayerDragRef.current = false;
-                }, 80);
+              }
+            } else {
+              if (transformBoxRef.current) {
+                transformBoxRef.current.style.transform = '';
               }
             }
-            window.removeEventListener('pointermove', handleLayerMove);
-            window.removeEventListener('pointerup', handleLayerUp);
-            window.removeEventListener('pointercancel', handleLayerUp);
-            window.removeEventListener('touchmove', handleLayerMove);
-            window.removeEventListener('touchend', handleLayerUp);
-            window.removeEventListener('touchcancel', handleLayerUp);
-          };
+          }
+          window.removeEventListener('pointermove', handleLayerMove);
+          window.removeEventListener('pointerup', handleLayerUp);
+          window.removeEventListener('pointercancel', handleLayerUp);
+        };
 
-          window.addEventListener('pointermove', handleLayerMove);
-          window.addEventListener('pointerup', handleLayerUp);
-          window.addEventListener('pointercancel', handleLayerUp);
-          window.addEventListener('touchmove', handleLayerMove, { passive: false });
-          window.addEventListener('touchend', handleLayerUp);
-          window.addEventListener('touchcancel', handleLayerUp);
-          return;
-        }
+        window.addEventListener('pointermove', handleLayerMove, { passive: false });
+        window.addEventListener('pointerup', handleLayerUp);
+        window.addEventListener('pointercancel', handleLayerUp);
+        return;
       }
 
       // Case B: Clicked on empty canvas background -> Light Blue Marquee Selection Box
-      // On mobile/touch screens, touching empty canvas should simply deselect without starting heavy 60fps marquee loops and getBoundingClientRect reflows
+      const isAdditive = Boolean(e.shiftKey || e.ctrlKey || e.metaKey);
       if (e.pointerType === 'touch' || !isDesktopScreen) {
-        setSelectedLayerIds([]);
-        setSelectedLayerId(null);
-        setActiveSelectedColor(null);
+        if (!isAdditive) {
+          setSelectedLayerIds([]);
+          setSelectedLayerId(null);
+          setActiveSelectedColor(null);
+        }
         return;
       }
 
       const wsEl = canvasWorkspaceRef.current;
       if (wsEl) {
         const wsRect = wsEl.getBoundingClientRect();
+        // Exact physical-to-CSS zoom ratio compensation (handles desktop body zoom: 1.1 with zero offset)
+        const zoomScaleX = wsEl.offsetWidth > 0 ? (wsRect.width / wsEl.offsetWidth) : 1;
+        const zoomScaleY = wsEl.offsetHeight > 0 ? (wsRect.height / wsEl.offsetHeight) : 1;
+
         const startClientX = e.clientX;
         const startClientY = e.clientY;
-        const startRelX = e.clientX - wsRect.left;
-        const startRelY = e.clientY - wsRect.top;
+        const startRelX = (e.clientX - wsRect.left) / zoomScaleX;
+        const startRelY = (e.clientY - wsRect.top) / zoomScaleY;
 
+        const baseSelection = isAdditive ? [...selectedLayerIds] : [];
         let isMarquee = false;
         let hitLayerIds = [];
 
@@ -1504,8 +1754,12 @@ export default function App() {
           if (dist > 4) {
             isMarquee = true;
             moveEvt.preventDefault();
-            const curRelX = curClientX - wsRect.left;
-            const curRelY = curClientY - wsRect.top;
+            const curWsRect = wsEl.getBoundingClientRect();
+            const zScaleX = wsEl.offsetWidth > 0 ? (curWsRect.width / wsEl.offsetWidth) : 1;
+            const zScaleY = wsEl.offsetHeight > 0 ? (curWsRect.height / wsEl.offsetHeight) : 1;
+
+            const curRelX = (curClientX - curWsRect.left) / zScaleX;
+            const curRelY = (curClientY - curWsRect.top) / zScaleY;
             setMarqueeBox({
               startX: startRelX,
               startY: startRelY,
@@ -1533,8 +1787,11 @@ export default function App() {
                 }
               });
               hitLayerIds = currentHits;
-              setSelectedLayerIds(currentHits);
-              setSelectedLayerId(currentHits[0] || null);
+              const combinedHits = isAdditive
+                ? Array.from(new Set([...baseSelection, ...currentHits]))
+                : currentHits;
+              setSelectedLayerIds(combinedHits);
+              setSelectedLayerId(combinedHits[0] || null);
             }
           }
         };
@@ -1548,16 +1805,21 @@ export default function App() {
           if (isMarquee) {
             justFinishedLayerDragRef.current = true;
             setTimeout(() => { justFinishedLayerDragRef.current = false; }, 80);
-            if (hitLayerIds.length > 0) {
-              setSelectedLayerIds(hitLayerIds);
-              setSelectedLayerId(hitLayerIds[0]);
+            const finalHits = isAdditive
+              ? Array.from(new Set([...baseSelection, ...hitLayerIds]))
+              : hitLayerIds;
+            if (finalHits.length > 0) {
+              setSelectedLayerIds(finalHits);
+              setSelectedLayerId(finalHits[0]);
               setStudioTab('colors');
             }
           } else {
-            // Simple click without drag on canvas background: deselect
-            setSelectedLayerIds([]);
-            setSelectedLayerId(null);
-            setActiveSelectedColor(null);
+            // Simple click without drag on canvas background:
+            if (!isAdditive) {
+              setSelectedLayerIds([]);
+              setSelectedLayerId(null);
+              setActiveSelectedColor(null);
+            }
           }
         };
 
@@ -1756,8 +2018,202 @@ export default function App() {
     });
   };
 
+  // Combined all active SVG layers (base + duplicates minus deleted)
+  const allSvgLayers = useMemo(() => {
+    const combined = [...svgLayers];
+    duplicatedLayers.forEach(dup => {
+      const source = svgLayers.find(l => l.id === dup.sourceId) || {};
+      combined.push({
+        id: dup.id,
+        name: `${source.name || 'Part'} (Copy)`,
+        tag: source.tag || 'path',
+        color: source.color || '#38bdf8',
+        rawColor: source.rawColor || '#38bdf8'
+      });
+    });
+    return combined.filter(l => !deletedLayerIds.includes(l.id));
+  }, [svgLayers, duplicatedLayers, deletedLayerIds]);
+
+  const handleDeleteSelectedLayers = () => {
+    const activeIds = (selectedLayerIdsRef.current && selectedLayerIdsRef.current.length > 0)
+      ? selectedLayerIdsRef.current
+      : (selectedLayerIds && selectedLayerIds.length > 0 ? selectedLayerIds : (selectedLayerId ? [selectedLayerId] : []));
+    if (activeIds.length === 0) return;
+    recordUndo();
+    setDeletedLayerIds(prev => Array.from(new Set([...prev, ...activeIds])));
+    setSelectedLayerIds([]);
+    setSelectedLayerId(null);
+    setActiveSelectedColor(null);
+    setTransformBox(null);
+  };
+
+  const handleDuplicateSelectedLayers = () => {
+    const activeIds = (selectedLayerIdsRef.current && selectedLayerIdsRef.current.length > 0)
+      ? selectedLayerIdsRef.current
+      : (selectedLayerIds && selectedLayerIds.length > 0 ? selectedLayerIds : (selectedLayerId ? [selectedLayerId] : []));
+    if (activeIds.length === 0) return;
+    recordUndo();
+    const newDuplicated = [];
+    const newSelectedIds = [];
+    const newTransforms = { ...layerTransformsRef.current };
+
+    activeIds.forEach(id => {
+      const dupId = `dup_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      newDuplicated.push({ id: dupId, sourceId: id });
+      newSelectedIds.push(dupId);
+
+      const orig = layerTransformsRef.current[id] || { x: 0, y: 0, rotate: 0, scaleX: 1, scaleY: 1 };
+      newTransforms[dupId] = {
+        ...orig,
+        x: (orig.x || 0) + 15,
+        y: (orig.y || 0) + 15
+      };
+    });
+
+    setDuplicatedLayers(prev => [...prev, ...newDuplicated]);
+    setLayerTransforms(newTransforms);
+    setSelectedLayerIds(newSelectedIds);
+    setSelectedLayerId(newSelectedIds[0]);
+  };
+
+  // Insert another element/object from the library into current canvas as editable multipart layers
+  const handleInsertElementFromLibrary = (assetToAdd) => {
+    if (!assetToAdd || !assetToAdd.svgCode || !selectedAsset) return;
+    recordUndo();
+
+    try {
+      const parser = new DOMParser();
+      const currentDoc = parser.parseFromString(selectedAsset.svgCode, 'image/svg+xml');
+      const currentSvg = currentDoc.querySelector('svg');
+      if (!currentSvg) return;
+
+      // Unique prefix to prevent gradient & filter ID collisions
+      const prefix = `add_${Date.now()}_`;
+      const scopedSvgCode = scopeSvgIds(assetToAdd.svgCode, prefix);
+      const addedDoc = parser.parseFromString(scopedSvgCode, 'image/svg+xml');
+      const addedSvg = addedDoc.querySelector('svg');
+      if (!addedSvg) return;
+
+      // 1. Merge defs (gradients, filters, patterns)
+      let currentDefs = currentSvg.querySelector('defs');
+      const addedDefs = addedSvg.querySelector('defs');
+      if (addedDefs) {
+        if (!currentDefs) {
+          currentDefs = currentDoc.createElementNS('http://www.w3.org/2000/svg', 'defs');
+          currentSvg.insertBefore(currentDefs, currentSvg.firstChild);
+        }
+        Array.from(addedDefs.children).forEach(defNode => {
+          currentDefs.appendChild(currentDoc.importNode(defNode, true));
+        });
+      }
+
+      // 2. Compute viewBox coordinates to position & scale added element nicely
+      const parseVb = (svgNode) => {
+        const vb = svgNode.getAttribute('viewBox') || svgNode.getAttribute('viewbox');
+        if (vb) {
+          const parts = vb.trim().split(/[\s,]+/).map(Number);
+          if (parts.length === 4 && parts[2] > 0 && parts[3] > 0) {
+            return { x: parts[0], y: parts[1], w: parts[2], h: parts[3] };
+          }
+        }
+        const w = parseFloat(svgNode.getAttribute('width')) || 200;
+        const h = parseFloat(svgNode.getAttribute('height')) || 200;
+        return { x: 0, y: 0, w, h };
+      };
+
+      const baseVb = parseVb(currentSvg);
+      const addVb = parseVb(addedSvg);
+
+      // Fit added asset proportionally (~45% of base canvas)
+      const scale = Math.min((baseVb.w * 0.45) / addVb.w, (baseVb.h * 0.45) / addVb.h);
+      const jitter = (Math.random() * 24) - 12;
+      const targetX = baseVb.x + (baseVb.w - (addVb.w * scale)) / 2 + jitter;
+      const targetY = baseVb.y + (baseVb.h - (addVb.h * scale)) / 2 + jitter;
+
+      // Create a group wrapper for the imported element
+      const groupWrapper = currentDoc.createElementNS('http://www.w3.org/2000/svg', 'g');
+      groupWrapper.setAttribute('id', `group_${assetToAdd.title.toLowerCase().replace(/[^a-z0-9]/g, '_')}_${Date.now()}`);
+      groupWrapper.setAttribute('transform', `translate(${targetX.toFixed(1)}, ${targetY.toFixed(1)}) scale(${scale.toFixed(4)}) translate(${-addVb.x}, ${-addVb.y})`);
+
+      const visualTags = ['path', 'rect', 'circle', 'ellipse', 'polygon', 'polyline', 'line', 'text'];
+      const newLayerIds = [];
+      let layerCounter = 0;
+
+      // Tag each visual shape with unique data-layer-id so each part becomes individually editable!
+      Array.from(addedSvg.children).forEach(child => {
+        const tag = child.tagName.toLowerCase();
+        if (tag === 'defs' || tag === 'metadata' || tag === 'title' || tag === 'desc') return;
+
+        const importedNode = currentDoc.importNode(child, true);
+
+        const tagVisualNodes = (node) => {
+          const nTag = node.tagName?.toLowerCase();
+          if (visualTags.includes(nTag)) {
+            const lId = `layer_add_${Date.now().toString(36)}_${layerCounter++}`;
+            node.setAttribute('data-layer-id', lId);
+            newLayerIds.push(lId);
+          } else if (node.children) {
+            Array.from(node.children).forEach(c => tagVisualNodes(c));
+          }
+        };
+
+        tagVisualNodes(importedNode);
+        groupWrapper.appendChild(importedNode);
+      });
+
+      currentSvg.appendChild(groupWrapper);
+
+      const serializer = new XMLSerializer();
+      const mergedSvg = serializer.serializeToString(currentDoc);
+
+      setSelectedAsset(prev => ({
+        ...prev,
+        svgCode: mergedSvg
+      }));
+
+      setElements(prev => prev.map(el =>
+        el.id === selectedAsset.id ? { ...el, svgCode: mergedSvg } : el
+      ));
+
+      if (newLayerIds.length > 0) {
+        const newGroupId = `group_${Date.now()}`;
+        setLayerGroups(prev => ({
+          ...prev,
+          [newGroupId]: [...newLayerIds]
+        }));
+        setSelectedLayerIds(newLayerIds);
+        setSelectedLayerId(newLayerIds[0]);
+      }
+
+      setIsAddElementModalOpen(false);
+    } catch (err) {
+      console.error('Error inserting element from library:', err);
+      alert('Could not insert element: ' + err.message);
+    }
+  };
+
+  const handleQuickRotate90 = () => {
+    const activeIds = selectedLayerIds && selectedLayerIds.length > 0
+      ? selectedLayerIds
+      : (selectedLayerId ? [selectedLayerId] : []);
+    if (activeIds.length === 0) return;
+    recordUndo();
+    setLayerTransforms(prev => {
+      const updated = { ...prev };
+      activeIds.forEach(id => {
+        const orig = prev[id] || { x: 0, y: 0, rotate: 0 };
+        updated[id] = {
+          ...orig,
+          rotate: ((orig.rotate || 0) + 90) % 360
+        };
+      });
+      return updated;
+    });
+  };
+
+
   const handleSelectAllLayers = () => {
-    const allIds = svgLayers.map(l => l.id);
+    const allIds = allSvgLayers.map(l => l.id);
     setSelectedLayerIds(allIds);
     if (allIds.length > 0) setSelectedLayerId(allIds[0]);
     setStudioTab('colors');
@@ -1767,7 +2223,71 @@ export default function App() {
     setSelectedLayerIds([]);
     setSelectedLayerId(null);
     setActiveSelectedColor(null);
+    setTransformBox(null);
   };
+
+  // Check if current selection represents an entire group
+  const isCurrentGroupSelected = useMemo(() => {
+    if (!selectedLayerIds || selectedLayerIds.length <= 1) return false;
+    return Object.values(layerGroups).some(ids => {
+      if (ids.length !== selectedLayerIds.length) return false;
+      const setA = new Set(ids);
+      return selectedLayerIds.every(id => setA.has(id));
+    });
+  }, [selectedLayerIds, layerGroups]);
+
+  // If currently selected part is a member of an existing group
+  const activeGroupForSelection = useMemo(() => {
+    if (!selectedLayerIds || selectedLayerIds.length === 0) return null;
+    const currentGroups = layerGroups || {};
+    return Object.values(currentGroups).find(ids =>
+      selectedLayerIds.some(id => ids.includes(id))
+    ) || null;
+  }, [selectedLayerIds, layerGroups]);
+
+  // A single element that belongs to a group is sub-selected (directly editable without ungrouping)
+  const isSubSelectedInGroup = useMemo(() => {
+    return Boolean(
+      activeGroupForSelection &&
+      selectedLayerIds &&
+      selectedLayerIds.length === 1 &&
+      activeGroupForSelection.includes(selectedLayerIds[0])
+    );
+  }, [activeGroupForSelection, selectedLayerIds]);
+
+  // Group currently selected layers together
+  const handleGroupSelected = useCallback(() => {
+    const activeIds = selectedLayerIds && selectedLayerIds.length > 1 ? selectedLayerIds : [];
+    if (activeIds.length <= 1) return;
+    recordUndo();
+    const newGroupId = `group_${Date.now()}`;
+    setLayerGroups(prev => {
+      const updated = { ...prev };
+      Object.keys(updated).forEach(gid => {
+        if (updated[gid].some(id => activeIds.includes(id))) {
+          delete updated[gid];
+        }
+      });
+      updated[newGroupId] = [...activeIds];
+      return updated;
+    });
+  }, [selectedLayerIds]);
+
+  // Ungroup the selected group so member parts become individually editable
+  const handleUngroupSelected = useCallback(() => {
+    const activeIds = selectedLayerIds && selectedLayerIds.length > 0 ? selectedLayerIds : [];
+    if (activeIds.length === 0) return;
+    recordUndo();
+    setLayerGroups(prev => {
+      const updated = { ...prev };
+      Object.keys(updated).forEach(gid => {
+        if (updated[gid].some(id => activeIds.includes(id))) {
+          delete updated[gid];
+        }
+      });
+      return updated;
+    });
+  }, [selectedLayerIds]);
 
   // Studio Resizable Right Sidebar Width (VS Code style - Max 50% screen)
   const [sidebarWidth, setSidebarWidth] = useState(() => {
@@ -1941,9 +2461,29 @@ export default function App() {
     let isPinching = false;
 
     const handleTouchStart = (e) => {
-      if (e.touches.length === 2) {
+      if (e.touches.length >= 2) {
         e.preventDefault();
         isPinching = true;
+        isPinchingRef.current = true;
+
+        // Instantly abort any active layer drag so dual-finger gesture pinches/pans rather than dragging vector elements!
+        if (isDraggingLayerRef.current) {
+          isDraggingLayerRef.current = false;
+          if (layerDragInitialTransformsRef.current) {
+            setLayerTransforms(prev => ({
+              ...prev,
+              ...layerDragInitialTransformsRef.current
+            }));
+          }
+          try {
+            if (activeTargetLayerElRef.current?.releasePointerCapture && activePointerIdRef.current !== null) {
+              activeTargetLayerElRef.current.releasePointerCapture(activePointerIdRef.current);
+            }
+          } catch (_) {}
+          activeTargetLayerElRef.current = null;
+          activePointerIdRef.current = null;
+        }
+
         const t1 = e.touches[0];
         const t2 = e.touches[1];
         initialPinchDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
@@ -1957,8 +2497,9 @@ export default function App() {
     };
 
     const handleTouchMove = (e) => {
-      if (e.touches.length === 2 && isPinching) {
+      if (e.touches.length >= 2 && isPinching) {
         e.preventDefault();
+        isDraggingLayerRef.current = false;
         const t1 = e.touches[0];
         const t2 = e.touches[1];
         const dist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
@@ -1988,6 +2529,7 @@ export default function App() {
     const handleTouchEnd = (e) => {
       if (e.touches.length < 2) {
         isPinching = false;
+        isPinchingRef.current = false;
         initialPinchDist = 0;
       }
     };
@@ -2020,7 +2562,12 @@ export default function App() {
   const [filterVersionFilter, setFilterVersionFilter] = useState('all'); // 'all' | 'new' | 'old'
   const [activeFilterPreset, setActiveFilterPreset] = useState('original');
   const [activeSelectedColor, setActiveSelectedColor] = useState(null);
+  const [colorWheelPopover, setColorWheelPopover] = useState(null); // { originalColor, currentHex, anchorX, anchorY }
+  const lastSwatchClickRef = useRef({ time: 0, color: null });
   const [isLayersListExpanded, setIsLayersListExpanded] = useState(false);
+  const [isAddElementModalOpen, setIsAddElementModalOpen] = useState(false);
+  const [addElementSearch, setAddElementSearch] = useState('');
+  const [addElementCategory, setAddElementCategory] = useState('All');
   const canvasSvgContainerRef = useRef(null);
 
   const filteredPresets = useMemo(() => {
@@ -2111,15 +2658,29 @@ export default function App() {
       setSelectedLayerIds([]);
       setLayerTransforms({});
       setLayerStyles({});
+      setDeletedLayerIds([]);
+      setDuplicatedLayers([]);
+      setLayerGroups({});
+      setTransformBox(null);
       return;
     }
+    const isNewAsset = prevAssetIdRef.current !== selectedAsset.id;
+    prevAssetIdRef.current = selectedAsset.id;
+
     const { layers } = extractSvgLayers(selectedAsset.svgCode);
     setSvgLayers(layers);
     setLayerOrder(layers.map(l => l.id));
-    setSelectedLayerId(layers.length > 0 ? layers[0].id : null);
-    setSelectedLayerIds(layers.length > 0 ? [layers[0].id] : []);
-    setLayerTransforms({});
-    setLayerStyles({});
+
+    if (isNewAsset) {
+      setSelectedLayerId(layers.length > 0 ? layers[0].id : null);
+      setSelectedLayerIds(layers.length > 0 ? [layers[0].id] : []);
+      setLayerTransforms({});
+      setLayerStyles({});
+      setDeletedLayerIds([]);
+      setDuplicatedLayers([]);
+      setLayerGroups({});
+      setTransformBox(null);
+    }
   }, [selectedAsset]);
 
   // Check if any 3D transformation is active to optimize 2D rendering performance
@@ -2130,15 +2691,31 @@ export default function App() {
     adjustments.is3DFloating
   );
 
-  // Compute live SVG markup with all active layer transforms, per-layer custom styles & colors, material transformations, and uniquely scoped IDs
+  // Compute live SVG markup with all active layer transforms, per-layer custom styles & colors, material transformations, deletions, duplications, and uniquely scoped IDs
   const currentPreviewSvg = useMemo(() => {
     if (!selectedAsset) return '';
 
-    // 1. Global color replacements
-    let colorReplaced = replaceSvgColors(selectedAsset.svgCode, adjustments.colorReplacements);
+    // 1. Tag layers if not already tagged so every element has a guaranteed data-layer-id
+    const { taggedSvg } = extractSvgLayers(selectedAsset.svgCode);
+    let colorReplaced = replaceSvgColors(taggedSvg, adjustments.colorReplacements);
 
-    // 2. Visual material/style transformations (Silhouette, Glassmorphism, Neon Blue, 3D Inflated, Line Art, Vibrant Mesh, etc.)
-    if (activeStyleMode && activeStyleMode !== 'original') {
+    // 2. Visual material/style transformations (support both per-layer styles and global style mode)
+    const layersWithCustomStyles = Object.entries(layerStyles || {})
+      .filter(([_, s]) => s && s.styleMode && s.styleMode !== 'original');
+
+    if (layersWithCustomStyles.length > 0) {
+      const styledLayerIds = new Set(layersWithCustomStyles.map(([id]) => String(id).replace(/^pf_studio_/i, '')));
+      if (activeStyleMode && activeStyleMode !== 'original') {
+        const remainingLayerIds = (layerOrder.length > 0 ? layerOrder : svgLayers.map(l => l.id))
+          .filter(id => !styledLayerIds.has(String(id).replace(/^pf_studio_/i, '')));
+        if (remainingLayerIds.length > 0) {
+          colorReplaced = transformSvgStyle(colorReplaced, activeStyleMode, remainingLayerIds);
+        }
+      }
+      layersWithCustomStyles.forEach(([layerId, style]) => {
+        colorReplaced = transformSvgStyle(colorReplaced, style.styleMode, [layerId]);
+      });
+    } else if (activeStyleMode && activeStyleMode !== 'original') {
       colorReplaced = transformSvgStyle(colorReplaced, activeStyleMode);
     }
 
@@ -2147,8 +2724,16 @@ export default function App() {
       colorReplaced = applyUniversalStroke(colorReplaced, strokeMultiplier, strokeColorMode, customStrokeColor);
     }
 
-    // 4. Per-layer position offsets, rotations, DOM ordering, and per-layer custom styling (fill, stroke, opacity, glow, blur)
-    let transformedSvg = applyLayerTransforms(colorReplaced, layerTransforms, layerOrder, true, layerStyles);
+    // 4. Per-layer position offsets, rotations, scaling, deletions, duplications, DOM ordering, and per-layer custom styling
+    let transformedSvg = applyLayerTransforms(
+      colorReplaced,
+      layerTransforms,
+      layerOrder,
+      true,
+      layerStyles,
+      deletedLayerIds,
+      duplicatedLayers
+    );
 
     // Ensure viewBox exists for responsive freeform scaling/stretching
     if (!transformedSvg.includes('viewBox=') && !transformedSvg.includes('viewbox=')) {
@@ -2167,7 +2752,50 @@ export default function App() {
     }
 
     return scopeSvgIds(transformedSvg, 'pf_studio_');
-  }, [selectedAsset, layerTransforms, layerStyles, layerOrder, adjustments.colorReplacements, activeStyleMode, strokeMultiplier, strokeColorMode, customStrokeColor]);
+  }, [selectedAsset, layerTransforms, layerStyles, layerOrder, deletedLayerIds, duplicatedLayers, adjustments.colorReplacements, activeStyleMode, strokeMultiplier, strokeColorMode, customStrokeColor]);
+
+  // Synchronous SVG viewBox-to-rendered screen pixel ratio (computed immediately on render)
+  const svgScaleRatio = useMemo(() => {
+    const raw = currentPreviewSvg || selectedAsset?.svgCode || '';
+    if (!raw) return 1;
+    const vbMatch = raw.match(/viewBox=["']\s*([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s*["']/i);
+    let vbWidth = 0;
+    if (vbMatch) {
+      vbWidth = parseFloat(vbMatch[3]);
+    }
+    if (!vbWidth || vbWidth <= 0) {
+      const wMatch = raw.match(/width=["']\s*([\d.]+)/i);
+      if (wMatch) vbWidth = parseFloat(wMatch[1]);
+    }
+    if (!vbWidth || vbWidth <= 0) vbWidth = 100;
+    const renderedW = Math.max(1, Math.round(iconWidth * zoomLevel));
+    return vbWidth / renderedW;
+  }, [currentPreviewSvg, selectedAsset, iconWidth, zoomLevel]);
+
+  // Live scale measured directly from real DOM SVG bounding client rect (null until accurately measured)
+  const [measuredSvgScale, setMeasuredSvgScale] = useState(null);
+
+  useEffect(() => {
+    const container = canvasSvgContainerRef.current;
+    if (!container) return;
+    const svg = container.querySelector('svg');
+    if (!svg) return;
+    const vb = svg.viewBox?.baseVal;
+    let vbW = (vb && vb.width > 0) ? vb.width : 0;
+    if (!vbW) {
+      const attrW = parseFloat(svg.getAttribute('width'));
+      if (attrW && attrW > 0) vbW = attrW;
+    }
+    if (!vbW) vbW = 100;
+
+    const rect = svg.getBoundingClientRect();
+    const renderedW = rect.width > 0 ? rect.width : (iconWidth * zoomLevel);
+    if (renderedW > 0 && vbW > 0) {
+      setMeasuredSvgScale(vbW / renderedW);
+    }
+  }, [currentPreviewSvg, iconWidth, iconHeight, zoomLevel]);
+
+  const finalSvgScale = (measuredSvgScale !== null && measuredSvgScale > 0) ? measuredSvgScale : (svgScaleRatio || 1);
 
   // Detect whether currently selected icon is a stroke-based or filled vector
   const isStrokeIcon = useMemo(() => {
@@ -2238,6 +2866,78 @@ export default function App() {
     return false;
   };
 
+  // Select color AND select the bodies of all SVG vector elements that have this color
+  const handleSelectColorAndElements = useCallback((targetColor) => {
+    if (!targetColor) return;
+    setActiveSelectedColor(targetColor);
+    setStudioTab('colors');
+
+    const matchingLayerIds = [];
+    const container = canvasSvgContainerRef.current;
+    if (container) {
+      const allVisualNodes = container.querySelectorAll('[data-layer-id]');
+      allVisualNodes.forEach(el => {
+        if (isElementMatchingColor(el, targetColor)) {
+          const rawId = el.getAttribute('data-layer-id');
+          const cleanId = rawId ? rawId.replace(/^pf_studio_/i, '') : null;
+          if (cleanId && !matchingLayerIds.includes(cleanId)) {
+            matchingLayerIds.push(cleanId);
+          }
+        }
+      });
+
+      // Fallback: Check shape elements if data-layer-id was not yet tagged
+      if (matchingLayerIds.length === 0) {
+        const shapes = container.querySelectorAll('path, rect, circle, ellipse, polygon, polyline, line, text');
+        shapes.forEach((el, idx) => {
+          if (isElementMatchingColor(el, targetColor)) {
+            let id = el.getAttribute('data-layer-id');
+            if (!id) {
+              id = `layer_${idx}`;
+              el.setAttribute('data-layer-id', id);
+            }
+            const cleanId = id.replace(/^pf_studio_/i, '');
+            if (!matchingLayerIds.includes(cleanId)) {
+              matchingLayerIds.push(cleanId);
+            }
+          }
+        });
+      }
+    }
+
+    // Fallback using allSvgLayers
+    if (matchingLayerIds.length === 0 && allSvgLayers.length > 0) {
+      const targetNorm = normalizeColor(targetColor)?.toLowerCase();
+      allSvgLayers.forEach(l => {
+        const rawNorm = normalizeColor(l.rawColor || l.color)?.toLowerCase();
+        if (rawNorm === targetNorm && !matchingLayerIds.includes(l.id)) {
+          matchingLayerIds.push(l.id);
+        }
+      });
+    }
+
+    if (matchingLayerIds.length > 0) {
+      setSelectedLayerIds(matchingLayerIds);
+      setSelectedLayerId(matchingLayerIds[0]);
+    }
+
+    const el = document.getElementById(`color-card-${targetColor.replace('#', '').toLowerCase()}`);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [allSvgLayers, adjustments.colorReplacements]);
+
+  // Open Color Wheel Popover floating directly above the clicked palette swatch
+  const openColorWheelPopover = useCallback((targetEl, color) => {
+    if (!targetEl || !color) return;
+    const rect = targetEl.getBoundingClientRect();
+    const currentHex = adjustments.colorReplacements[color.toLowerCase()] || color;
+    setColorWheelPopover({
+      originalColor: color,
+      currentHex: currentHex,
+      anchorX: Math.round(rect.left + rect.width / 2),
+      anchorY: Math.round(rect.top)
+    });
+  }, [adjustments.colorReplacements]);
+
   // Solid Selection Outline effect on Canvas SVG elements
   useEffect(() => {
     if (!canvasSvgContainerRef.current) return;
@@ -2272,6 +2972,307 @@ export default function App() {
       });
     }
   }, [selectedLayerId, selectedLayerIds, activeSelectedColor, currentPreviewSvg]);
+
+  // Live calculation of the Transform Bounding Box around selected SVG element(s)
+  const updateTransformBox = useCallback(() => {
+    const wsEl = canvasWorkspaceRef.current;
+    const svgContainer = canvasSvgContainerRef.current;
+    if (!wsEl || !svgContainer) {
+      setTransformBox(null);
+      return;
+    }
+
+    const activeIds = selectedLayerIds && selectedLayerIds.length > 0
+      ? selectedLayerIds
+      : (selectedLayerId ? [selectedLayerId] : []);
+
+    if (activeIds.length === 0) {
+      setTransformBox(null);
+      return;
+    }
+
+    const nodes = activeIds.map(id => {
+      const cleanId = String(id).replace(/^pf_studio_/i, '');
+      const numOnly = cleanId.replace(/\D/g, '');
+      return svgContainer.querySelector(`[data-layer-id="${id}"]`) ||
+             svgContainer.querySelector(`[data-layer-id="${cleanId}"]`) ||
+             (numOnly ? svgContainer.querySelector(`[data-layer-id="layer_${numOnly}"]`) : null);
+    }).filter(Boolean);
+
+    if (nodes.length === 0) {
+      setTransformBox(null);
+      return;
+    }
+
+    let minLeft = Infinity;
+    let minTop = Infinity;
+    let maxRight = -Infinity;
+    let maxBottom = -Infinity;
+
+    nodes.forEach(node => {
+      const rect = node.getBoundingClientRect();
+      if (rect.width > 0 || rect.height > 0) {
+        if (rect.left < minLeft) minLeft = rect.left;
+        if (rect.top < minTop) minTop = rect.top;
+        if (rect.right > maxRight) maxRight = rect.right;
+        if (rect.bottom > maxBottom) maxBottom = rect.bottom;
+      }
+    });
+
+    if (!isFinite(minLeft) || !isFinite(minTop)) {
+      setTransformBox(null);
+      return;
+    }
+
+    const wsRect = wsEl.getBoundingClientRect();
+    const zoomScaleX = wsEl.offsetWidth > 0 ? (wsRect.width / wsEl.offsetWidth) : 1;
+    const zoomScaleY = wsEl.offsetHeight > 0 ? (wsRect.height / wsEl.offsetHeight) : 1;
+
+    const pad = 0;
+    const x = (minLeft - wsRect.left) / zoomScaleX;
+    const y = (minTop - wsRect.top) / zoomScaleY;
+    const width = (maxRight - minLeft) / zoomScaleX;
+    const height = (maxBottom - minTop) / zoomScaleY;
+
+    setTransformBox({
+      x,
+      y,
+      width,
+      height,
+      minLeft,
+      minTop,
+      maxRight,
+      maxBottom
+    });
+  }, [selectedLayerIds, selectedLayerId]);
+
+  useEffect(() => {
+    updateTransformBox();
+  }, [updateTransformBox, currentPreviewSvg, zoomLevel, canvasPan, layerTransforms]);
+
+  // Transform handle pointer down: Handles corner proportional scaling, edge stretching, and rotation
+  const handleTransformHandleDown = (e, handleType) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const activeIds = selectedLayerIds && selectedLayerIds.length > 0
+      ? selectedLayerIds
+      : (selectedLayerId ? [selectedLayerId] : []);
+
+    if (activeIds.length === 0 || !transformBox) return;
+
+    recordUndo();
+
+    const startClientX = e.clientX;
+    const startClientY = e.clientY;
+    const startBox = { ...transformBox };
+
+    const wsEl = canvasWorkspaceRef.current;
+    const wsRect = wsEl ? wsEl.getBoundingClientRect() : { width: 1, height: 1 };
+    const zoomScaleX = wsEl?.offsetWidth > 0 ? (wsRect.width / wsEl.offsetWidth) : 1;
+    const zoomScaleY = wsEl?.offsetHeight > 0 ? (wsRect.height / wsEl.offsetHeight) : 1;
+
+    const centerClientX = (startBox.minLeft + startBox.maxRight) / 2;
+    const centerClientY = (startBox.minTop + startBox.maxBottom) / 2;
+    const startAngle = Math.atan2(startClientY - centerClientY, startClientX - centerClientX) * (180 / Math.PI);
+
+    const initialTransforms = {};
+    const svgContainer = canvasSvgContainerRef.current;
+
+    let groupCx = 0;
+    let groupCy = 0;
+    if (activeIds.length > 1 && svgContainer) {
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      activeIds.forEach(id => {
+        const cleanId = String(id).replace(/^pf_studio_/i, '');
+        const numOnly = cleanId.replace(/\D/g, '');
+        const el = svgContainer.querySelector(`[data-layer-id="${id}"]`) ||
+                   svgContainer.querySelector(`[data-layer-id="${cleanId}"]`) ||
+                   (numOnly ? svgContainer.querySelector(`[data-layer-id="layer_${numOnly}"]`) : null);
+        if (el && el.getBBox) {
+          try {
+            const bbox = el.getBBox();
+            if (bbox.width > 0 || bbox.height > 0) {
+              minX = Math.min(minX, bbox.x);
+              minY = Math.min(minY, bbox.y);
+              maxX = Math.max(maxX, bbox.x + bbox.width);
+              maxY = Math.max(maxY, bbox.y + bbox.height);
+            }
+          } catch (_) {}
+        }
+      });
+      if (minX < Infinity && maxX > -Infinity) {
+        groupCx = (minX + maxX) / 2;
+        groupCy = (minY + maxY) / 2;
+      }
+    }
+
+    activeIds.forEach(id => {
+      const orig = layerTransformsRef.current[id] || { x: 0, y: 0, rotate: 0, scaleX: 1, scaleY: 1 };
+      let cx = (activeIds.length > 1 && groupCx) ? groupCx : (orig.cx || 0);
+      let cy = (activeIds.length > 1 && groupCy) ? groupCy : (orig.cy || 0);
+      if (svgContainer && (!cx || !cy)) {
+        const cleanId = String(id).replace(/^pf_studio_/i, '');
+        const numOnly = cleanId.replace(/\D/g, '');
+        const el = svgContainer.querySelector(`[data-layer-id="${id}"]`) ||
+                   svgContainer.querySelector(`[data-layer-id="${cleanId}"]`) ||
+                   (numOnly ? svgContainer.querySelector(`[data-layer-id="layer_${numOnly}"]`) : null);
+        if (el && el.getBBox) {
+          try {
+            const bbox = el.getBBox();
+            cx = bbox.x + bbox.width / 2;
+            cy = bbox.y + bbox.height / 2;
+          } catch (_) {}
+        }
+      }
+      initialTransforms[id] = {
+        ...orig,
+        scaleX: orig.scaleX ?? 1,
+        scaleY: orig.scaleY ?? 1,
+        cx,
+        cy
+      };
+    });
+
+    let rafId = null;
+
+    const handlePointerMove = (moveEvt) => {
+      moveEvt.preventDefault();
+      const curClientX = moveEvt.clientX;
+      const curClientY = moveEvt.clientY;
+
+      const dx = (curClientX - startClientX) / zoomScaleX;
+      const dy = (curClientY - startClientY) / zoomScaleY;
+
+      if (rafId) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+
+        if (handleType === 'rotate') {
+          const curAngle = Math.atan2(curClientY - centerClientY, curClientX - centerClientX) * (180 / Math.PI);
+          let deltaAngle = curAngle - startAngle;
+          if (moveEvt.shiftKey) {
+            deltaAngle = Math.round(deltaAngle / 15) * 15;
+          }
+
+          setLayerTransforms(prev => {
+            const updated = { ...prev };
+            activeIds.forEach(id => {
+              const init = initialTransforms[id];
+              updated[id] = {
+                ...init,
+                rotate: Math.round(((init.rotate || 0) + deltaAngle) % 360)
+              };
+            });
+            return updated;
+          });
+          return;
+        }
+
+        // Scaling calculations
+        let scaleFactorX = 1;
+        let scaleFactorY = 1;
+
+        if (handleType === 'se') {
+          const newW = Math.max(10, startBox.width + dx);
+          const ratio = newW / startBox.width;
+          scaleFactorX = ratio;
+          scaleFactorY = ratio;
+        } else if (handleType === 'nw') {
+          const newW = Math.max(10, startBox.width - dx);
+          const ratio = newW / startBox.width;
+          scaleFactorX = ratio;
+          scaleFactorY = ratio;
+        } else if (handleType === 'ne') {
+          const newW = Math.max(10, startBox.width + dx);
+          const ratio = newW / startBox.width;
+          scaleFactorX = ratio;
+          scaleFactorY = ratio;
+        } else if (handleType === 'sw') {
+          const newW = Math.max(10, startBox.width - dx);
+          const ratio = newW / startBox.width;
+          scaleFactorX = ratio;
+          scaleFactorY = ratio;
+        } else if (handleType === 'e') {
+          const newW = Math.max(10, startBox.width + dx);
+          scaleFactorX = newW / startBox.width;
+          scaleFactorY = 1;
+        } else if (handleType === 'w') {
+          const newW = Math.max(10, startBox.width - dx);
+          scaleFactorX = newW / startBox.width;
+          scaleFactorY = 1;
+        } else if (handleType === 's') {
+          const newH = Math.max(10, startBox.height + dy);
+          scaleFactorX = 1;
+          scaleFactorY = newH / startBox.height;
+        } else if (handleType === 'n') {
+          const newH = Math.max(10, startBox.height - dy);
+          scaleFactorX = 1;
+          scaleFactorY = newH / startBox.height;
+        }
+
+        setLayerTransforms(prev => {
+          const updated = { ...prev };
+          activeIds.forEach(id => {
+            const init = initialTransforms[id];
+            updated[id] = {
+              ...init,
+              scaleX: Number(Math.max(0.05, init.scaleX * scaleFactorX).toFixed(4)),
+              scaleY: Number(Math.max(0.05, init.scaleY * scaleFactorY).toFixed(4))
+            };
+          });
+          return updated;
+        });
+      });
+    };
+
+    const handlePointerUp = () => {
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerUp);
+    };
+
+    window.addEventListener('pointermove', handlePointerMove, { passive: false });
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
+  };
+
+  // Keyboard Shortcuts: Delete/Backspace to delete part, Ctrl+D to duplicate part
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      const tag = document.activeElement?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || document.activeElement?.isContentEditable) {
+        return;
+      }
+
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        const activeIds = selectedLayerIds && selectedLayerIds.length > 0
+          ? selectedLayerIds
+          : (selectedLayerId ? [selectedLayerId] : []);
+        if (activeIds.length > 0) {
+          e.preventDefault();
+          handleDeleteSelectedLayers();
+        }
+      }
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
+        const activeIds = selectedLayerIds && selectedLayerIds.length > 0
+          ? selectedLayerIds
+          : (selectedLayerId ? [selectedLayerId] : []);
+        if (activeIds.length > 0) {
+          e.preventDefault();
+          handleDuplicateSelectedLayers();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedLayerIds, selectedLayerId]);
 
   const handleColorChange = (originalColor, newColor) => {
     // Record undo state before color replacement
@@ -2374,21 +3375,54 @@ export default function App() {
   // Panel 2: Effects Reset
   const handleResetEffectsPanel = () => {
     recordUndo();
-    setActiveStyleMode('original');
-    setActiveFilterPreset('original');
-    setAdjustments(prev => ({
-      ...prev,
-      hue: 0,
-      saturation: 100,
-      contrast: 100,
-      brightness: 100,
-      sepia: 0,
-      invert: 0,
-      opacity: 100,
-      blur: 0,
-      shadowColor: '#000000',
-      shadowBlur: 0
-    }));
+    const activeIds = (selectedLayerIdsRef.current && selectedLayerIdsRef.current.length > 0)
+      ? selectedLayerIdsRef.current
+      : (selectedLayerIds && selectedLayerIds.length > 0 ? selectedLayerIds : (selectedLayerId ? [selectedLayerId] : []));
+
+    if (activeIds.length > 0) {
+      // Reset only the selected part(s)
+      setLayerStyles(prev => {
+        const next = { ...prev };
+        activeIds.forEach(id => {
+          const cleanId = String(id).replace(/^pf_studio_/i, '');
+          if (next[cleanId]) {
+            const cur = { ...next[cleanId] };
+            delete cur.styleMode;
+            delete cur.glow;
+            delete cur.blur;
+            delete cur.brightness;
+            delete cur.opacity;
+            delete cur.customFilter;
+            next[cleanId] = cur;
+          }
+        });
+        return next;
+      });
+    } else {
+      // Global reset for entire canvas
+      setActiveStyleMode('original');
+      setActiveFilterPreset('original');
+      setLayerStyles(prev => {
+        const next = { ...prev };
+        Object.keys(next).forEach(k => {
+          delete next[k].styleMode;
+        });
+        return next;
+      });
+      setAdjustments(prev => ({
+        ...prev,
+        hue: 0,
+        saturation: 100,
+        contrast: 100,
+        brightness: 100,
+        sepia: 0,
+        invert: 0,
+        opacity: 100,
+        blur: 0,
+        shadowColor: '#000000',
+        shadowBlur: 0
+      }));
+    }
   };
 
   // Panel 3: Dimensions Reset
@@ -2448,6 +3482,9 @@ export default function App() {
     layerTransforms: JSON.parse(JSON.stringify(layerTransforms)),
     layerStyles: JSON.parse(JSON.stringify(layerStyles)),
     layerOrder: [...layerOrder],
+    deletedLayerIds: [...deletedLayerIds],
+    duplicatedLayers: JSON.parse(JSON.stringify(duplicatedLayers)),
+    layerGroups: JSON.parse(JSON.stringify(layerGroups)),
     selectedLayerId,
     selectedLayerIds: [...selectedLayerIds],
     activeStyleMode,
@@ -2482,6 +3519,9 @@ export default function App() {
     if (previous.layerTransforms) setLayerTransforms(previous.layerTransforms);
     if (previous.layerStyles) setLayerStyles(previous.layerStyles);
     if (previous.layerOrder) setLayerOrder(previous.layerOrder);
+    if (previous.deletedLayerIds) setDeletedLayerIds(previous.deletedLayerIds);
+    if (previous.duplicatedLayers) setDuplicatedLayers(previous.duplicatedLayers);
+    if (previous.layerGroups) setLayerGroups(previous.layerGroups);
     if (previous.selectedLayerId !== undefined) setSelectedLayerId(previous.selectedLayerId);
     if (previous.selectedLayerIds) setSelectedLayerIds(previous.selectedLayerIds);
     if (previous.activeStyleMode) setActiveStyleMode(previous.activeStyleMode);
@@ -2509,6 +3549,9 @@ export default function App() {
     if (next.layerTransforms) setLayerTransforms(next.layerTransforms);
     if (next.layerStyles) setLayerStyles(next.layerStyles);
     if (next.layerOrder) setLayerOrder(next.layerOrder);
+    if (next.deletedLayerIds) setDeletedLayerIds(next.deletedLayerIds);
+    if (next.duplicatedLayers) setDuplicatedLayers(next.duplicatedLayers);
+    if (next.layerGroups) setLayerGroups(next.layerGroups);
     if (next.selectedLayerId !== undefined) setSelectedLayerId(next.selectedLayerId);
     if (next.selectedLayerIds) setSelectedLayerIds(next.selectedLayerIds);
     if (next.activeStyleMode) setActiveStyleMode(next.activeStyleMode);
@@ -2549,7 +3592,6 @@ export default function App() {
     const rawLayerId = target.getAttribute('data-layer-id') || target.closest('[data-layer-id]')?.getAttribute('data-layer-id');
     const layerId = rawLayerId ? rawLayerId.replace(/^pf_studio_/, '') : null;
     if (layerId) {
-      setSelectedLayerId(layerId);
       setStudioTab('colors');
     }
 
@@ -2862,10 +3904,29 @@ export default function App() {
     if (!selectedAsset) return;
     setDownloading(true);
     try {
-      // Calculate true export resolution respecting custom aspect ratio
+      // Auto-fit bounds calculation: If autoFitToElements is enabled, calculate exact viewBox containing all elements
+      let autoFitViewBox = null;
+      if (autoFitToElements && canvasSvgContainerRef.current) {
+        autoFitViewBox = calculateArtworkBounds(
+          canvasSvgContainerRef.current,
+          0.04,
+          deletedLayerIds,
+          autoFitFrameMode === 'square'
+        );
+      }
+
+      // Calculate true export resolution respecting tight artwork aspect ratio
       let finalWidth = exportSize;
       let finalHeight = exportSize;
-      if (iconWidth && iconHeight && iconWidth > 0 && iconHeight > 0) {
+      if (autoFitToElements && autoFitViewBox && autoFitViewBox.width > 0 && autoFitViewBox.height > 0) {
+        if (autoFitViewBox.width >= autoFitViewBox.height) {
+          finalWidth = exportSize;
+          finalHeight = Math.max(32, Math.round(exportSize * (autoFitViewBox.height / autoFitViewBox.width)));
+        } else {
+          finalHeight = exportSize;
+          finalWidth = Math.max(32, Math.round(exportSize * (autoFitViewBox.width / autoFitViewBox.height)));
+        }
+      } else if (iconWidth && iconHeight && iconWidth > 0 && iconHeight > 0) {
         if (iconWidth >= iconHeight) {
           finalWidth = exportSize;
           finalHeight = Math.round(exportSize * (iconHeight / iconWidth));
@@ -2896,6 +3957,10 @@ export default function App() {
           layerTransforms,
           layerOrder,
           layerStyles,
+          deletedLayerIds,
+          duplicatedLayers,
+          autoFitToElements,
+          autoFitViewBox,
           activeStyleMode,
           strokeMultiplier,
           strokeColorMode,
@@ -2922,9 +3987,27 @@ export default function App() {
     if (!selectedAsset || downloading) return;
     setDownloading(true);
     try {
+      let autoFitViewBox = null;
+      if (autoFitToElements && canvasSvgContainerRef.current) {
+        autoFitViewBox = calculateArtworkBounds(
+          canvasSvgContainerRef.current,
+          0.04,
+          deletedLayerIds,
+          autoFitFrameMode === 'square'
+        );
+      }
+
       let finalWidth = 512;
       let finalHeight = 512;
-      if (iconWidth && iconHeight) {
+      if (autoFitToElements && autoFitViewBox && autoFitViewBox.width > 0 && autoFitViewBox.height > 0) {
+        if (autoFitViewBox.width >= autoFitViewBox.height) {
+          finalWidth = 512;
+          finalHeight = Math.max(32, Math.round(512 * (autoFitViewBox.height / autoFitViewBox.width)));
+        } else {
+          finalHeight = 512;
+          finalWidth = Math.max(32, Math.round(512 * (autoFitViewBox.width / autoFitViewBox.height)));
+        }
+      } else if (iconWidth && iconHeight) {
         if (iconWidth >= iconHeight) {
           finalWidth = 512;
           finalHeight = Math.round(512 * (iconHeight / iconWidth));
@@ -2947,6 +4030,10 @@ export default function App() {
           layerTransforms,
           layerOrder,
           layerStyles,
+          deletedLayerIds,
+          duplicatedLayers,
+          autoFitToElements,
+          autoFitViewBox,
           activeStyleMode,
           strokeMultiplier,
           strokeColorMode,
@@ -2996,19 +4083,53 @@ export default function App() {
   };
 
   const handleSelectStyleLook = (preset) => {
-    setActiveStyleMode(preset.id || 'original');
-    if (preset.adjustments) {
-      setAdjustments(prev => {
-        // Exclude shadowBlur and shadowColor so user's glow aura setting is preserved
-        const { shadowBlur, shadowColor, ...cleanAdj } = preset.adjustments;
-        return {
-          ...prev,
-          ...cleanAdj,
-          shadowBlur: prev.shadowBlur,
-          shadowColor: prev.shadowColor,
-          colorReplacements: preset.id === 'original' ? {} : prev.colorReplacements
-        };
+    recordUndo();
+    const activeIds = (selectedLayerIdsRef.current && selectedLayerIdsRef.current.length > 0)
+      ? selectedLayerIdsRef.current
+      : (selectedLayerIds && selectedLayerIds.length > 0 ? selectedLayerIds : (selectedLayerId ? [selectedLayerId] : []));
+
+    if (activeIds.length > 0) {
+      // Apply style ONLY to selected part(s)!
+      setLayerStyles(prev => {
+        const next = { ...prev };
+        activeIds.forEach(id => {
+          const cleanId = String(id).replace(/^pf_studio_/i, '');
+          if (preset.id === 'original') {
+            const cur = { ...(next[cleanId] || {}) };
+            delete cur.styleMode;
+            delete cur.glow;
+            next[cleanId] = cur;
+          } else {
+            next[cleanId] = {
+              ...(next[cleanId] || {}),
+              styleMode: preset.id,
+              glow: preset.adjustments?.shadowBlur ? {
+                enabled: true,
+                color: preset.adjustments.shadowColor || '#38bdf8',
+                radius: preset.adjustments.shadowBlur
+              } : (next[cleanId]?.glow),
+              brightness: preset.adjustments?.brightness !== undefined ? preset.adjustments.brightness : next[cleanId]?.brightness,
+              opacity: preset.adjustments?.opacity !== undefined ? preset.adjustments.opacity : next[cleanId]?.opacity
+            };
+          }
+        });
+        return next;
       });
+    } else {
+      // No layer selected: Apply globally to entire artwork
+      setActiveStyleMode(preset.id || 'original');
+      if (preset.adjustments) {
+        setAdjustments(prev => {
+          const { shadowBlur, shadowColor, ...cleanAdj } = preset.adjustments;
+          return {
+            ...prev,
+            ...cleanAdj,
+            shadowBlur: prev.shadowBlur,
+            shadowColor: prev.shadowColor,
+            colorReplacements: preset.id === 'original' ? {} : prev.colorReplacements
+          };
+        });
+      }
     }
   };
 
@@ -3567,6 +4688,19 @@ export default function App() {
                 <span className="hidden sm:inline font-semibold">Reset All</span>
               </button>
 
+              {/* Add Element from Library Button */}
+              <button
+                onClick={() => setIsAddElementModalOpen(true)}
+                title="Add another element from library to this canvas"
+                className={`text-xs flex items-center gap-1 sm:gap-1.5 p-1.5 sm:px-3 sm:py-1.5 rounded-xl border font-semibold transition ${appTheme === 'dark'
+                  ? 'bg-cyan-500/15 border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/25 hover:border-cyan-400'
+                  : 'bg-blue-50 border-blue-200 text-blue-600 hover:bg-blue-100'
+                  }`}
+              >
+                <PlusCircle className="w-3.5 h-3.5 text-cyan-400" />
+                <span className="hidden xs:inline">Add Element</span>
+              </button>
+
               {/* Export Button with Quality & Resolution Dropdown */}
               <div className="relative flex-shrink-0" ref={exportDropdownRef}>
                 <button
@@ -3673,6 +4807,24 @@ export default function App() {
                       </div>
                     </div>
 
+                    {/* Quick Auto-Fit Toggle in Dropdown */}
+                    <div className="flex items-center justify-between mt-3 pt-2.5 border-t border-slate-800">
+                      <div className="flex items-center gap-1.5">
+                        <Maximize2 className="w-3.5 h-3.5 text-cyan-400" />
+                        <span className="text-[11px] font-semibold text-slate-300">Fit Canvas to All Elements</span>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={autoFitToElements}
+                        onChange={(e) => {
+                          const val = e.target.checked;
+                          setAutoFitToElements(val);
+                          localStorage.setItem('iconderry_autofit_elements', String(val));
+                        }}
+                        className="w-4 h-4 accent-cyan-500 rounded cursor-pointer"
+                      />
+                    </div>
+
                     {/* Prominent Action Button for the Selected Quality */}
                     <button
                       onClick={() => {
@@ -3753,6 +4905,129 @@ export default function App() {
                 />
               )}
 
+              {/* Interactive Transform Bounding Box with 8 resize handles & rotation button - Unified Single Sky-Blue Frame */}
+              {transformBox && !isPanning && (
+                <div
+                  ref={transformBoxRef}
+                  style={{
+                    position: 'absolute',
+                    left: `${transformBox.x}px`,
+                    top: `${transformBox.y}px`,
+                    width: `${transformBox.width}px`,
+                    height: `${transformBox.height}px`,
+                  }}
+                  className="pointer-events-none z-30 border-2 border-[#38bdf8] shadow-[0_0_12px_rgba(56,189,248,0.45)] rounded-none"
+                >
+                  {/* 4 Corner Proportional Resize Dots */}
+                  <div
+                    onPointerDown={(e) => handleTransformHandleDown(e, 'nw')}
+                    className="pointer-events-auto absolute -top-2 -left-2 w-3.5 h-3.5 bg-white rounded-full border-2 border-[#38bdf8] shadow-md cursor-nwse-resize hover:scale-125 transition-transform"
+                    title="Drag to scale proportionally"
+                  />
+                  <div
+                    onPointerDown={(e) => handleTransformHandleDown(e, 'ne')}
+                    className="pointer-events-auto absolute -top-2 -right-2 w-3.5 h-3.5 bg-white rounded-full border-2 border-[#38bdf8] shadow-md cursor-nesw-resize hover:scale-125 transition-transform"
+                    title="Drag to scale proportionally"
+                  />
+                  <div
+                    onPointerDown={(e) => handleTransformHandleDown(e, 'se')}
+                    className="pointer-events-auto absolute -bottom-2 -right-2 w-3.5 h-3.5 bg-white rounded-full border-2 border-[#38bdf8] shadow-md cursor-nwse-resize hover:scale-125 transition-transform"
+                    title="Drag to scale proportionally"
+                  />
+                  <div
+                    onPointerDown={(e) => handleTransformHandleDown(e, 'sw')}
+                    className="pointer-events-auto absolute -bottom-2 -left-2 w-3.5 h-3.5 bg-white rounded-full border-2 border-[#38bdf8] shadow-md cursor-nesw-resize hover:scale-125 transition-transform"
+                    title="Drag to scale proportionally"
+                  />
+
+                  {/* 4 Mid-Edge Stretch Pills/Bars */}
+                  <div
+                    onPointerDown={(e) => handleTransformHandleDown(e, 'n')}
+                    className="pointer-events-auto absolute -top-1.5 left-1/2 -translate-x-1/2 w-4 h-2 bg-white rounded-full border border-[#38bdf8] shadow-sm cursor-ns-resize hover:scale-125 transition-transform"
+                    title="Drag to change height"
+                  />
+                  <div
+                    onPointerDown={(e) => handleTransformHandleDown(e, 's')}
+                    className="pointer-events-auto absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-4 h-2 bg-white rounded-full border border-[#38bdf8] shadow-sm cursor-ns-resize hover:scale-125 transition-transform"
+                    title="Drag to change height"
+                  />
+                  <div
+                    onPointerDown={(e) => handleTransformHandleDown(e, 'w')}
+                    className="pointer-events-auto absolute top-1/2 -left-1.5 -translate-y-1/2 w-2 h-4 bg-white rounded-full border border-[#38bdf8] shadow-sm cursor-ew-resize hover:scale-125 transition-transform"
+                    title="Drag to change width"
+                  />
+                  <div
+                    onPointerDown={(e) => handleTransformHandleDown(e, 'e')}
+                    className="pointer-events-auto absolute top-1/2 -right-1.5 -translate-y-1/2 w-2 h-4 bg-white rounded-full border border-[#38bdf8] shadow-sm cursor-ew-resize hover:scale-125 transition-transform"
+                    title="Drag to change width"
+                  />
+
+                  {/* Rotation & Group/Ungroup Controls Container right by the left selection line */}
+                  <div className="pointer-events-auto absolute top-1/2 -left-3 -translate-x-full -translate-y-1/2 flex items-center gap-1.5 z-40">
+                    {/* If single child inside a group is sub-selected: Provide "Select Group" button */}
+                    {isSubSelectedInGroup && activeGroupForSelection && (
+                      <button
+                        type="button"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedLayerIds([...activeGroupForSelection]);
+                          setSelectedLayerId(activeGroupForSelection[0]);
+                        }}
+                        className="h-6 px-2.5 rounded-full border shadow-lg flex items-center gap-1 text-[10px] font-bold transition-all hover:scale-105 active:scale-95 whitespace-nowrap cursor-pointer select-none bg-cyan-500 hover:bg-cyan-400 text-slate-950 border-cyan-300 shadow-cyan-950/40"
+                        title="Click to select all parts in this group together"
+                      >
+                        <Layers className="w-3 h-3 flex-shrink-0" />
+                        <span>Select Group</span>
+                      </button>
+                    )}
+
+                    {/* Group / Ungroup Button */}
+                    {(isCurrentGroupSelected || isSubSelectedInGroup || (selectedLayerIds && selectedLayerIds.length > 1)) && (
+                      <button
+                        type="button"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (isCurrentGroupSelected || isSubSelectedInGroup) {
+                            handleUngroupSelected();
+                          } else {
+                            handleGroupSelected();
+                          }
+                        }}
+                        className={`h-6 px-2.5 rounded-full border shadow-lg flex items-center gap-1 text-[10px] font-bold transition-all hover:scale-105 active:scale-95 whitespace-nowrap cursor-pointer select-none ${
+                          isCurrentGroupSelected || isSubSelectedInGroup
+                            ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 border-amber-300 shadow-amber-950/40'
+                            : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 border-cyan-300 shadow-cyan-950/40'
+                        }`}
+                        title={isCurrentGroupSelected || isSubSelectedInGroup ? "Click to ungroup parts so they become standalone" : "Click to group selected parts"}
+                      >
+                        {isCurrentGroupSelected || isSubSelectedInGroup ? (
+                          <>
+                            <Unlink2 className="w-3 h-3 flex-shrink-0" />
+                            <span>Ungroup</span>
+                          </>
+                        ) : (
+                          <>
+                            <Link2 className="w-3 h-3 flex-shrink-0" />
+                            <span>Group</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+
+                    {/* Rotation Button: Circular button */}
+                    <div
+                      onPointerDown={(e) => handleTransformHandleDown(e, 'rotate')}
+                      className="w-6 h-6 bg-white rounded-full border-2 border-[#38bdf8] shadow-lg flex items-center justify-center cursor-grab active:cursor-grabbing hover:scale-115 hover:border-cyan-300 transition-all text-[#0284c7] hover:text-cyan-500 flex-shrink-0"
+                      title="Drag to rotate smoothly (or click to rotate)"
+                    >
+                      <RotateCw className="w-3.5 h-3.5" />
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Floating Canvas Controls & Direct Selection Indicator (Hidden on mobile UI per user request for a completely clean, empty canvas) */}
               <div className="hidden sm:flex absolute top-2 inset-x-2 sm:top-4 sm:inset-x-6 items-center justify-between z-10 pointer-events-none gap-2">
                 {isCtrlShiftDown || isPanning ? (
@@ -3767,7 +5042,19 @@ export default function App() {
                     }`}>
                     <Layers className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
                     <span>
-                      <strong className="text-cyan-400 font-bold">{selectedLayerIds.length}</strong> {selectedLayerIds.length === 1 ? 'part' : 'parts'} selected
+                      {isSubSelectedInGroup ? (
+                        <>
+                          <strong className="text-cyan-400 font-bold">Group Child Part</strong> (Directly movable)
+                        </>
+                      ) : isCurrentGroupSelected ? (
+                        <>
+                          <strong className="text-amber-400 font-bold">Group</strong> ({selectedLayerIds.length} parts) &bull; Double-click part to isolate
+                        </>
+                      ) : (
+                        <>
+                          <strong className="text-cyan-400 font-bold">{selectedLayerIds.length}</strong> {selectedLayerIds.length === 1 ? 'part' : 'parts'} selected
+                        </>
+                      )}
                     </span>
                     <div className="flex items-center gap-1 ml-1">
                       <button
@@ -3925,6 +5212,10 @@ export default function App() {
                     '--zoom-level': zoomLevel,
                     '--sel-w': `${Math.max(0.02, Number((0.9 / zoomLevel).toFixed(4)))}px`,
                     '--hover-w': `${Math.max(0.015, Number((0.75 / zoomLevel).toFixed(4)))}px`,
+                    '--sel-outline-w': `${Math.max(0.001, Number((2 * finalSvgScale).toFixed(5)))}px`,
+                    '--sel-outline-off': `${Math.max(0.001, Number((2 * finalSvgScale).toFixed(5)))}px`,
+                    '--hover-outline-w': `${Math.max(0.001, Number((1.5 * finalSvgScale).toFixed(5)))}px`,
+                    '--hover-outline-off': `${Math.max(0.001, Number((2 * finalSvgScale).toFixed(5)))}px`,
                     width: `${Math.round(iconWidth * zoomLevel)}px`,
                     height: `${Math.round(iconHeight * zoomLevel)}px`,
                     transform: `translate(${canvasPan.x}px, ${canvasPan.y}px) ${has3D ? `perspective(${adjustments.perspective || 800}px) rotateX(${adjustments.rotateX || 0}deg) rotateY(${adjustments.rotateY || 0}deg) ` : ''}rotate(${adjustments.rotation || 0}deg) skew(${adjustments.skewX || 0}deg, ${adjustments.skewY || 0}deg) scale(${adjustments.flipH ? -1 : 1}, ${adjustments.flipV ? -1 : 1})`,
@@ -3960,14 +5251,23 @@ export default function App() {
                         return (
                           <button
                             key={c.color}
-                            onClick={() => {
-                              setActiveSelectedColor(c.color);
-                              setStudioTab('colors');
-                              const el = document.getElementById(`color-card-${c.color.replace('#', '').toLowerCase()}`);
-                              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                            onClick={(e) => {
+                              const now = Date.now();
+                              const isDoubleClick = lastSwatchClickRef.current.color === c.color && (now - lastSwatchClickRef.current.time < 380);
+                              lastSwatchClickRef.current = { time: now, color: c.color };
+
+                              if (isDoubleClick) {
+                                openColorWheelPopover(e.currentTarget, c.color);
+                              } else {
+                                handleSelectColorAndElements(c.color);
+                              }
                             }}
-                            title={`Original: ${c.color} | Current: ${activeColor}${isChanged ? ' (Modified)' : ''}`}
-                            className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 transition-transform hover:scale-125 relative ${isSelected
+                            onDoubleClick={(e) => {
+                              e.stopPropagation();
+                              openColorWheelPopover(e.currentTarget, c.color);
+                            }}
+                            title={`Click: Select Element Body | Double Click: Open Color Wheel\nOriginal: ${c.color} | Current: ${activeColor}${isChanged ? ' (Modified)' : ''}`}
+                            className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 transition-transform hover:scale-125 relative cursor-pointer ${isSelected
                               ? 'border-cyan-400 ring-2 sm:ring-4 ring-cyan-400/40 scale-110'
                               : isChanged
                                 ? 'border-cyan-400 ring-1 sm:ring-2 ring-cyan-400/30'
@@ -3981,6 +5281,46 @@ export default function App() {
                   </div>
                 )}
               </div>
+
+              {/* Mobile Quick Action Strip when element is selected */}
+              {selectedLayerIds && selectedLayerIds.length > 0 && (
+                <div
+                  data-no-canvas-click="true"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onTouchStart={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                  className="sm:hidden absolute bottom-3 left-1/2 -translate-x-1/2 z-40 pointer-events-auto flex items-center gap-2.5 p-1.5 px-3.5 bg-slate-900/95 backdrop-blur-md border border-cyan-500/50 rounded-2xl shadow-2xl animate-in slide-in-from-bottom-2 duration-150"
+                >
+                  <button
+                    type="button"
+                    data-no-canvas-click="true"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onTouchStart={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDuplicateSelectedLayers();
+                    }}
+                    className="p-1.5 px-3 rounded-xl bg-cyan-500/20 active:bg-cyan-500/40 text-cyan-300 font-bold text-xs flex items-center gap-1.5 shadow-sm active:scale-95 transition-all"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>Duplicate</span>
+                  </button>
+                  <button
+                    type="button"
+                    data-no-canvas-click="true"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onTouchStart={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteSelectedLayers();
+                    }}
+                    className="p-1.5 px-3 rounded-xl bg-rose-500/20 active:bg-rose-500/40 text-rose-300 font-bold text-xs flex items-center gap-1.5 shadow-sm active:scale-95 transition-all"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete</span>
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Draggable Divider Handle between Canvas and Tools (Mobile Vertical Resize) */}
@@ -4805,6 +6145,17 @@ export default function App() {
                               }`}>
                               {svgLayers.length || detectedColors.length}
                             </span>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setIsAddElementModalOpen(true); }}
+                              className={`ml-1 text-[10px] px-2 py-0.5 rounded-lg border font-bold flex items-center gap-1 transition ${appTheme === 'dark'
+                                ? 'bg-cyan-500/15 border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/25'
+                                : 'bg-blue-50 border-blue-200 text-blue-600 hover:bg-blue-100'
+                                }`}
+                              title="Add another element from library"
+                            >
+                              <PlusCircle className="w-3 h-3" />
+                              <span>Add</span>
+                            </button>
                           </div>
                           <div className={`flex items-center gap-2 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
                             <span className="text-[10px] font-normal">
@@ -4860,8 +6211,8 @@ export default function App() {
                                   </span>
                                 </div>
 
-                                {[...layerOrder].reverse().map((layerId, displayIdx) => {
-                                  const layerObj = svgLayers.find(l => l.id === layerId) || {
+                                {[...layerOrder].reverse().filter(id => !deletedLayerIds.includes(id)).map((layerId, displayIdx) => {
+                                  const layerObj = allSvgLayers.find(l => l.id === layerId) || {
                                     id: layerId,
                                     name: layerId.replace('_', ' ').toUpperCase(),
                                     tag: 'shape',
@@ -4906,9 +6257,43 @@ export default function App() {
                                         setDraggedLayerIdx(null);
                                         setDragOverLayerIdx(null);
                                       }}
-                                      onClick={() => {
+                                      onDoubleClick={(e) => {
+                                        e.stopPropagation();
                                         setSelectedLayerId(layerId);
                                         setSelectedLayerIds([layerId]);
+                                      }}
+                                      onClick={(e) => {
+                                        const currentGroups = layerGroupsRef.current || {};
+                                        const belongingGroup = Object.values(currentGroups).find(ids => ids.includes(layerId));
+                                        if (belongingGroup) {
+                                          if (e.ctrlKey || e.metaKey || e.shiftKey) {
+                                            setSelectedLayerIds(prev =>
+                                              belongingGroup.every(x => prev.includes(x))
+                                                ? prev.filter(x => !belongingGroup.includes(x))
+                                                : Array.from(new Set([...prev, ...belongingGroup]))
+                                            );
+                                            setSelectedLayerId(belongingGroup[0]);
+                                          } else {
+                                            if (selectedLayerIds && selectedLayerIds.length === 1 && selectedLayerIds[0] === layerId) {
+                                              // Already sub-selected
+                                              setSelectedLayerId(layerId);
+                                              setSelectedLayerIds([layerId]);
+                                            } else {
+                                              setSelectedLayerId(belongingGroup[0]);
+                                              setSelectedLayerIds(belongingGroup);
+                                            }
+                                          }
+                                        } else {
+                                          if (e.ctrlKey || e.metaKey || e.shiftKey) {
+                                            setSelectedLayerIds(prev =>
+                                              prev.includes(layerId) ? prev.filter(x => x !== layerId) : [...prev, layerId]
+                                            );
+                                            setSelectedLayerId(layerId);
+                                          } else {
+                                            setSelectedLayerId(layerId);
+                                            setSelectedLayerIds([layerId]);
+                                          }
+                                        }
                                       }}
                                       className={`p-2.5 rounded-xl border transition-all cursor-grab active:cursor-grabbing flex items-center justify-between gap-2.5 select-none relative ${isDragging
                                         ? 'opacity-30 scale-[0.98] border-dashed border-cyan-400 bg-cyan-950/20'
@@ -4952,6 +6337,28 @@ export default function App() {
                                       </div>
 
                                       <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                        <button
+                                          onClick={() => {
+                                            setSelectedLayerIds([layerId]);
+                                            setSelectedLayerId(layerId);
+                                            handleDuplicateSelectedLayers();
+                                          }}
+                                          title="Duplicate part (Ctrl + D)"
+                                          className={`p-1 rounded hover:bg-cyan-500/20 text-cyan-400 hover:text-cyan-300 transition`}
+                                        >
+                                          <Copy className="w-3.5 h-3.5" />
+                                        </button>
+                                        <button
+                                          onClick={() => {
+                                            setSelectedLayerIds([layerId]);
+                                            setSelectedLayerId(layerId);
+                                            handleDeleteSelectedLayers();
+                                          }}
+                                          title="Delete part"
+                                          className={`p-1 rounded hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition`}
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </button>
                                         <button
                                           onClick={() => handleBringForward(layerId)}
                                           title="Move layer up (1 step forward)"
@@ -5435,10 +6842,56 @@ export default function App() {
                           })}
                         </div>
 
+                        {/* Status banner: Shows whether effect is applying to Selected Part or Entire Canvas */}
+                        {(() => {
+                          const targetIds = (selectedLayerIds && selectedLayerIds.length > 0)
+                            ? selectedLayerIds
+                            : (selectedLayerId ? [selectedLayerId] : []);
+                          const isPartSelected = targetIds.length > 0;
+                          const primaryId = isPartSelected ? String(targetIds[0]).replace(/^pf_studio_/i, '') : null;
+                          const selectedPart = primaryId ? svgLayers.find(l => String(l.id).replace(/^pf_studio_/i, '') === primaryId) : null;
+
+                          return isPartSelected ? (
+                            <div className={`p-2.5 rounded-xl border flex items-center justify-between text-xs transition ${
+                              appTheme === 'dark' ? 'bg-cyan-500/10 border-cyan-500/30' : 'bg-blue-50 border-blue-200'
+                            }`}>
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse flex-shrink-0" />
+                                <span className={`font-semibold truncate text-[11px] ${appTheme === 'dark' ? 'text-cyan-300' : 'text-blue-800'}`}>
+                                  Selected Part: <span className="underline">{targetIds.length === 1 ? (selectedPart?.name || 'Part 1') : `${targetIds.length} Parts`}</span> (Effect applies only here)
+                                </span>
+                              </div>
+                              <button
+                                onClick={() => { setSelectedLayerIds([]); setSelectedLayerId(null); }}
+                                className={`text-[10px] font-bold underline flex-shrink-0 ml-2 ${
+                                  appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                                }`}
+                                title="Deselect to apply effect to entire canvas"
+                              >
+                                Deselect
+                              </button>
+                            </div>
+                          ) : (
+                            <div className={`p-2 rounded-xl border flex items-center gap-1.5 text-[11px] ${
+                              appTheme === 'dark' ? 'bg-slate-900/60 border-slate-800 text-slate-400' : 'bg-slate-100 border-slate-200 text-slate-600'
+                            }`}>
+                              <Layers className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                              <span>Applying to Entire Canvas. Click any part on canvas to apply effect only to that part.</span>
+                            </div>
+                          );
+                        })()}
+
                         {/* 2-Column Material & Style Cards with Live Visual Preview */}
                         <div className="grid grid-cols-2 gap-2.5 max-h-[500px] overflow-y-auto pr-1">
                           {filteredStyleModes.map((preset) => {
-                            const isCurrentActive = activeStyleMode === preset.id;
+                            const targetIds = (selectedLayerIds && selectedLayerIds.length > 0)
+                              ? selectedLayerIds
+                              : (selectedLayerId ? [selectedLayerId] : []);
+                            const isPartSelected = targetIds.length > 0;
+                            const primaryId = isPartSelected ? String(targetIds[0]).replace(/^pf_studio_/i, '') : null;
+                            const currentPartLook = primaryId && layerStyles[primaryId]?.styleMode;
+                            const effectiveActiveLook = isPartSelected ? (currentPartLook || 'original') : activeStyleMode;
+                            const isCurrentActive = effectiveActiveLook === preset.id;
                             const isNew = preset.isNew || NEW_EFFECT_IDS.has(preset.id);
                             return (
                               <button
@@ -6830,6 +8283,86 @@ export default function App() {
                       />
                     </div>
 
+                    {/* Auto-Fit Canvas to All Elements Toggle (Illustrator Style) */}
+                    <div className={`p-3.5 rounded-2xl border transition-all ${
+                      autoFitToElements 
+                        ? (appTheme === 'dark' ? 'bg-cyan-950/20 border-cyan-500/40 shadow-sm' : 'bg-cyan-50/50 border-cyan-300 shadow-sm')
+                        : (appTheme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200')
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2.5 pr-2">
+                          <div className={`p-2 rounded-xl flex-shrink-0 transition-colors ${
+                            autoFitToElements ? 'bg-cyan-500/20 text-cyan-400' : 'bg-slate-800 text-slate-400'
+                          }`}>
+                            <Maximize2 className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <p className={`text-xs font-bold ${appTheme === 'dark' ? 'text-slate-100' : 'text-slate-900'}`}>
+                                Fit Canvas to All Elements
+                              </p>
+                              <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
+                                Illustrator Auto-Fit
+                              </span>
+                            </div>
+                            <p className={`text-[11px] leading-tight mt-0.5 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                              Door-door rakhe sabhi parts ko bina cut kiye frame me fit karega.
+                            </p>
+                          </div>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={autoFitToElements}
+                          onChange={(e) => {
+                            const val = e.target.checked;
+                            setAutoFitToElements(val);
+                            localStorage.setItem('iconderry_autofit_elements', String(val));
+                          }}
+                          className="w-5 h-5 accent-cyan-500 rounded cursor-pointer flex-shrink-0"
+                        />
+                      </div>
+
+                      {autoFitToElements && (
+                        <div className="mt-3 pt-2.5 border-t border-cyan-500/20 flex items-center justify-between gap-2 flex-wrap sm:flex-nowrap">
+                          <span className={`text-[11px] font-semibold ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                            Export Frame Cut:
+                          </span>
+                          <div className={`flex items-center gap-1 p-0.5 rounded-xl border ${appTheme === 'dark' ? 'bg-slate-950/80 border-slate-800' : 'bg-white border-slate-200 shadow-inner'}`}>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAutoFitFrameMode('tight');
+                                localStorage.setItem('iconderry_autofit_mode', 'tight');
+                              }}
+                              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition ${
+                                autoFitFrameMode === 'tight'
+                                  ? 'bg-cyan-500 text-slate-950 shadow-sm'
+                                  : appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                              }`}
+                              title="Frame ends closely right where outermost elements end (No empty space)"
+                            >
+                              Tight Crop (No empty space)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAutoFitFrameMode('square');
+                                localStorage.setItem('iconderry_autofit_mode', 'square');
+                              }}
+                              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition ${
+                                autoFitFrameMode === 'square'
+                                  ? 'bg-cyan-500 text-slate-950 shadow-sm'
+                                  : appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                              }`}
+                              title="Pad with equal borders into a 1:1 Square"
+                            >
+                              Square 1:1
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
                     {/* Download CTA */}
                     <button
                       onClick={handleDownload}
@@ -7550,6 +9083,419 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Add Element from Library Modal */}
+      {isAddElementModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/75 backdrop-blur-md animate-in fade-in duration-200">
+          <div
+            className={`w-full max-w-3xl max-h-[85vh] rounded-3xl border shadow-2xl flex flex-col overflow-hidden ${
+              appTheme === 'dark' ? 'bg-[#0d1527] border-slate-700/80 text-slate-100' : 'bg-white border-slate-200 text-slate-900'
+            }`}
+          >
+            {/* Header */}
+            <div className="p-4 sm:p-5 border-b border-slate-700/30 flex items-center justify-between flex-shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">
+                  <PlusCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold">Add Element from Library</h3>
+                  <p className={`text-xs ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                    Select any object or icon to insert onto your canvas as editable vector parts
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsAddElementModalOpen(false)}
+                className={`p-2 rounded-xl border transition ${
+                  appTheme === 'dark' ? 'border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-white' : 'border-slate-200 hover:bg-slate-100 text-slate-600'
+                }`}
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Search & Category Filter */}
+            <div className="p-4 border-b border-slate-700/20 flex flex-col sm:flex-row gap-2.5 flex-shrink-0">
+              <div className="relative flex-1">
+                <Search className="absolute left-3.5 top-2.5 text-slate-400 w-4 h-4" />
+                <input
+                  type="text"
+                  placeholder="Search elements by title or tag..."
+                  value={addElementSearch}
+                  onChange={(e) => setAddElementSearch(e.target.value)}
+                  className={`w-full border rounded-xl pl-10 pr-3.5 py-2 text-xs focus:outline-none focus:border-cyan-500 transition ${
+                    appTheme === 'dark' ? 'bg-slate-900/90 border-slate-800 text-slate-100 placeholder-slate-500' : 'bg-slate-50 border-slate-200 text-slate-900'
+                  }`}
+                />
+              </div>
+              <div className="flex gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                {categories.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setAddElementCategory(cat)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
+                      addElementCategory === cat
+                        ? 'bg-cyan-500 text-slate-950 font-bold shadow'
+                        : appTheme === 'dark' ? 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800' : 'bg-slate-100 text-slate-600 border border-slate-200'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Grid of Elements */}
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              {elements.filter(el => {
+                const matchesSearch = el.title.toLowerCase().includes(addElementSearch.toLowerCase()) ||
+                  el.tags?.toLowerCase().includes(addElementSearch.toLowerCase());
+                const matchesCategory = addElementCategory === 'All'
+                  ? true
+                  : addElementCategory === 'Favorites'
+                    ? favorites.includes(el.id)
+                    : el.category === addElementCategory;
+                return matchesSearch && matchesCategory;
+              }).map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => handleInsertElementFromLibrary(item)}
+                  className={`p-3 rounded-2xl border text-left flex flex-col items-center justify-between transition-all duration-200 hover:-translate-y-1 group relative ${
+                    appTheme === 'dark'
+                      ? 'bg-slate-900/80 border-slate-800 hover:border-cyan-400 hover:shadow-lg hover:shadow-cyan-950/40'
+                      : 'bg-slate-50 border-slate-200 hover:border-blue-500 hover:shadow-lg'
+                  }`}
+                >
+                  <div
+                    className="w-20 h-20 sm:w-24 sm:h-24 flex items-center justify-center p-2 mb-2 [&>svg]:w-full [&>svg]:h-full transition-transform group-hover:scale-105 pointer-events-none"
+                    dangerouslySetInnerHTML={{ __html: item.svgCode }}
+                  />
+                  <div className="w-full text-center pointer-events-none">
+                    <span className={`text-xs font-bold truncate block ${appTheme === 'dark' ? 'text-slate-200 group-hover:text-cyan-400' : 'text-slate-900 group-hover:text-blue-600'}`}>
+                      {item.title}
+                    </span>
+                    <span className={`text-[10px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                      {item.category}
+                    </span>
+                  </div>
+                  <div className="mt-2 w-full py-1 text-[10px] font-semibold text-center rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 group-hover:bg-cyan-500 group-hover:text-slate-950 transition">
+                    + Insert to Canvas
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Color Wheel Popover (Opened via double-click on bottom palette swatches) */}
+      {colorWheelPopover && (
+        <ColorWheelPopover
+          popover={colorWheelPopover}
+          onClose={() => setColorWheelPopover(null)}
+          onColorChange={handleColorChange}
+          appTheme={appTheme}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * ColorWheelPopover Component
+ * Displays a 360-degree interactive circular color wheel, lightness slider,
+ * hex input, eyedropper, and quick presets directly floating above the clicked palette swatch.
+ */
+function ColorWheelPopover({ popover, onClose, onColorChange, appTheme }) {
+  const [hexVal, setHexVal] = useState(popover.currentHex || popover.originalColor || '#38bdf8');
+  const initialHsl = hexToHsl(hexVal);
+  const [hsl, setHsl] = useState(initialHsl);
+  const wheelRef = useRef(null);
+  const lightnessRef = useRef(null);
+  const isDraggingWheelRef = useRef(false);
+  const isDraggingLightnessRef = useRef(false);
+  const popoverRef = useRef(null);
+
+  // Sync state if popover prop changes
+  useEffect(() => {
+    const cur = popover.currentHex || popover.originalColor || '#38bdf8';
+    setHexVal(cur);
+    setHsl(hexToHsl(cur));
+  }, [popover.originalColor, popover.currentHex]);
+
+  // Close on Escape or click outside
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    const handleClickOutside = (e) => {
+      if (popoverRef.current && !popoverRef.current.contains(e.target)) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    const timer = setTimeout(() => {
+      document.addEventListener('pointerdown', handleClickOutside);
+    }, 60);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      clearTimeout(timer);
+      document.removeEventListener('pointerdown', handleClickOutside);
+    };
+  }, [onClose]);
+
+  const applyHsl = (newHsl) => {
+    setHsl(newHsl);
+    const newHex = hslToHex(newHsl.h, newHsl.s, newHsl.l);
+    setHexVal(newHex);
+    onColorChange(popover.originalColor, newHex);
+  };
+
+  const handleWheelPointer = (e) => {
+    if (!wheelRef.current) return;
+    const rect = wheelRef.current.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const dx = e.clientX - cx;
+    const dy = e.clientY - cy;
+    const rad = Math.atan2(dy, dx);
+    let deg = Math.round((rad * 180) / Math.PI);
+    if (deg < 0) deg += 360;
+    const dist = Math.hypot(dx, dy);
+    const maxR = rect.width / 2;
+    const sat = Math.min(100, Math.max(0, Math.round((dist / maxR) * 100)));
+    applyHsl({ ...hsl, h: deg, s: sat });
+  };
+
+  const handleWheelDown = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    isDraggingWheelRef.current = true;
+    handleWheelPointer(e);
+
+    const handleMove = (ev) => {
+      if (isDraggingWheelRef.current) handleWheelPointer(ev);
+    };
+    const handleUp = () => {
+      isDraggingWheelRef.current = false;
+      window.removeEventListener('pointermove', handleMove);
+      window.removeEventListener('pointerup', handleUp);
+    };
+    window.addEventListener('pointermove', handleMove);
+    window.addEventListener('pointerup', handleUp);
+  };
+
+  const handleLightnessPointer = (e) => {
+    if (!lightnessRef.current) return;
+    const rect = lightnessRef.current.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const newL = Math.round(5 + ratio * 90);
+    applyHsl({ ...hsl, l: newL });
+  };
+
+  const handleLightnessDown = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    isDraggingLightnessRef.current = true;
+    handleLightnessPointer(e);
+
+    const handleMove = (ev) => {
+      if (isDraggingLightnessRef.current) handleLightnessPointer(ev);
+    };
+    const handleUp = () => {
+      isDraggingLightnessRef.current = false;
+      window.removeEventListener('pointermove', handleMove);
+      window.removeEventListener('pointerup', handleUp);
+    };
+    window.addEventListener('pointermove', handleMove);
+    window.addEventListener('pointerup', handleUp);
+  };
+
+  const handleHexInput = (e) => {
+    const val = e.target.value;
+    setHexVal(val);
+    const norm = normalizeColor(val);
+    if (norm) {
+      const parsedHsl = hexToHsl(norm);
+      setHsl(parsedHsl);
+      onColorChange(popover.originalColor, norm);
+    }
+  };
+
+  const handleQuickColor = (color) => {
+    setHexVal(color);
+    const parsedHsl = hexToHsl(color);
+    setHsl(parsedHsl);
+    onColorChange(popover.originalColor, color);
+  };
+
+  const handleReset = () => {
+    handleQuickColor(popover.originalColor);
+  };
+
+  // Dimensions & Positioning
+  const popoverWidth = 250;
+  const clampedX = Math.max(12, Math.min(window.innerWidth - popoverWidth - 12, popover.anchorX - popoverWidth / 2));
+  const bottomPos = Math.max(16, window.innerHeight - popover.anchorY + 14);
+  const arrowOffset = Math.max(14, Math.min(popoverWidth - 14, popover.anchorX - clampedX));
+
+  // Wheel indicator handle position
+  const wheelRadius = 75; // 150px wheel / 2
+  const handleX = wheelRadius + Math.cos((hsl.h * Math.PI) / 180) * ((hsl.s / 100) * wheelRadius);
+  const handleY = wheelRadius + Math.sin((hsl.h * Math.PI) / 180) * ((hsl.s / 100) * wheelRadius);
+  const lightnessPercent = Math.max(0, Math.min(100, ((hsl.l - 5) / 90) * 100));
+
+  const QUICK_COLORS = [
+    '#ef4444', '#f97316', '#eab308', '#10b981', '#06b6d4',
+    '#3b82f6', '#8b5cf6', '#ec4899', '#ffffff', '#020617'
+  ];
+
+  return (
+    <div
+      ref={popoverRef}
+      role="dialog"
+      aria-label="Color Wheel Popover"
+      className={`fixed z-[9999] rounded-2xl border p-3.5 shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150 select-none ${
+        appTheme === 'dark'
+          ? 'bg-slate-950/95 border-slate-800 text-slate-100 ring-1 ring-white/10'
+          : 'bg-white/95 border-slate-200 text-slate-900 ring-1 ring-black/5'
+      }`}
+      style={{
+        left: `${clampedX}px`,
+        bottom: `${bottomPos}px`,
+        width: `${popoverWidth}px`
+      }}
+    >
+      {/* Downward pointing arrow directly over the clicked swatch */}
+      <div
+        className="absolute -bottom-2 w-4 h-4 rotate-45 pointer-events-none"
+        style={{
+          left: `${arrowOffset - 8}px`,
+          backgroundColor: appTheme === 'dark' ? '#020617' : '#ffffff',
+          borderRight: appTheme === 'dark' ? '1px solid #1e293b' : '1px solid #e2e8f0',
+          borderBottom: appTheme === 'dark' ? '1px solid #1e293b' : '1px solid #e2e8f0'
+        }}
+      />
+
+      {/* Header */}
+      <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800/40">
+        <div className="flex items-center gap-2">
+          <div className="w-3.5 h-3.5 rounded-full bg-gradient-to-tr from-pink-500 via-cyan-400 to-amber-400 shadow-sm" />
+          <span className="text-xs font-bold tracking-wide">Color Wheel</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={handleReset}
+            title="Reset to original color"
+            className="text-[10px] px-1.5 py-0.5 rounded font-medium hover:bg-slate-800 text-slate-400 hover:text-cyan-400 transition cursor-pointer"
+          >
+            Reset
+          </button>
+          <button
+            onClick={onClose}
+            title="Close"
+            className="w-5 h-5 flex items-center justify-center rounded-full hover:bg-slate-800 text-slate-400 hover:text-white transition cursor-pointer"
+          >
+            ×
+          </button>
+        </div>
+      </div>
+
+      {/* Circular Color Wheel */}
+      <div className="flex justify-center py-1">
+        <div
+          ref={wheelRef}
+          onPointerDown={handleWheelDown}
+          className="relative w-[150px] h-[150px] rounded-full cursor-crosshair shadow-inner border border-white/20 select-none touch-none"
+          style={{
+            background: `radial-gradient(circle, #ffffff 0%, rgba(255,255,255,0.7) 20%, rgba(255,255,255,0) 75%, rgba(0,0,0,0.3) 100%), conic-gradient(from 90deg, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)`
+          }}
+        >
+          {/* Wheel handle */}
+          <div
+            className="absolute w-4 h-4 rounded-full border-2 border-white shadow-md pointer-events-none"
+            style={{
+              left: `${handleX}px`,
+              top: `${handleY}px`,
+              transform: 'translate(-50%, -50%)',
+              backgroundColor: hexVal
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Lightness Slider */}
+      <div className="mt-2.5">
+        <div className="flex justify-between items-center text-[10px] mb-1 text-slate-400">
+          <span>Brightness / Light</span>
+          <span className="font-mono">{hsl.l}%</span>
+        </div>
+        <div
+          ref={lightnessRef}
+          onPointerDown={handleLightnessDown}
+          className="relative w-full h-3.5 rounded-full cursor-pointer shadow-inner border border-white/20 select-none touch-none"
+          style={{
+            background: `linear-gradient(to right, #000000, ${hslToHex(hsl.h, hsl.s, 50)}, #ffffff)`
+          }}
+        >
+          <div
+            className="absolute top-1/2 w-3.5 h-3.5 rounded-full border-2 border-white bg-slate-900 shadow-md pointer-events-none"
+            style={{
+              left: `${lightnessPercent}%`,
+              transform: 'translate(-50%, -50%)'
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Hex input & live preview chip */}
+      <div className="mt-2.5 flex items-center gap-2">
+        <div className="relative flex-1">
+          <input
+            type="text"
+            value={hexVal}
+            onChange={handleHexInput}
+            maxLength={7}
+            placeholder="#38bdf8"
+            className={`w-full text-xs font-mono font-bold px-2 py-1 rounded-lg border focus:outline-none focus:border-cyan-400 uppercase ${
+              appTheme === 'dark'
+                ? 'bg-slate-900 border-slate-700 text-white'
+                : 'bg-slate-50 border-slate-300 text-slate-900'
+            }`}
+          />
+        </div>
+        {/* Native color picker button as quick alternative */}
+        <div className="relative w-7 h-7 rounded-lg overflow-hidden border border-white/20 shadow-sm flex-shrink-0 cursor-pointer">
+          <input
+            type="color"
+            value={normalizeColor(hexVal) || '#38bdf8'}
+            onChange={(e) => handleQuickColor(e.target.value)}
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            title="Open system color picker"
+          />
+          <div
+            className="w-full h-full"
+            style={{ backgroundColor: hexVal }}
+          />
+        </div>
+      </div>
+
+      {/* Quick Color Swatches */}
+      <div className="mt-2.5 pt-2 border-t border-slate-800/40 flex items-center justify-between gap-1">
+        {QUICK_COLORS.map(c => (
+          <button
+            key={c}
+            onClick={() => handleQuickColor(c)}
+            title={c}
+            className={`w-4 h-4 rounded-full border transition-transform hover:scale-125 cursor-pointer ${
+              hexVal.toLowerCase() === c.toLowerCase() ? 'ring-2 ring-cyan-400 scale-110' : 'border-black/20'
+            }`}
+            style={{ backgroundColor: c }}
+          />
+        ))}
+      </div>
     </div>
   );
 }

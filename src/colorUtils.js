@@ -87,6 +87,68 @@ export function normalizeColor(colorStr) {
   return null;
 }
 
+export function hslToHex(h, s, l) {
+  let normH = ((h % 360) + 360) % 360;
+  let normS = s > 1 ? s / 100 : s;
+  let normL = l > 1 ? l / 100 : l;
+  normS = Math.max(0, Math.min(1, normS));
+  normL = Math.max(0, Math.min(1, normL));
+
+  const c = (1 - Math.abs(2 * normL - 1)) * normS;
+  const x = c * (1 - Math.abs(((normH / 60) % 2) - 1));
+  const m = normL - c / 2;
+  let r = 0, g = 0, b = 0;
+
+  if (normH >= 0 && normH < 60) {
+    r = c; g = x; b = 0;
+  } else if (normH >= 60 && normH < 120) {
+    r = x; g = c; b = 0;
+  } else if (normH >= 120 && normH < 180) {
+    r = 0; g = c; b = x;
+  } else if (normH >= 180 && normH < 240) {
+    r = 0; g = x; b = c;
+  } else if (normH >= 240 && normH < 300) {
+    r = x; g = 0; b = c;
+  } else {
+    r = c; g = 0; b = x;
+  }
+
+  const toHex = val => Math.round((val + m) * 255).toString(16).padStart(2, '0');
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
+export function hexToHsl(hexStr) {
+  const norm = normalizeColor(hexStr) || '#38bdf8';
+  let r = parseInt(norm.slice(1, 3), 16) / 255;
+  let g = parseInt(norm.slice(3, 5), 16) / 255;
+  let b = parseInt(norm.slice(5, 7), 16) / 255;
+
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const delta = max - min;
+
+  let h = 0;
+  let s = 0;
+  let l = (max + min) / 2;
+
+  if (delta !== 0) {
+    s = l > 0.5 ? delta / (2 - max - min) : delta / (max + min);
+    if (max === r) {
+      h = ((g - b) / delta + (g < b ? 6 : 0)) * 60;
+    } else if (max === g) {
+      h = ((b - r) / delta + 2) * 60;
+    } else {
+      h = ((r - g) / delta + 4) * 60;
+    }
+  }
+
+  return {
+    h: Math.round(((h % 360) + 360) % 360),
+    s: Math.round(s * 100),
+    l: Math.round(l * 100)
+  };
+}
+
 export function adjustColorBrightness(hex, percent) {
   const norm = normalizeColor(hex);
   if (!norm) return hex;

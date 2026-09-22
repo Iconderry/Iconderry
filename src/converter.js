@@ -1,6 +1,6 @@
 import { replaceSvgColors, applyUniversalStroke } from './colorUtils';
 import { transformSvgStyle } from './styleTransformer';
-import { applyLayerTransforms } from './layerUtils';
+import { applyLayerTransforms, extractSvgLayers } from './layerUtils';
 import { GIFEncoder, quantize, applyPalette } from 'gifenc';
 
 export async function downloadAsset({
@@ -92,8 +92,8 @@ export async function downloadAsset({
     }
 
     const blob = new Blob([preparedSvg], { type: 'image/svg+xml;charset=utf-8' });
-    triggerDownload(blob, `${baseFilename}.svg`);
-    return Promise.resolve(true);
+    await triggerDownload(blob, `${baseFilename}.svg`);
+    return true;
   }
 
   return new Promise((resolve, reject) => {
@@ -106,7 +106,6 @@ export async function downloadAsset({
     const blobUrl = URL.createObjectURL(blob);
 
     const img = new Image();
-    img.crossOrigin = 'anonymous';
 
     img.onload = () => {
       const canvas = document.createElement('canvas');
@@ -298,11 +297,15 @@ export async function downloadAsset({
       const mimeType = format === 'jpeg' ? 'image/jpeg' : format === 'webp' ? 'image/webp' : 'image/png';
       const compressionQuality = Math.max(0.1, Math.min(1.0, Number(quality) || 0.92));
 
-      canvas.toBlob((resBlob) => {
+      canvas.toBlob(async (resBlob) => {
         URL.revokeObjectURL(blobUrl);
         if (resBlob) {
-          triggerDownload(resBlob, `${baseFilename}.${format}`);
-          resolve(true);
+          try {
+            await triggerDownload(resBlob, `${baseFilename}.${format}`);
+            resolve(true);
+          } catch (err) {
+            reject(err);
+          }
         } else {
           reject(new Error('Conversion failed'));
         }
@@ -408,8 +411,27 @@ function prepareSvgWithAdjustments(svgCode, adjustments = {}, targetWidth, targe
     res = replaceSvgColors(res, adjustments.colorReplacements);
   }
 
-  // Apply real material/look style transformation (Silhouette, Glass, Neon, 3D Inflated, Line Art, Vibrant Mesh, etc.)
-  if (adjustments.activeStyleMode && adjustments.activeStyleMode !== 'original') {
+  // Ensure all visual elements have stable data-layer-id tags before applying styles & transforms
+  const { taggedSvg } = extractSvgLayers(res);
+  res = taggedSvg;
+
+  // Apply real material/look style transformation (supports per-layer styles and global style)
+  const layersWithCustomStyles = Object.entries(adjustments.layerStyles || {})
+    .filter(([_, s]) => s && s.styleMode && s.styleMode !== 'original');
+
+  if (layersWithCustomStyles.length > 0) {
+    const styledLayerIds = new Set(layersWithCustomStyles.map(([id]) => String(id).replace(/^pf_studio_/i, '')));
+    if (adjustments.activeStyleMode && adjustments.activeStyleMode !== 'original') {
+      const allIds = adjustments.layerOrder || [];
+      const remaining = allIds.filter(id => !styledLayerIds.has(String(id).replace(/^pf_studio_/i, '')));
+      if (remaining.length > 0) {
+        res = transformSvgStyle(res, adjustments.activeStyleMode, remaining);
+      }
+    }
+    layersWithCustomStyles.forEach(([layerId, style]) => {
+      res = transformSvgStyle(res, style.styleMode, [layerId]);
+    });
+  } else if (adjustments.activeStyleMode && adjustments.activeStyleMode !== 'original') {
     res = transformSvgStyle(res, adjustments.activeStyleMode);
   }
 
@@ -421,8 +443,29 @@ function prepareSvgWithAdjustments(svgCode, adjustments = {}, targetWidth, targe
   // Apply individual vector layer moves, rotations, DOM reordering, and per-layer custom styles
   if ((adjustments.layerTransforms && Object.keys(adjustments.layerTransforms).length > 0) || 
       (adjustments.layerOrder && adjustments.layerOrder.length > 0) ||
-      (adjustments.layerStyles && Object.keys(adjustments.layerStyles).length > 0)) {
-    res = applyLayerTransforms(res, adjustments.layerTransforms || {}, adjustments.layerOrder || [], false, adjustments.layerStyles || {});
+      (adjustments.layerStyles && Object.keys(adjustments.layerStyles).length > 0) ||
+      (adjustments.deletedLayerIds && adjustments.deletedLayerIds.length > 0) ||
+      (adjustments.duplicatedLayers && adjustments.duplicatedLayers.length > 0)) {
+    res = applyLayerTransforms(
+      res, 
+      adjustments.layerTransforms || {}, 
+      adjustments.layerOrder || [], 
+      false, 
+      adjustments.layerStyles || {},
+      adjustments.deletedLayerIds || [],
+      adjustments.duplicatedLayers || []
+    );
+  }
+
+  // Auto-Fit ViewBox: If enabled, expand viewBox so all scattered/moved elements fit perfectly inside the canvas without any clipping
+  if (adjustments.autoFitToElements && adjustments.autoFitViewBox) {
+    const { minX, minY, width, height } = adjustments.autoFitViewBox;
+    const newVb = `${minX} ${minY} ${width} ${height}`;
+    if (/viewBox="[^"]*"/i.test(res)) {
+      res = res.replace(/viewBox="[^"]*"/i, `viewBox="${newVb}"`);
+    } else {
+      res = res.replace('<svg', `<svg viewBox="${newVb}"`);
+    }
   }
 
   // Ensure viewBox exists for responsive scaling before updating width/height
@@ -438,11 +481,12 @@ function prepareSvgWithAdjustments(svgCode, adjustments = {}, targetWidth, targe
     }
   }
 
-  // Ensure preserveAspectRatio="none" so it stretches to targetWidth and targetHeight independently
+  // Preserve aspect ratio cleanly (xMidYMid meet for auto-fit or none for custom dimension stretching)
+  const aspectRule = adjustments.autoFitToElements ? 'xMidYMid meet' : 'none';
   if (res.includes('preserveAspectRatio=')) {
-    res = res.replace(/preserveAspectRatio="[^"]*"/gi, 'preserveAspectRatio="none"');
+    res = res.replace(/preserveAspectRatio="[^"]*"/gi, `preserveAspectRatio="${aspectRule}"`);
   } else {
-    res = res.replace('<svg', '<svg preserveAspectRatio="none"');
+    res = res.replace('<svg', `<svg preserveAspectRatio="${aspectRule}"`);
   }
 
   // Ensure overflow: visible so native SVG filters and glows don't get clipped by the viewBox boundary
@@ -938,16 +982,67 @@ async function exportAnimatedGif({
   gif.finish();
   const buffer = gif.bytes();
   const blob = new Blob([buffer], { type: 'image/gif' });
-  triggerDownload(blob, `${safeFilename}-${gifW}x${gifH}.gif`);
+  await triggerDownload(blob, `${safeFilename}-${gifW}x${gifH}.gif`);
   URL.revokeObjectURL(blobUrl);
   return true;
 }
 
-function triggerDownload(blob, fullFilename) {
+async function triggerDownload(blob, fullFilename) {
+  // Helper to convert Blob to pure base64 string
+  const getBase64 = () => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = () => {
+      const dataUrl = reader.result;
+      const base64 = typeof dataUrl === 'string' && dataUrl.includes(',')
+        ? dataUrl.split(',')[1]
+        : dataUrl;
+      resolve(base64);
+    };
+    reader.readAsDataURL(blob);
+  });
+
+  // 1. Android APK Native Direct Download: saves straight to device's public Downloads folder without any share screen!
+  if (typeof window !== 'undefined' && window.AndroidNativeDownloader && typeof window.AndroidNativeDownloader.downloadFile === 'function') {
+    try {
+      const base64Data = await getBase64();
+      window.AndroidNativeDownloader.downloadFile(base64Data, fullFilename, blob.type || 'image/png');
+      return;
+    } catch (err) {
+      console.warn('AndroidNativeDownloader error, falling back:', err);
+    }
+  }
+
+  // 2. Native Capacitor Filesystem fallback (save directly to Documents without share dialog)
+  const isNative = typeof window !== 'undefined' && (
+    window.Capacitor?.isNativePlatform?.() ||
+    document.documentElement.classList.contains('is-native-capacitor')
+  );
+
+  if (isNative) {
+    try {
+      const { Filesystem, Directory } = await import('@capacitor/filesystem');
+      const base64Data = await getBase64();
+      await Filesystem.writeFile({
+        path: fullFilename,
+        data: base64Data,
+        directory: Directory.Documents
+      });
+      return;
+    } catch (nativeErr) {
+      console.warn('Capacitor Filesystem direct save error:', nativeErr);
+    }
+  }
+
+  // 3. Default for all devices (PC, Mac, Linux, Android/iOS Browsers):
+  // Directly downloads straight to the device's default Downloads folder without any share sheet!
   const link = document.createElement('a');
   link.href = window.URL.createObjectURL(blob);
   link.download = fullFilename;
   document.body.appendChild(link);
   link.click();
-  document.body.removeChild(link);
+  setTimeout(() => {
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(link.href);
+  }, 250);
 }
