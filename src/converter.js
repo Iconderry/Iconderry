@@ -199,14 +199,19 @@ export async function downloadAsset({
       const skY = adjustments.skewY || 0;
       const has3D = rotX !== 0 || rotY !== 0 || skX !== 0 || skY !== 0;
 
-      // Icon Padding / Inset
-      let paddingRatio = adjustments.shadowBlur > 0 ? 0.76 : 0.86;
+      // Icon Padding / Inset:
+      // Default to 1.0 (edge-to-edge, zero artificial white padding/shrinkage).
+      // Only reduce padding when shadow blur, container badge shapes, or 3D tilt would otherwise clip outside canvas.
+      let paddingRatio = 1.0;
+      if (adjustments.shadowBlur > 0) {
+        paddingRatio = 0.88;
+      }
       if (adjustments.bgShape && adjustments.bgShape !== 'none') {
         const shapePad = Number(adjustments.bgShapePadding || 20) / 100;
         paddingRatio = Math.max(0.2, (1 - shapePad * 1.5));
       }
       if (has3D) {
-        paddingRatio *= 0.82; // Margin so 3D perspective tilted corners and glow don't get clipped by canvas bounds
+        paddingRatio = Math.min(paddingRatio, 0.82); // Margin so 3D perspective tilted corners and glow don't get clipped by canvas bounds
       }
 
       const drawWidth = targetWidth * paddingRatio;
@@ -457,44 +462,52 @@ function prepareSvgWithAdjustments(svgCode, adjustments = {}, targetWidth, targe
     );
   }
 
-  // Auto-Fit ViewBox: If enabled, expand viewBox so all scattered/moved elements fit perfectly inside the canvas without any clipping
-  if (adjustments.autoFitToElements && adjustments.autoFitViewBox) {
+  // Auto-Fit ViewBox: If enabled or explicit box provided, update viewBox strictly on root <svg>
+  if (adjustments.autoFitViewBox) {
     const { minX, minY, width, height } = adjustments.autoFitViewBox;
     const newVb = `${minX} ${minY} ${width} ${height}`;
-    if (/viewBox="[^"]*"/i.test(res)) {
-      res = res.replace(/viewBox="[^"]*"/i, `viewBox="${newVb}"`);
-    } else {
-      res = res.replace('<svg', `<svg viewBox="${newVb}"`);
-    }
+    res = res.replace(/<svg\b([^>]*)>/i, (match, attrs) => {
+      let updated = attrs;
+      if (/viewBox="[^"]*"/i.test(updated)) {
+        updated = updated.replace(/viewBox="[^"]*"/i, `viewBox="${newVb}"`);
+      } else {
+        updated += ` viewBox="${newVb}"`;
+      }
+      return `<svg${updated}>`;
+    });
   }
 
   // Ensure viewBox exists for responsive scaling before updating width/height
-  if (!res.includes('viewBox=') && !res.includes('viewbox=')) {
-    const wMatch = res.match(/width="([0-9.]+)(?:px)?"/i);
-    const hMatch = res.match(/height="([0-9.]+)(?:px)?"/i);
-    if (wMatch && hMatch) {
-      const w = wMatch[1];
-      const h = hMatch[1];
-      res = res.replace('<svg', `<svg viewBox="0 0 ${w} ${h}"`);
-    } else {
-      res = res.replace('<svg', '<svg viewBox="0 0 100 100"');
+  res = res.replace(/<svg\b([^>]*)>/i, (match, attrs) => {
+    let updated = attrs;
+    if (!/viewBox=/i.test(updated)) {
+      const wMatch = updated.match(/\bwidth="([0-9.]+)(?:px)?"/i);
+      const hMatch = updated.match(/\bheight="([0-9.]+)(?:px)?"/i);
+      if (wMatch && hMatch) {
+        updated += ` viewBox="0 0 ${wMatch[1]} ${hMatch[1]}"`;
+      } else {
+        updated += ' viewBox="0 0 100 100"';
+      }
     }
-  }
+    return `<svg${updated}>`;
+  });
 
-  // Preserve aspect ratio cleanly (xMidYMid meet for auto-fit or none for custom dimension stretching)
-  const aspectRule = adjustments.autoFitToElements ? 'xMidYMid meet' : 'none';
-  if (res.includes('preserveAspectRatio=')) {
-    res = res.replace(/preserveAspectRatio="[^"]*"/gi, `preserveAspectRatio="${aspectRule}"`);
-  } else {
-    res = res.replace('<svg', `<svg preserveAspectRatio="${aspectRule}"`);
-  }
-
-  // Ensure overflow: visible so native SVG filters and glows don't get clipped by the viewBox boundary
-  if (res.includes('overflow=')) {
-    res = res.replace(/overflow="[^"]*"/gi, 'overflow="visible"');
-  } else {
-    res = res.replace('<svg', '<svg overflow="visible"');
-  }
+  // Preserve aspect ratio cleanly & ensure overflow: visible STRICTLY on root <svg>
+  const aspectRule = 'xMidYMid meet';
+  res = res.replace(/<svg\b([^>]*)>/i, (match, attrs) => {
+    let updated = attrs;
+    if (/preserveAspectRatio="[^"]*"/i.test(updated)) {
+      updated = updated.replace(/preserveAspectRatio="[^"]*"/i, `preserveAspectRatio="${aspectRule}"`);
+    } else {
+      updated += ` preserveAspectRatio="${aspectRule}"`;
+    }
+    if (/overflow="[^"]*"/i.test(updated)) {
+      updated = updated.replace(/overflow="[^"]*"/i, 'overflow="visible"');
+    } else {
+      updated += ' overflow="visible"';
+    }
+    return `<svg${updated}>`;
+  });
 
   // Expand native SVG filter boundaries so diffuse blur/glow effects never clip against tight filter bounds
   res = res.replace(/<filter\b([^>]*)>/gi, (match, attrs) => {
@@ -522,19 +535,23 @@ function prepareSvgWithAdjustments(svgCode, adjustments = {}, targetWidth, targe
     return `<filter${updated}>`;
   });
 
-  // Set explicit width and height on SVG element
+  // Set explicit width and height STRICTLY on root <svg> element
+  // (CRITICAL: NEVER replace width/height globally across the SVG, which mutates child <rect>, <path>, or shapes!)
   if (targetWidth && targetHeight) {
-    if (/\bwidth="[^"]*"/i.test(res)) {
-      res = res.replace(/\bwidth="[^"]*"/i, `width="${targetWidth}"`);
-    } else {
-      res = res.replace('<svg', `<svg width="${targetWidth}"`);
-    }
-
-    if (/\bheight="[^"]*"/i.test(res)) {
-      res = res.replace(/\bheight="[^"]*"/i, `height="${targetHeight}"`);
-    } else {
-      res = res.replace('<svg', `<svg height="${targetHeight}"`);
-    }
+    res = res.replace(/<svg\b([^>]*)>/i, (match, attrs) => {
+      let updated = attrs;
+      if (/\bwidth="[^"]*"/i.test(updated)) {
+        updated = updated.replace(/\bwidth="[^"]*"/i, `width="${targetWidth}"`);
+      } else {
+        updated += ` width="${targetWidth}"`;
+      }
+      if (/\bheight="[^"]*"/i.test(updated)) {
+        updated = updated.replace(/\bheight="[^"]*"/i, `height="${targetHeight}"`);
+      } else {
+        updated += ` height="${targetHeight}"`;
+      }
+      return `<svg${updated}>`;
+    });
   }
 
   if (adjustments.customColor) {

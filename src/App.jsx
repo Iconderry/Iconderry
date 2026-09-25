@@ -8,7 +8,8 @@ import {
   ZoomIn, ZoomOut, Maximize2, Link2, Unlink2, Wand2, Scan,
   Heart, Shapes, MessageSquarePlus, Shield, FileText, Info,
   Box, Compass, Move3d, Film, Play, Activity, GripVertical,
-  Move, ArrowUp, ArrowDown, ChevronsUp, ChevronsDown, Copy
+  Move, ArrowUp, ArrowDown, ChevronsUp, ChevronsDown, Copy,
+  Crosshair, AlignCenter
 } from 'lucide-react';
 import { INITIAL_ELEMENTS } from './initialData';
 import { downloadAsset } from './converter';
@@ -1123,7 +1124,7 @@ export default function App() {
   const [exportSize, setExportSize] = useState(() => Number(localStorage.getItem('iconderry_default_size')) || 1024);
   const [isTransparent, setIsTransparent] = useState(true);
   const [autoFitToElements, setAutoFitToElements] = useState(() => localStorage.getItem('iconderry_autofit_elements') !== 'false');
-  const [autoFitFrameMode, setAutoFitFrameMode] = useState(() => localStorage.getItem('iconderry_autofit_mode') || 'tight');
+  const [autoFitFrameMode, setAutoFitFrameMode] = useState(() => localStorage.getItem('iconderry_autofit_mode') || 'square');
   const [downloading, setDownloading] = useState(false);
   const [previewBg, setPreviewBg] = useState(() => localStorage.getItem('iconderry_default_bg') || 'dark');
   const [zoomLevel, setZoomLevel] = useState(1);
@@ -1203,6 +1204,7 @@ export default function App() {
   const [transformBox, setTransformBox] = useState(null);
   const transformBoxRef = useRef(null);
   const lastCanvasClickRef = useRef({ time: 0, layerId: null, x: 0, y: 0 });
+  const clipboardLayersRef = useRef(null);
 
   // Sync refs when zoomLevel is updated externally
   useEffect(() => {
@@ -1374,6 +1376,11 @@ export default function App() {
           maxPanY = 0;
         }
 
+        if (e.pointerType === 'mouse' && e.buttons === 0) {
+          handlePointerUp();
+          return;
+        }
+
         const rawX = startPanOffsetRef.current.x + dx;
         const rawY = startPanOffsetRef.current.y + dy;
         const nextX = Math.round(Math.max(-maxPanX, Math.min(maxPanX, rawX)));
@@ -1384,22 +1391,31 @@ export default function App() {
       };
 
       const handlePointerUp = () => {
-        if (isDraggingPanRef.current) {
-          isDraggingPanRef.current = false;
-          setIsPanning(false);
-          justFinishedPanRef.current = true;
-          setTimeout(() => {
-            justFinishedPanRef.current = false;
-          }, 80);
+        try {
+          if (isDraggingPanRef.current) {
+            isDraggingPanRef.current = false;
+            setIsPanning(false);
+            justFinishedPanRef.current = true;
+            setTimeout(() => {
+              justFinishedPanRef.current = false;
+            }, 80);
+          }
+        } finally {
+          window.removeEventListener('pointermove', handlePointerMove, true);
+          window.removeEventListener('pointerup', handlePointerUp, true);
+          window.removeEventListener('pointercancel', handlePointerUp, true);
+          window.removeEventListener('mouseup', handlePointerUp, true);
+          window.removeEventListener('touchend', handlePointerUp, true);
+          window.removeEventListener('blur', handlePointerUp);
         }
-        window.removeEventListener('pointermove', handlePointerMove);
-        window.removeEventListener('pointerup', handlePointerUp);
-        window.removeEventListener('pointercancel', handlePointerUp);
       };
 
-      window.addEventListener('pointermove', handlePointerMove);
-      window.addEventListener('pointerup', handlePointerUp);
-      window.addEventListener('pointercancel', handlePointerUp);
+      window.addEventListener('pointermove', handlePointerMove, { capture: true });
+      window.addEventListener('pointerup', handlePointerUp, { capture: true });
+      window.addEventListener('pointercancel', handlePointerUp, { capture: true });
+      window.addEventListener('mouseup', handlePointerUp, { capture: true });
+      window.addEventListener('touchend', handlePointerUp, { capture: true });
+      window.addEventListener('blur', handlePointerUp);
       return;
     }
 
@@ -1508,6 +1524,23 @@ export default function App() {
 
         if (activeIds.length === 0) return;
 
+        // Synchronously update selection refs so all subsequent methods and closures read the accurate target
+        selectedLayerIdsRef.current = activeIds;
+        selectedLayerIdRef.current = activeIds[0] || null;
+
+        // Immediately compute fresh transformBox for activeIds synchronously
+        const freshBox = updateTransformBox(activeIds);
+        const startTransformBox = freshBox ? { ...freshBox } : (transformBox ? { ...transformBox } : null);
+
+        // Instantly align the bounding box frame to freshBox in DOM if frame already exists
+        if (transformBoxRef.current && freshBox) {
+          transformBoxRef.current.style.left = `${freshBox.x}px`;
+          transformBoxRef.current.style.top = `${freshBox.y}px`;
+          transformBoxRef.current.style.width = `${freshBox.width}px`;
+          transformBoxRef.current.style.height = `${freshBox.height}px`;
+          transformBoxRef.current.style.transform = '';
+        }
+
         e.preventDefault();
         e.stopPropagation();
 
@@ -1547,7 +1580,6 @@ export default function App() {
         const wsRect = wsEl ? wsEl.getBoundingClientRect() : null;
         const zoomScaleX = wsEl?.offsetWidth > 0 ? (wsRect.width / wsEl.offsetWidth) : 1;
         const zoomScaleY = wsEl?.offsetHeight > 0 ? (wsRect.height / wsEl.offsetHeight) : 1;
-        const startTransformBox = transformBox ? { ...transformBox } : null;
 
         // Query active DOM nodes once at start so we can update them directly during drag with 0 SVG re-parsing
         const svgContainer = canvasSvgContainerRef.current;
@@ -1557,7 +1589,10 @@ export default function App() {
           const node = svgContainer?.querySelector(`[data-layer-id="${id}"]`) ||
                        svgContainer?.querySelector(`[data-layer-id="${cleanId}"]`) ||
                        (numOnly ? svgContainer?.querySelector(`[data-layer-id="layer_${numOnly}"]`) : null);
-          const origAttr = node?.getAttribute('data-orig-transform') || node?.getAttribute('transform') || '';
+          const rawOrig = node?.hasAttribute('data-orig-transform')
+            ? (node.getAttribute('data-orig-transform') || '')
+            : (node?.getAttribute('transform') || '');
+          const origAttr = rawOrig.replace(/translate\([^)]*\)/gi, '').trim();
           return { id, node, origAttr };
         }).filter(item => item.node);
 
@@ -1566,8 +1601,19 @@ export default function App() {
         const DRAG_THRESHOLD = e.pointerType === 'touch' ? 12 : 3;
         let dragRafId = null;
 
+        let latestDx = 0;
+        let latestDy = 0;
+        let latestSvgDx = 0;
+        let latestSvgDy = 0;
+
         const handleLayerMove = (moveEvt) => {
           if (!isDraggingLayerRef.current) return;
+
+          // Safety: If pointer is mouse and no buttons are pressed, release drag immediately!
+          if (moveEvt.pointerType === 'mouse' && moveEvt.buttons === 0) {
+            handleLayerUp(moveEvt);
+            return;
+          }
 
           // If user begins two-finger pinch/pan or multiple touches detected, immediately abort layer drag!
           if (isPinchingRef.current || activePointersRef.current.size >= 2 || (moveEvt.touches && moveEvt.touches.length >= 2)) {
@@ -1606,17 +1652,27 @@ export default function App() {
           }
 
           if (moveEvt.preventDefault) moveEvt.preventDefault();
+
+          latestDx = rawDx;
+          latestDy = rawDy;
+          latestSvgDx = Math.round(rawDx * dragScaleX);
+          latestSvgDy = Math.round(rawDy * dragScaleY);
+
           if (dragRafId) return;
           dragRafId = requestAnimationFrame(() => {
             dragRafId = null;
-            const svgDx = Math.round(rawDx * dragScaleX);
-            const svgDy = Math.round(rawDy * dragScaleY);
+            if (!isDraggingLayerRef.current) return;
+
+            const curSvgDx = latestSvgDx;
+            const curSvgDy = latestSvgDy;
+            const curRawDx = latestDx;
+            const curRawDy = latestDy;
 
             // 1. Direct smooth DOM updates on active SVG nodes - zero DOM destruction, zero flickering!
             activeDomNodes.forEach(({ id, node, origAttr }) => {
               const init = initialTransforms[id] || { x: 0, y: 0, rotate: 0, scaleX: 1, scaleY: 1 };
-              const targetX = init.x + svgDx;
-              const targetY = init.y + svgDy;
+              const targetX = init.x + curSvgDx;
+              const targetY = init.y + curSvgDy;
 
               const parts = [];
               if (targetX !== 0 || targetY !== 0) {
@@ -1643,81 +1699,143 @@ export default function App() {
 
             // 2. Direct transform on Transform Bounding Box for 60/120fps tracking
             if (transformBoxRef.current && startTransformBox && zoomScaleX > 0 && zoomScaleY > 0) {
-              const boxDx = rawDx / zoomScaleX;
-              const boxDy = rawDy / zoomScaleY;
+              const boxDx = curRawDx / zoomScaleX;
+              const boxDy = curRawDy / zoomScaleY;
               transformBoxRef.current.style.transform = `translate3d(${boxDx}px, ${boxDy}px, 0px)`;
             }
           });
         };
 
         const handleLayerUp = (upEvt) => {
-          document.body.classList.remove('is-dragging-layer');
-          activePointersRef.current.delete(e.pointerId);
-          activeTargetLayerElRef.current = null;
-          activePointerIdRef.current = null;
-
-          if (dragRafId) {
-            cancelAnimationFrame(dragRafId);
-            dragRafId = null;
-          }
           try {
-            const captureEl = canvasWorkspaceRef.current;
-            if (e.pointerId !== undefined && captureEl?.releasePointerCapture) {
-              captureEl.releasePointerCapture(e.pointerId);
+            document.body.classList.remove('is-dragging-layer');
+            activePointersRef.current.delete(e.pointerId);
+            activeTargetLayerElRef.current = null;
+            activePointerIdRef.current = null;
+
+            if (dragRafId) {
+              cancelAnimationFrame(dragRafId);
+              dragRafId = null;
             }
-          } catch (_) {}
-
-          if (isDraggingLayerRef.current) {
-            isDraggingLayerRef.current = false;
-            if (hasActuallyMoved) {
-              const clientX = upEvt?.clientX ?? layerDragStartPosRef.current.x;
-              const clientY = upEvt?.clientY ?? layerDragStartPosRef.current.y;
-              const rawDx = clientX - layerDragStartPosRef.current.x;
-              const rawDy = clientY - layerDragStartPosRef.current.y;
-              const finalSvgDx = Math.round(rawDx * dragScaleX);
-              const finalSvgDy = Math.round(rawDy * dragScaleY);
-
-              // Reset transformBox translate3d style so React's setTransformBox controls it cleanly
-              if (transformBoxRef.current) {
-                transformBoxRef.current.style.transform = '';
+            try {
+              const captureEl = canvasWorkspaceRef.current;
+              if (e.pointerId !== undefined && captureEl?.releasePointerCapture) {
+                captureEl.releasePointerCapture(e.pointerId);
               }
+            } catch (_) {}
 
-              // Commit new transforms to React state
-              setLayerTransforms(prev => {
-                const updated = { ...prev };
+            if (isDraggingLayerRef.current) {
+              isDraggingLayerRef.current = false;
+              if (hasActuallyMoved) {
+                const clientX = upEvt?.clientX ?? (layerDragStartPosRef.current.x + latestDx);
+                const clientY = upEvt?.clientY ?? (layerDragStartPosRef.current.y + latestDy);
+                const rawDx = clientX - layerDragStartPosRef.current.x;
+                const rawDy = clientY - layerDragStartPosRef.current.y;
+                const finalSvgDx = Math.round(rawDx * dragScaleX);
+                const finalSvgDy = Math.round(rawDy * dragScaleY);
+
+                // 1. GUARANTEED: Synchronously apply the final transform to DOM nodes immediately.
+                // Even on ultra-fast flick releases, this ensures SVG DOM nodes are already at their exact target position!
+                activeDomNodes.forEach(({ id, node, origAttr }) => {
+                  const init = initialTransforms[id] || { x: 0, y: 0, rotate: 0, scaleX: 1, scaleY: 1 };
+                  const targetX = init.x + finalSvgDx;
+                  const targetY = init.y + finalSvgDy;
+
+                  const parts = [];
+                  if (targetX !== 0 || targetY !== 0) {
+                    parts.push(`translate(${targetX} ${targetY})`);
+                  }
+                  const hasRotate = init.rotate && init.rotate !== 0;
+                  const hasScale = (init.scaleX !== undefined && init.scaleX !== 1) || (init.scaleY !== undefined && init.scaleY !== 1);
+                  if (hasRotate || hasScale) {
+                    const cx = init.cx || 0;
+                    const cy = init.cy || 0;
+                    if (cx !== 0 || cy !== 0) {
+                      parts.push(`translate(${cx} ${cy})`);
+                      if (hasRotate) parts.push(`rotate(${init.rotate})`);
+                      if (hasScale) parts.push(`scale(${init.scaleX || 1} ${init.scaleY || 1})`);
+                      parts.push(`translate(${-cx} ${-cy})`);
+                    } else {
+                      if (hasRotate) parts.push(`rotate(${init.rotate})`);
+                      if (hasScale) parts.push(`scale(${init.scaleX || 1} ${init.scaleY || 1})`);
+                    }
+                  }
+                  if (origAttr) parts.push(origAttr);
+                  node.setAttribute('transform', parts.join(' '));
+                });
+
+                // 2. Synchronously update layerTransformsRef.current so immediate subsequent clicks/drags read accurate state
+                const updatedTransforms = { ...layerTransformsRef.current };
                 activeIds.forEach(id => {
                   const init = initialTransforms[id] || { x: 0, y: 0, rotate: 0 };
-                  updated[id] = {
-                    ...(prev[id] || { rotate: 0 }),
+                  updatedTransforms[id] = {
+                    ...(layerTransformsRef.current[id] || { rotate: 0 }),
                     x: init.x + finalSvgDx,
                     y: init.y + finalSvgDy
                   };
                 });
-                return updated;
-              });
+                layerTransformsRef.current = updatedTransforms;
 
-              justFinishedLayerDragRef.current = true;
-              setTimeout(() => {
-                justFinishedLayerDragRef.current = false;
-              }, 80);
-              if (dragInitialSnapshotRef.current) {
-                setUndoStack(prev => [...prev.slice(-30), dragInitialSnapshotRef.current]);
-                setRedoStack([]);
-              }
-            } else {
-              if (transformBoxRef.current) {
-                transformBoxRef.current.style.transform = '';
+                // 3. Immediately lock transformBox mathematically at the final position to eliminate any flick jump/lag
+                if (startTransformBox && zoomScaleX > 0 && zoomScaleY > 0) {
+                  const screenDx = rawDx / zoomScaleX;
+                  const screenDy = rawDy / zoomScaleY;
+                  const accurateBox = {
+                    ...startTransformBox,
+                    x: startTransformBox.x + screenDx,
+                    y: startTransformBox.y + screenDy,
+                    minLeft: startTransformBox.minLeft + screenDx,
+                    maxRight: startTransformBox.maxRight + screenDx,
+                    minTop: startTransformBox.minTop + screenDy,
+                    maxBottom: startTransformBox.maxBottom + screenDy
+                  };
+                  setTransformBox(accurateBox);
+                  if (transformBoxRef.current) {
+                    transformBoxRef.current.style.transform = '';
+                    transformBoxRef.current.style.left = `${accurateBox.x}px`;
+                    transformBoxRef.current.style.top = `${accurateBox.y}px`;
+                  }
+                } else {
+                  if (transformBoxRef.current) {
+                    transformBoxRef.current.style.transform = '';
+                  }
+                  updateTransformBox(activeIds);
+                }
+
+                // 4. Commit new transforms to React state
+                setLayerTransforms(updatedTransforms);
+
+                justFinishedLayerDragRef.current = true;
+                setTimeout(() => {
+                  justFinishedLayerDragRef.current = false;
+                }, 100);
+                if (dragInitialSnapshotRef.current) {
+                  setUndoStack(prev => [...prev.slice(-30), dragInitialSnapshotRef.current]);
+                  setRedoStack([]);
+                }
+              } else {
+                if (transformBoxRef.current) {
+                  transformBoxRef.current.style.transform = '';
+                }
               }
             }
+          } finally {
+            isDraggingLayerRef.current = false;
+            window.removeEventListener('pointermove', handleLayerMove, true);
+            window.removeEventListener('pointerup', handleLayerUp, true);
+            window.removeEventListener('pointercancel', handleLayerUp, true);
+            window.removeEventListener('mouseup', handleLayerUp, true);
+            window.removeEventListener('touchend', handleLayerUp, true);
+            window.removeEventListener('blur', handleLayerUp);
           }
-          window.removeEventListener('pointermove', handleLayerMove);
-          window.removeEventListener('pointerup', handleLayerUp);
-          window.removeEventListener('pointercancel', handleLayerUp);
         };
 
-        window.addEventListener('pointermove', handleLayerMove, { passive: false });
-        window.addEventListener('pointerup', handleLayerUp);
-        window.addEventListener('pointercancel', handleLayerUp);
+        window.addEventListener('pointermove', handleLayerMove, { passive: false, capture: true });
+        window.addEventListener('pointerup', handleLayerUp, { capture: true });
+        window.addEventListener('pointercancel', handleLayerUp, { capture: true });
+        window.addEventListener('mouseup', handleLayerUp, { capture: true });
+        window.addEventListener('touchend', handleLayerUp, { capture: true });
+        window.addEventListener('blur', handleLayerUp);
         return;
       }
 
@@ -1749,6 +1867,11 @@ export default function App() {
         let hitLayerIds = [];
 
         const handleMarqueeMove = (moveEvt) => {
+          if (moveEvt.pointerType === 'mouse' && moveEvt.buttons === 0) {
+            handleMarqueeUp();
+            return;
+          }
+
           const curClientX = moveEvt.clientX;
           const curClientY = moveEvt.clientY;
           const dist = Math.hypot(curClientX - startClientX, curClientY - startClientY);
@@ -1799,35 +1922,43 @@ export default function App() {
         };
 
         const handleMarqueeUp = () => {
-          setMarqueeBox(null);
-          window.removeEventListener('pointermove', handleMarqueeMove);
-          window.removeEventListener('pointerup', handleMarqueeUp);
-          window.removeEventListener('pointercancel', handleMarqueeUp);
-
-          if (isMarquee) {
-            justFinishedLayerDragRef.current = true;
-            setTimeout(() => { justFinishedLayerDragRef.current = false; }, 80);
-            const finalHits = isAdditive
-              ? Array.from(new Set([...baseSelection, ...hitLayerIds]))
-              : hitLayerIds;
-            if (finalHits.length > 0) {
-              setSelectedLayerIds(finalHits);
-              setSelectedLayerId(finalHits[0]);
-              setStudioTab('colors');
+          try {
+            setMarqueeBox(null);
+            if (isMarquee) {
+              justFinishedLayerDragRef.current = true;
+              setTimeout(() => { justFinishedLayerDragRef.current = false; }, 80);
+              const finalHits = isAdditive
+                ? Array.from(new Set([...baseSelection, ...hitLayerIds]))
+                : hitLayerIds;
+              if (finalHits.length > 0) {
+                setSelectedLayerIds(finalHits);
+                setSelectedLayerId(finalHits[0]);
+                setStudioTab('colors');
+              }
+            } else {
+              // Simple click without drag on canvas background:
+              if (!isAdditive) {
+                setSelectedLayerIds([]);
+                setSelectedLayerId(null);
+                setActiveSelectedColor(null);
+              }
             }
-          } else {
-            // Simple click without drag on canvas background:
-            if (!isAdditive) {
-              setSelectedLayerIds([]);
-              setSelectedLayerId(null);
-              setActiveSelectedColor(null);
-            }
+          } finally {
+            window.removeEventListener('pointermove', handleMarqueeMove, true);
+            window.removeEventListener('pointerup', handleMarqueeUp, true);
+            window.removeEventListener('pointercancel', handleMarqueeUp, true);
+            window.removeEventListener('mouseup', handleMarqueeUp, true);
+            window.removeEventListener('touchend', handleMarqueeUp, true);
+            window.removeEventListener('blur', handleMarqueeUp);
           }
         };
 
-        window.addEventListener('pointermove', handleMarqueeMove);
-        window.addEventListener('pointerup', handleMarqueeUp);
-        window.addEventListener('pointercancel', handleMarqueeUp);
+        window.addEventListener('pointermove', handleMarqueeMove, { capture: true });
+        window.addEventListener('pointerup', handleMarqueeUp, { capture: true });
+        window.addEventListener('pointercancel', handleMarqueeUp, { capture: true });
+        window.addEventListener('mouseup', handleMarqueeUp, { capture: true });
+        window.addEventListener('touchend', handleMarqueeUp, { capture: true });
+        window.addEventListener('blur', handleMarqueeUp);
       }
     }
   };
@@ -2078,6 +2209,93 @@ export default function App() {
     setSelectedLayerId(newSelectedIds[0]);
   };
 
+  // Center Selected Element(s) to Canvas Center (or Reset Canvas Pan/Zoom if no element selected)
+  const handleCenterSelectedLayers = useCallback(() => {
+    recordUndo();
+    const activeIds = (selectedLayerIdsRef.current && selectedLayerIdsRef.current.length > 0)
+      ? selectedLayerIdsRef.current
+      : (selectedLayerIds && selectedLayerIds.length > 0 ? selectedLayerIds : (selectedLayerId ? [selectedLayerId] : []));
+
+    const svgContainer = canvasSvgContainerRef.current;
+    const svgEl = svgContainer?.querySelector('svg');
+
+    if (activeIds.length > 0 && svgEl) {
+      // 1. Determine native canvas viewBox dimensions
+      let vbWidth = 512;
+      let vbHeight = 512;
+      const vb = svgEl.viewBox?.baseVal;
+      if (vb && vb.width > 0 && vb.height > 0) {
+        vbWidth = vb.width;
+        vbHeight = vb.height;
+      } else {
+        const wAttr = parseFloat(svgEl.getAttribute('width'));
+        const hAttr = parseFloat(svgEl.getAttribute('height'));
+        if (wAttr > 0) vbWidth = wAttr;
+        if (hAttr > 0) vbHeight = hAttr;
+      }
+      const canvasCenterX = vbWidth / 2;
+      const canvasCenterY = vbHeight / 2;
+
+      // 2. Measure untransformed bounding box of the active layer(s)
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      activeIds.forEach(id => {
+        const cleanId = String(id).replace(/^pf_studio_/i, '');
+        const el = svgContainer.querySelector(`[data-layer-id="${id}"]`) ||
+                   svgContainer.querySelector(`[data-layer-id="${cleanId}"]`) ||
+                   svgContainer.querySelector(`[data-layer-id="pf_studio_${cleanId}"]`);
+        if (el && typeof el.getBBox === 'function') {
+          try {
+            const bbox = el.getBBox();
+            if (bbox && (bbox.width > 0 || bbox.height > 0)) {
+              minX = Math.min(minX, bbox.x);
+              minY = Math.min(minY, bbox.y);
+              maxX = Math.max(maxX, bbox.x + bbox.width);
+              maxY = Math.max(maxY, bbox.y + bbox.height);
+            }
+          } catch (_) {}
+        }
+      });
+
+      if (isFinite(minX) && isFinite(maxX)) {
+        const groupCenterX = (minX + maxX) / 2;
+        const groupCenterY = (minY + maxY) / 2;
+        const targetOffsetX = Math.round(canvasCenterX - groupCenterX);
+        const targetOffsetY = Math.round(canvasCenterY - groupCenterY);
+
+        setLayerTransforms(prev => {
+          const updated = { ...prev };
+          activeIds.forEach(id => {
+            const orig = prev[id] || { rotate: 0 };
+            updated[id] = {
+              ...orig,
+              x: targetOffsetX,
+              y: targetOffsetY
+            };
+          });
+          return updated;
+        });
+
+        // Clear any leftover inline transforms and recompute
+        if (transformBoxRef.current) {
+          transformBoxRef.current.style.transform = '';
+        }
+        updateTransformBox(activeIds);
+        requestAnimationFrame(() => {
+          updateTransformBox(activeIds);
+        });
+        setTimeout(() => {
+          updateTransformBox(activeIds);
+        }, 40);
+        return;
+      }
+    }
+
+    // Fallback: If no layer selected, reset canvas pan to center
+    targetPanRef.current = { x: 0, y: 0 };
+    setCanvasPan({ x: 0, y: 0 });
+    startSmoothZoomLoop();
+  }, [selectedLayerIds, selectedLayerId]);
+
   // Insert another element/object from the library into current canvas as editable multipart layers
   const handleInsertElementFromLibrary = (assetToAdd) => {
     if (!assetToAdd || !assetToAdd.svgCode || !selectedAsset) return;
@@ -2219,6 +2437,9 @@ export default function App() {
     setSelectedLayerIds(allIds);
     if (allIds.length > 0) setSelectedLayerId(allIds[0]);
     setStudioTab('colors');
+    setTimeout(() => {
+      updateTransformBox(allIds);
+    }, 40);
   };
 
   const handleDeselectAllLayers = () => {
@@ -2746,12 +2967,16 @@ export default function App() {
       }
     }
 
-    // Force preserveAspectRatio="none" so height and width stretch independently
-    if (transformedSvg.includes('preserveAspectRatio=')) {
-      transformedSvg = transformedSvg.replace(/preserveAspectRatio="[^"]*"/gi, 'preserveAspectRatio="none"');
-    } else {
-      transformedSvg = transformedSvg.replace('<svg', '<svg preserveAspectRatio="none"');
-    }
+    // Force preserveAspectRatio="none" on root <svg> so height and width stretch independently
+    transformedSvg = transformedSvg.replace(/<svg\b([^>]*)>/i, (match, attrs) => {
+      let updated = attrs;
+      if (/preserveAspectRatio="[^"]*"/i.test(updated)) {
+        updated = updated.replace(/preserveAspectRatio="[^"]*"/i, 'preserveAspectRatio="none"');
+      } else {
+        updated += ' preserveAspectRatio="none"';
+      }
+      return `<svg${updated}>`;
+    });
 
     return scopeSvgIds(transformedSvg, 'pf_studio_');
   }, [selectedAsset, layerTransforms, layerStyles, layerOrder, deletedLayerIds, duplicatedLayers, adjustments.colorReplacements, activeStyleMode, strokeMultiplier, strokeColorMode, customStrokeColor]);
@@ -2976,21 +3201,30 @@ export default function App() {
   }, [selectedLayerId, selectedLayerIds, activeSelectedColor, currentPreviewSvg]);
 
   // Live calculation of the Transform Bounding Box around selected SVG element(s)
-  const updateTransformBox = useCallback(() => {
+  const updateTransformBox = useCallback((overrideIds = null) => {
     const wsEl = canvasWorkspaceRef.current;
     const svgContainer = canvasSvgContainerRef.current;
     if (!wsEl || !svgContainer) {
       setTransformBox(null);
-      return;
+      return null;
     }
 
-    const activeIds = selectedLayerIds && selectedLayerIds.length > 0
-      ? selectedLayerIds
-      : (selectedLayerId ? [selectedLayerId] : []);
+    // Always clear temporary translate3d style so measurement and rendering are 100% clean
+    if (transformBoxRef.current) {
+      transformBoxRef.current.style.transform = '';
+    }
+
+    const activeIds = (overrideIds && overrideIds.length > 0)
+      ? overrideIds
+      : (selectedLayerIdsRef.current && selectedLayerIdsRef.current.length > 0
+          ? selectedLayerIdsRef.current
+          : (selectedLayerIds && selectedLayerIds.length > 0
+              ? selectedLayerIds
+              : (selectedLayerIdRef.current ? [selectedLayerIdRef.current] : (selectedLayerId ? [selectedLayerId] : []))));
 
     if (activeIds.length === 0) {
       setTransformBox(null);
-      return;
+      return null;
     }
 
     const nodes = activeIds.map(id => {
@@ -2998,12 +3232,13 @@ export default function App() {
       const numOnly = cleanId.replace(/\D/g, '');
       return svgContainer.querySelector(`[data-layer-id="${id}"]`) ||
              svgContainer.querySelector(`[data-layer-id="${cleanId}"]`) ||
+             svgContainer.querySelector(`[data-layer-id="pf_studio_${cleanId}"]`) ||
              (numOnly ? svgContainer.querySelector(`[data-layer-id="layer_${numOnly}"]`) : null);
     }).filter(Boolean);
 
     if (nodes.length === 0) {
       setTransformBox(null);
-      return;
+      return null;
     }
 
     let minLeft = Infinity;
@@ -3012,8 +3247,39 @@ export default function App() {
     let maxBottom = -Infinity;
 
     nodes.forEach(node => {
-      const rect = node.getBoundingClientRect();
-      if (rect.width > 0 || rect.height > 0) {
+      let rect = node.getBoundingClientRect();
+      if ((!rect || (rect.width === 0 && rect.height === 0)) && node.getBBox) {
+        try {
+          const svgEl = svgContainer.querySelector('svg');
+          const ctm = (node.getScreenCTM ? node.getScreenCTM() : null) || (svgEl?.getScreenCTM ? svgEl.getScreenCTM() : null);
+          const bbox = node.getBBox();
+          if (ctm && bbox && (bbox.width > 0 || bbox.height > 0) && svgEl?.createSVGPoint) {
+            const corners = [
+              { x: bbox.x, y: bbox.y },
+              { x: bbox.x + bbox.width, y: bbox.y },
+              { x: bbox.x + bbox.width, y: bbox.y + bbox.height },
+              { x: bbox.x, y: bbox.y + bbox.height }
+            ].map(p => {
+              const pt = svgEl.createSVGPoint();
+              pt.x = p.x;
+              pt.y = p.y;
+              return pt.matrixTransform(ctm);
+            });
+            const xs = corners.map(p => p.x);
+            const ys = corners.map(p => p.y);
+            rect = {
+              left: Math.min(...xs),
+              top: Math.min(...ys),
+              right: Math.max(...xs),
+              bottom: Math.max(...ys),
+              width: Math.max(...xs) - Math.min(...xs),
+              height: Math.max(...ys) - Math.min(...ys)
+            };
+          }
+        } catch (_) {}
+      }
+
+      if (rect && (rect.width > 0 || rect.height > 0)) {
         if (rect.left < minLeft) minLeft = rect.left;
         if (rect.top < minTop) minTop = rect.top;
         if (rect.right > maxRight) maxRight = rect.right;
@@ -3023,20 +3289,23 @@ export default function App() {
 
     if (!isFinite(minLeft) || !isFinite(minTop)) {
       setTransformBox(null);
-      return;
+      return null;
     }
 
     const wsRect = wsEl.getBoundingClientRect();
     const zoomScaleX = wsEl.offsetWidth > 0 ? (wsRect.width / wsEl.offsetWidth) : 1;
     const zoomScaleY = wsEl.offsetHeight > 0 ? (wsRect.height / wsEl.offsetHeight) : 1;
 
-    const pad = 0;
-    const x = (minLeft - wsRect.left) / zoomScaleX;
-    const y = (minTop - wsRect.top) / zoomScaleY;
+    // Account for any scroll offset inside canvasWorkspaceRef
+    const scrollLeft = wsEl.scrollLeft || 0;
+    const scrollTop = wsEl.scrollTop || 0;
+
+    const x = (minLeft - wsRect.left + scrollLeft) / zoomScaleX;
+    const y = (minTop - wsRect.top + scrollTop) / zoomScaleY;
     const width = (maxRight - minLeft) / zoomScaleX;
     const height = (maxBottom - minTop) / zoomScaleY;
 
-    setTransformBox({
+    const box = {
       x,
       y,
       width,
@@ -3045,11 +3314,40 @@ export default function App() {
       minTop,
       maxRight,
       maxBottom
-    });
+    };
+
+    setTransformBox(box);
+    return box;
   }, [selectedLayerIds, selectedLayerId]);
 
   useEffect(() => {
+    if (isDraggingLayerRef.current || justFinishedLayerDragRef.current) return;
     updateTransformBox();
+    const wsEl = canvasWorkspaceRef.current;
+    const svgEl = canvasSvgContainerRef.current;
+
+    const rafId = requestAnimationFrame(() => {
+      updateTransformBox();
+    });
+
+    let ro = null;
+    if (wsEl && typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(() => {
+        updateTransformBox();
+      });
+      ro.observe(wsEl);
+      if (svgEl) ro.observe(svgEl);
+    }
+
+    window.addEventListener('resize', updateTransformBox);
+    window.addEventListener('scroll', updateTransformBox, true);
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      if (ro) ro.disconnect();
+      window.removeEventListener('resize', updateTransformBox);
+      window.removeEventListener('scroll', updateTransformBox, true);
+    };
   }, [updateTransformBox, currentPreviewSvg, zoomLevel, canvasPan, layerTransforms]);
 
   // Transform handle pointer down: Handles corner proportional scaling, edge stretching, and rotation
@@ -3146,6 +3444,11 @@ export default function App() {
       const dx = (curClientX - startClientX) / zoomScaleX;
       const dy = (curClientY - startClientY) / zoomScaleY;
 
+      if (moveEvt.pointerType === 'mouse' && moveEvt.buttons === 0) {
+        handlePointerUp();
+        return;
+      }
+
       if (rafId) return;
       rafId = requestAnimationFrame(() => {
         rafId = null;
@@ -3229,21 +3532,122 @@ export default function App() {
     };
 
     const handlePointerUp = () => {
-      if (rafId) {
-        cancelAnimationFrame(rafId);
-        rafId = null;
+      try {
+        if (rafId) {
+          cancelAnimationFrame(rafId);
+          rafId = null;
+        }
+        updateTransformBox(activeIds);
+        requestAnimationFrame(() => {
+          updateTransformBox(activeIds);
+        });
+        setTimeout(() => {
+          updateTransformBox(activeIds);
+        }, 40);
+      } finally {
+        window.removeEventListener('pointermove', handlePointerMove, true);
+        window.removeEventListener('pointerup', handlePointerUp, true);
+        window.removeEventListener('pointercancel', handlePointerUp, true);
+        window.removeEventListener('mouseup', handlePointerUp, true);
+        window.removeEventListener('touchend', handlePointerUp, true);
+        window.removeEventListener('blur', handlePointerUp);
       }
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handlePointerUp);
-      window.removeEventListener('pointercancel', handlePointerUp);
     };
 
-    window.addEventListener('pointermove', handlePointerMove, { passive: false });
-    window.addEventListener('pointerup', handlePointerUp);
-    window.addEventListener('pointercancel', handlePointerUp);
+    window.addEventListener('pointermove', handlePointerMove, { passive: false, capture: true });
+    window.addEventListener('pointerup', handlePointerUp, { capture: true });
+    window.addEventListener('pointercancel', handlePointerUp, { capture: true });
+    window.addEventListener('mouseup', handlePointerUp, { capture: true });
+    window.addEventListener('touchend', handlePointerUp, { capture: true });
+    window.addEventListener('blur', handlePointerUp);
   };
 
-  // Keyboard Shortcuts: Delete/Backspace to delete part, Ctrl+D to duplicate part
+  // Canvas Keyboard Shortcuts Helpers: Copy, Cut, Paste, Select All
+  const handleCopySelectedLayers = useCallback(() => {
+    const activeIds = (selectedLayerIdsRef.current && selectedLayerIdsRef.current.length > 0)
+      ? selectedLayerIdsRef.current
+      : (selectedLayerIds && selectedLayerIds.length > 0 ? selectedLayerIds : (selectedLayerId ? [selectedLayerId] : []));
+    if (activeIds.length === 0) return;
+
+    clipboardLayersRef.current = {
+      ids: [...activeIds],
+      sourceIds: activeIds.map(id => {
+        const dup = (duplicatedLayersRef.current || []).find(d => d.id === id);
+        return dup ? dup.sourceId : id;
+      }),
+      transforms: activeIds.reduce((acc, id) => {
+        acc[id] = layerTransformsRef.current[id] || { x: 0, y: 0, rotate: 0, scaleX: 1, scaleY: 1 };
+        return acc;
+      }, {}),
+      styles: activeIds.reduce((acc, id) => {
+        if (layerStylesRef.current && layerStylesRef.current[id]) {
+          acc[id] = { ...layerStylesRef.current[id] };
+        }
+        return acc;
+      }, {}),
+      pasteCount: 0
+    };
+  }, [selectedLayerIds, selectedLayerId]);
+
+  const handleCutSelectedLayers = useCallback(() => {
+    const activeIds = (selectedLayerIdsRef.current && selectedLayerIdsRef.current.length > 0)
+      ? selectedLayerIdsRef.current
+      : (selectedLayerIds && selectedLayerIds.length > 0 ? selectedLayerIds : (selectedLayerId ? [selectedLayerId] : []));
+    if (activeIds.length === 0) return;
+
+    // 1. Copy to clipboard
+    handleCopySelectedLayers();
+
+    // 2. Delete from canvas
+    handleDeleteSelectedLayers();
+  }, [handleCopySelectedLayers, handleDeleteSelectedLayers, selectedLayerIds, selectedLayerId]);
+
+  const handlePasteLayers = useCallback(() => {
+    if (!clipboardLayersRef.current || !clipboardLayersRef.current.ids || clipboardLayersRef.current.ids.length === 0) {
+      return;
+    }
+    recordUndoRef.current?.();
+    const clip = clipboardLayersRef.current;
+    clip.pasteCount = (clip.pasteCount || 0) + 1;
+    const offset = clip.pasteCount * 18;
+
+    const newDuplicated = [];
+    const newSelectedIds = [];
+    const newTransforms = { ...layerTransformsRef.current };
+    const newStyles = { ...layerStylesRef.current };
+
+    clip.ids.forEach((id, idx) => {
+      const dupId = `dup_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      const sourceId = clip.sourceIds[idx] || id;
+      newDuplicated.push({ id: dupId, sourceId });
+      newSelectedIds.push(dupId);
+
+      const origTrans = clip.transforms[id] || { x: 0, y: 0, rotate: 0, scaleX: 1, scaleY: 1 };
+      newTransforms[dupId] = {
+        ...origTrans,
+        x: (origTrans.x || 0) + offset,
+        y: (origTrans.y || 0) + offset
+      };
+
+      if (clip.styles[id]) {
+        newStyles[dupId] = { ...clip.styles[id] };
+      }
+    });
+
+    layerTransformsRef.current = newTransforms;
+    layerStylesRef.current = newStyles;
+    setDuplicatedLayers(prev => [...prev, ...newDuplicated]);
+    setLayerTransforms(newTransforms);
+    setLayerStyles(newStyles);
+    setSelectedLayerIds(newSelectedIds);
+    setSelectedLayerId(newSelectedIds[0]);
+
+    setTimeout(() => {
+      updateTransformBox(newSelectedIds);
+    }, 40);
+  }, [updateTransformBox]);
+
+  // Keyboard Shortcuts: Delete/Backspace, Ctrl+D, Ctrl+E, Ctrl+C, Ctrl+X, Ctrl+V, Ctrl+A
   useEffect(() => {
     const handleKeyDown = (e) => {
       const tag = document.activeElement?.tagName?.toLowerCase();
@@ -3251,6 +3655,9 @@ export default function App() {
         return;
       }
 
+      const isCmdOrCtrl = e.ctrlKey || e.metaKey;
+
+      // Delete / Backspace: Delete selected element(s)
       if (e.key === 'Delete' || e.key === 'Backspace') {
         const activeIds = selectedLayerIds && selectedLayerIds.length > 0
           ? selectedLayerIds
@@ -3261,7 +3668,8 @@ export default function App() {
         }
       }
 
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
+      // Ctrl + D: Duplicate selected part
+      if (isCmdOrCtrl && e.key.toLowerCase() === 'd') {
         const activeIds = selectedLayerIds && selectedLayerIds.length > 0
           ? selectedLayerIds
           : (selectedLayerId ? [selectedLayerId] : []);
@@ -3270,48 +3678,84 @@ export default function App() {
           handleDuplicateSelectedLayers();
         }
       }
+
+      // Ctrl + C: Copy selected element(s)
+      if (isCmdOrCtrl && e.key.toLowerCase() === 'c') {
+        const activeIds = selectedLayerIds && selectedLayerIds.length > 0
+          ? selectedLayerIds
+          : (selectedLayerId ? [selectedLayerId] : []);
+        if (activeIds.length > 0) {
+          e.preventDefault();
+          handleCopySelectedLayers();
+        }
+      }
+
+      // Ctrl + X: Cut selected element(s)
+      if (isCmdOrCtrl && e.key.toLowerCase() === 'x') {
+        const activeIds = selectedLayerIds && selectedLayerIds.length > 0
+          ? selectedLayerIds
+          : (selectedLayerId ? [selectedLayerId] : []);
+        if (activeIds.length > 0) {
+          e.preventDefault();
+          handleCutSelectedLayers();
+        }
+      }
+
+      // Ctrl + V: Paste copied/cut element(s)
+      if (isCmdOrCtrl && e.key.toLowerCase() === 'v') {
+        e.preventDefault();
+        handlePasteLayers();
+      }
+
+      // Ctrl + A: Select all elements on canvas
+      if (isCmdOrCtrl && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        handleSelectAllLayers();
+      }
+
+      // Ctrl + E: Center selected element(s) on canvas (or center canvas view if none selected)
+      if (isCmdOrCtrl && e.key.toLowerCase() === 'e') {
+        e.preventDefault();
+        handleCenterSelectedLayers();
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedLayerIds, selectedLayerId]);
+  }, [
+    selectedLayerIds,
+    selectedLayerId,
+    handleDeleteSelectedLayers,
+    handleDuplicateSelectedLayers,
+    handleCopySelectedLayers,
+    handleCutSelectedLayers,
+    handlePasteLayers,
+    handleSelectAllLayers,
+    handleCenterSelectedLayers
+  ]);
 
   const handleColorChange = (originalColor, newColor) => {
     // Record undo state before color replacement
     recordUndo();
     const origKey = originalColor.toLowerCase();
     const newNorm = normalizeColor(newColor) || newColor;
-    const linkedStops = selectedAsset ? getLinkedGradientColors(selectedAsset.svgCode, origKey) : [];
 
-    setAdjustments(prev => {
-      const updated = { ...prev.colorReplacements, [origKey]: newNorm };
-
-      // If this color is part of a gradient with multiple stops, auto-sync the other stops harmoniously
-      if (linkedStops.length > 1) {
-        linkedStops.forEach((stopColor) => {
-          if (stopColor !== origKey) {
-            const shade = stopColor === linkedStops[1] ? adjustColorBrightness(newNorm, -20) : newNorm;
-            updated[stopColor] = shade;
-          }
-        });
+    setAdjustments(prev => ({
+      ...prev,
+      colorReplacements: {
+        ...prev.colorReplacements,
+        [origKey]: newNorm
       }
-
-      return {
-        ...prev,
-        colorReplacements: updated
-      };
-    });
+    }));
   };
 
   const handleResetSingleColor = (originalColor) => {
     recordUndo();
     const origKey = originalColor.toLowerCase();
-    const linkedStops = selectedAsset ? getLinkedGradientColors(selectedAsset.svgCode, origKey) : [];
 
     setAdjustments(prev => {
       const updated = { ...prev.colorReplacements };
       delete updated[origKey];
-      linkedStops.forEach(s => delete updated[s]);
       return {
         ...prev,
         colorReplacements: updated
@@ -3971,22 +4415,60 @@ export default function App() {
     if (!selectedAsset) return;
     setDownloading(true);
     try {
-      // Auto-fit bounds calculation: If autoFitToElements is enabled, calculate exact viewBox containing all elements
+      // Auto-fit bounds calculation:
+      // If layers are moved, rotated, scaled, duplicated, or have effects (glow/blur), or autoFitToElements is ON,
+      // calculate autoFitViewBox encompassing all elements + glow + blur + generous padding ("thodi door").
       let autoFitViewBox = null;
-      if (autoFitToElements && canvasSvgContainerRef.current) {
+      const hasMovedLayers = Object.values(layerTransforms || {}).some(t => {
+        if (!t) return false;
+        const hasX = typeof t.x === 'number' && Math.abs(t.x) > 0.5;
+        const hasY = typeof t.y === 'number' && Math.abs(t.y) > 0.5;
+        const hasRot = (typeof t.rotate === 'number' && Math.abs(t.rotate) > 0.5) ||
+                       (typeof t.rotation === 'number' && Math.abs(t.rotation) > 0.5);
+        const hasScaleX = typeof t.scaleX === 'number' && Math.abs(t.scaleX - 1) > 0.01;
+        const hasScaleY = typeof t.scaleY === 'number' && Math.abs(t.scaleY - 1) > 0.01;
+        const hasScale = typeof t.scale === 'number' && Math.abs(t.scale - 1) > 0.01;
+        return hasX || hasY || hasRot || hasScaleX || hasScaleY || hasScale;
+      });
+      const hasDuplicatedLayers = (duplicatedLayers || []).length > 0;
+      const hasLayerEffects = Object.values(layerStyles || {}).some(s => {
+        if (!s) return false;
+        const hasGlow = Boolean(s.glow && s.glow.enabled && (s.glow.radius || 12) > 0);
+        const hasBlur = Boolean(s.blur && Number(s.blur) > 0);
+        return hasGlow || hasBlur;
+      });
+      const hasGlobalEffects = Boolean(
+        (adjustments?.blur && Number(adjustments.blur) > 0) ||
+        (adjustments?.shadowBlur && Number(adjustments.shadowBlur) > 0)
+      );
+
+      const shouldAutoFit = Boolean(
+        autoFitToElements ||
+        hasMovedLayers ||
+        hasDuplicatedLayers ||
+        hasLayerEffects ||
+        hasGlobalEffects
+      );
+
+      if (shouldAutoFit && canvasSvgContainerRef.current) {
         autoFitViewBox = calculateArtworkBounds(
           canvasSvgContainerRef.current,
-          0.04,
+          0.08,
           deletedLayerIds,
-          autoFitFrameMode === 'square'
+          autoFitFrameMode === 'square',
+          layerStyles,
+          adjustments
         );
       }
 
-      // Calculate true export resolution respecting tight artwork aspect ratio
+      // Calculate true export resolution respecting artwork aspect ratio
       let finalWidth = exportSize;
       let finalHeight = exportSize;
-      if (autoFitToElements && autoFitViewBox && autoFitViewBox.width > 0 && autoFitViewBox.height > 0) {
-        if (autoFitViewBox.width >= autoFitViewBox.height) {
+      if (autoFitViewBox && autoFitViewBox.width > 0 && autoFitViewBox.height > 0) {
+        if (autoFitFrameMode === 'square') {
+          finalWidth = exportSize;
+          finalHeight = exportSize;
+        } else if (autoFitViewBox.width >= autoFitViewBox.height) {
           finalWidth = exportSize;
           finalHeight = Math.max(32, Math.round(exportSize * (autoFitViewBox.height / autoFitViewBox.width)));
         } else {
@@ -4026,7 +4508,7 @@ export default function App() {
           layerStyles,
           deletedLayerIds,
           duplicatedLayers,
-          autoFitToElements,
+          autoFitToElements: Boolean(autoFitViewBox) || autoFitToElements,
           autoFitViewBox,
           activeStyleMode,
           strokeMultiplier,
@@ -4055,19 +4537,55 @@ export default function App() {
     setDownloading(true);
     try {
       let autoFitViewBox = null;
-      if (autoFitToElements && canvasSvgContainerRef.current) {
+      const hasMovedLayers = Object.values(layerTransforms || {}).some(t => {
+        if (!t) return false;
+        const hasX = typeof t.x === 'number' && Math.abs(t.x) > 0.5;
+        const hasY = typeof t.y === 'number' && Math.abs(t.y) > 0.5;
+        const hasRot = (typeof t.rotate === 'number' && Math.abs(t.rotate) > 0.5) ||
+                       (typeof t.rotation === 'number' && Math.abs(t.rotation) > 0.5);
+        const hasScaleX = typeof t.scaleX === 'number' && Math.abs(t.scaleX - 1) > 0.01;
+        const hasScaleY = typeof t.scaleY === 'number' && Math.abs(t.scaleY - 1) > 0.01;
+        const hasScale = typeof t.scale === 'number' && Math.abs(t.scale - 1) > 0.01;
+        return hasX || hasY || hasRot || hasScaleX || hasScaleY || hasScale;
+      });
+      const hasDuplicatedLayers = (duplicatedLayers || []).length > 0;
+      const hasLayerEffects = Object.values(layerStyles || {}).some(s => {
+        if (!s) return false;
+        const hasGlow = Boolean(s.glow && s.glow.enabled && (s.glow.radius || 12) > 0);
+        const hasBlur = Boolean(s.blur && Number(s.blur) > 0);
+        return hasGlow || hasBlur;
+      });
+      const hasGlobalEffects = Boolean(
+        (adjustments?.blur && Number(adjustments.blur) > 0) ||
+        (adjustments?.shadowBlur && Number(adjustments.shadowBlur) > 0)
+      );
+
+      const shouldAutoFit = Boolean(
+        autoFitToElements ||
+        hasMovedLayers ||
+        hasDuplicatedLayers ||
+        hasLayerEffects ||
+        hasGlobalEffects
+      );
+
+      if (shouldAutoFit && canvasSvgContainerRef.current) {
         autoFitViewBox = calculateArtworkBounds(
           canvasSvgContainerRef.current,
-          0.04,
+          0.08,
           deletedLayerIds,
-          autoFitFrameMode === 'square'
+          autoFitFrameMode === 'square',
+          layerStyles,
+          adjustments
         );
       }
 
       let finalWidth = 512;
       let finalHeight = 512;
-      if (autoFitToElements && autoFitViewBox && autoFitViewBox.width > 0 && autoFitViewBox.height > 0) {
-        if (autoFitViewBox.width >= autoFitViewBox.height) {
+      if (autoFitViewBox && autoFitViewBox.width > 0 && autoFitViewBox.height > 0) {
+        if (autoFitFrameMode === 'square') {
+          finalWidth = 512;
+          finalHeight = 512;
+        } else if (autoFitViewBox.width >= autoFitViewBox.height) {
           finalWidth = 512;
           finalHeight = Math.max(32, Math.round(512 * (autoFitViewBox.height / autoFitViewBox.width)));
         } else {
@@ -4099,7 +4617,7 @@ export default function App() {
           layerStyles,
           deletedLayerIds,
           duplicatedLayers,
-          autoFitToElements,
+          autoFitToElements: Boolean(autoFitViewBox) || autoFitToElements,
           autoFitViewBox,
           activeStyleMode,
           strokeMultiplier,
@@ -5104,7 +5622,7 @@ export default function App() {
                       </button>
                     )}
 
-                    {/* Rotation Button: Circular button */}
+                    {/* Single Rotation Handle Button */}
                     <div
                       onPointerDown={(e) => handleTransformHandleDown(e, 'rotate')}
                       className="w-6 h-6 bg-white rounded-full border-2 border-[#38bdf8] shadow-lg flex items-center justify-center cursor-grab active:cursor-grabbing hover:scale-115 hover:border-cyan-300 transition-all text-[#0284c7] hover:text-cyan-500 flex-shrink-0"

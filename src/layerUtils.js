@@ -19,6 +19,9 @@ export function tagSvgElements(svgEl) {
       if (!el.getAttribute('data-layer-id')) {
         el.setAttribute('data-layer-id', `layer_${layerIndex}`);
       }
+      if (!el.hasAttribute('data-orig-transform')) {
+        el.setAttribute('data-orig-transform', el.getAttribute('transform') || '');
+      }
       layerIndex++;
     } else if (tag === 'g') {
       const children = Array.from(el.children);
@@ -62,6 +65,9 @@ export function extractSvgLayers(svgCode) {
         if (!layerId) {
           layerId = `layer_${layerIndex}`;
           el.setAttribute('data-layer-id', layerId);
+        }
+        if (!el.hasAttribute('data-orig-transform')) {
+          el.setAttribute('data-orig-transform', el.getAttribute('transform') || '');
         }
 
         // Determine primary color
@@ -245,9 +251,11 @@ export function applyLayerTransforms(
                    (numOnly ? svgEl.querySelector(`[data-layer-id="layer_${numOnly}"]`) : null);
         if (!el) return;
 
-        const existingTransform = el.getAttribute('data-orig-transform') || el.getAttribute('transform') || '';
-        if (!el.getAttribute('data-orig-transform') && existingTransform) {
-          el.setAttribute('data-orig-transform', existingTransform);
+        const existingTransform = el.hasAttribute('data-orig-transform')
+          ? (el.getAttribute('data-orig-transform') || '')
+          : (el.getAttribute('transform') || '');
+        if (!el.hasAttribute('data-orig-transform')) {
+          el.setAttribute('data-orig-transform', existingTransform.replace(/translate\([^)]*\)/gi, '').trim());
         }
 
         // Clean out any inline style transform that can override the SVG transform attribute
@@ -261,7 +269,7 @@ export function applyLayerTransforms(
           el.setAttribute('style', cleanStyle);
         }
 
-        const origAttr = el.getAttribute('data-orig-transform') || '';
+        const origAttr = (el.getAttribute('data-orig-transform') || '').replace(/translate\([^)]*\)/gi, '').trim();
         const transformParts = [];
 
         // Center origin calculation: if cx, cy are provided, translate to origin, rotate & scale, then translate back
@@ -357,12 +365,22 @@ export function applyLayerTransforms(
 /**
  * Calculates the bounding box of all active/visible artwork elements inside an SVG container
  * in native SVG viewBox coordinate space.
- * Includes all translated, rotated, scaled, duplicated elements so they can be auto-fitted
+ * Includes all translated, rotated, scaled, duplicated elements, as well as their
+ * stroke-width, blur, and glow/drop-shadow effect spreads so they can be auto-fitted
  * onto the exported canvas without any clipping.
  */
-export function calculateArtworkBounds(svgContainerEl, paddingPercent = 0.04, deletedLayerIds = [], keepSquare = false) {
+export function calculateArtworkBounds(
+  svgContainerEl,
+  paddingPercent = 0.08,
+  deletedLayerIds = [],
+  keepSquare = false,
+  layerStyles = {},
+  adjustments = {}
+) {
   if (!svgContainerEl) return null;
-  const svgEl = svgContainerEl.querySelector('svg');
+  const svgEl = svgContainerEl.tagName?.toLowerCase() === 'svg'
+    ? svgContainerEl
+    : svgContainerEl.querySelector('svg');
   if (!svgEl) return null;
 
   const svgRect = svgEl.getBoundingClientRect();
@@ -380,6 +398,10 @@ export function calculateArtworkBounds(svgContainerEl, paddingPercent = 0.04, de
 
   const scaleX = vbW / svgRect.width;
   const scaleY = vbH / svgRect.height;
+
+  // Global adjustments effect spreads
+  const globalGlowRadius = adjustments?.shadowBlur ? Number(adjustments.shadowBlur) : 0;
+  const globalBlurRadius = adjustments?.blur ? Number(adjustments.blur) : 0;
 
   // Find all leaf visual nodes (shapes, paths, rects, circles, texts, etc.)
   const visualTags = ['path', 'rect', 'circle', 'ellipse', 'polygon', 'polyline', 'line', 'text'];
@@ -418,32 +440,138 @@ export function calculateArtworkBounds(svgContainerEl, paddingPercent = 0.04, de
   let minY = Infinity;
   let maxX = -Infinity;
   let maxY = -Infinity;
+  let usedBBox = false;
 
-  nodes.forEach(node => {
-    const r = node.getBoundingClientRect();
-    if (r.width > 0 || r.height > 0) {
-      if (r.left < minX) minX = r.left;
-      if (r.top < minY) minY = r.top;
-      if (r.right > maxX) maxX = r.right;
-      if (r.bottom > maxY) maxY = r.bottom;
+  // Helper to calculate effect spread for an element (glow, blur, stroke) in SVG viewBox space
+  const getNodeSpread = (node) => {
+    const rawId = node.getAttribute('data-layer-id');
+    const cleanId = rawId ? String(rawId).replace(/^pf_studio_/i, '') : '';
+    const numOnly = cleanId.replace(/\D/g, '');
+    const style = (layerStyles && (layerStyles[rawId] || layerStyles[cleanId] || (numOnly ? layerStyles[`layer_${numOnly}`] : null))) || {};
+
+    // 1. Glow Spread (per-layer + global shadowBlur)
+    let glowRadius = globalGlowRadius;
+    if (style.glow && style.glow.enabled) {
+      glowRadius = Math.max(glowRadius, Number(style.glow.radius !== undefined ? style.glow.radius : 12));
     }
-  });
+    const inlineFilter = (node.getAttribute('style') || '') + ' ' + (node.style?.filter || '');
+    const dsMatch = inlineFilter.match(/drop-shadow\([^)]*?\s([0-9.]+)px/i);
+    if (dsMatch && dsMatch[1]) {
+      glowRadius = Math.max(glowRadius, Number(dsMatch[1]));
+    }
+    // Drop shadow light diffuses out to ~2.0x radius in all directions
+    const effectiveGlowRadius = Math.max(glowRadius, glowRadius * scaleX);
+    const glowSpread = glowRadius > 0 ? (effectiveGlowRadius * 2.0) : 0;
 
-  if (!isFinite(minX) || !isFinite(minY)) return null;
+    // 2. Blur Spread (per-layer + global blur)
+    let blurRadius = globalBlurRadius;
+    if (style.blur && Number(style.blur) > 0) {
+      blurRadius = Math.max(blurRadius, Number(style.blur));
+    }
+    const blurMatch = inlineFilter.match(/blur\(([0-9.]+)px\)/i);
+    if (blurMatch && blurMatch[1]) {
+      blurRadius = Math.max(blurRadius, Number(blurMatch[1]));
+    }
+    // Gaussian blur 3-sigma tails spread out to ~2.8x radius in all directions
+    const effectiveBlurRadius = Math.max(blurRadius, blurRadius * scaleY);
+    const blurSpread = blurRadius > 0 ? (effectiveBlurRadius * 2.8) : 0;
 
-  // Convert screen coordinates to native SVG viewBox coordinates
-  const svgMinX = vbX + (minX - svgRect.left) * scaleX;
-  const svgMinY = vbY + (minY - svgRect.top) * scaleY;
-  const svgMaxX = vbX + (maxX - svgRect.left) * scaleX;
-  const svgMaxY = vbY + (maxY - svgRect.top) * scaleY;
+    // 3. Stroke Spread (stroke-width / 2 + miter safety)
+    const strokeAttr = parseFloat(node.getAttribute('stroke-width') || node.style?.strokeWidth || '0') || 0;
+    const customStrokeW = style.strokeWidth !== undefined ? parseFloat(style.strokeWidth) : 0;
+    const strokeW = Math.max(strokeAttr, customStrokeW);
+    const strokeSpread = strokeW > 0 ? strokeW : 0;
+
+    return glowSpread + blurSpread + strokeSpread;
+  };
+
+  // Try native SVG getBBox() transformed via CTM to bypass screen zoom/pan distortion
+  try {
+    const svgCTM = svgEl.getScreenCTM();
+    if (svgCTM) {
+      const invSvgCTM = svgCTM.inverse();
+      nodes.forEach(node => {
+        try {
+          if (typeof node.getBBox === 'function') {
+            const bbox = node.getBBox();
+            if (bbox && (bbox.width > 0 || bbox.height > 0)) {
+              const nodeCTM = node.getScreenCTM();
+              if (nodeCTM) {
+                const matrix = invSvgCTM.multiply(nodeCTM);
+                const spread = getNodeSpread(node);
+                // Expand local bbox with effect spread so glow and blur are fully included
+                const lx1 = bbox.x - spread;
+                const ly1 = bbox.y - spread;
+                const lx2 = bbox.x + bbox.width + spread;
+                const ly2 = bbox.y + bbox.height + spread;
+
+                const corners = [
+                  { x: lx1, y: ly1 },
+                  { x: lx2, y: ly1 },
+                  { x: lx1, y: ly2 },
+                  { x: lx2, y: ly2 }
+                ];
+                corners.forEach(pt => {
+                  const tx = pt.x * matrix.a + pt.y * matrix.c + matrix.e;
+                  const ty = pt.x * matrix.b + pt.y * matrix.d + matrix.f;
+                  const vx = tx;
+                  const vy = ty;
+                  if (vx < minX) minX = vx;
+                  if (vy < minY) minY = vy;
+                  if (vx > maxX) maxX = vx;
+                  if (vy > maxY) maxY = vy;
+                });
+                usedBBox = true;
+              }
+            }
+          }
+        } catch (_) {}
+      });
+    }
+  } catch (_) {}
+
+  let svgMinX, svgMinY, svgMaxX, svgMaxY;
+  if (usedBBox && isFinite(minX) && isFinite(minY)) {
+    svgMinX = minX;
+    svgMinY = minY;
+    svgMaxX = maxX;
+    svgMaxY = maxY;
+  } else {
+    // Screen bounding rect fallback
+    minX = Infinity; minY = Infinity; maxX = -Infinity; maxY = -Infinity;
+    nodes.forEach(node => {
+      const r = node.getBoundingClientRect();
+      if (r.width > 0 || r.height > 0) {
+        const spread = getNodeSpread(node);
+        const screenSpreadX = spread / scaleX;
+        const screenSpreadY = spread / scaleY;
+        if (r.left - screenSpreadX < minX) minX = r.left - screenSpreadX;
+        if (r.top - screenSpreadY < minY) minY = r.top - screenSpreadY;
+        if (r.right + screenSpreadX > maxX) maxX = r.right + screenSpreadX;
+        if (r.bottom + screenSpreadY > maxY) maxY = r.bottom + screenSpreadY;
+      }
+    });
+
+    if (!isFinite(minX) || !isFinite(minY)) return null;
+
+    // Convert screen coordinates to native SVG viewBox coordinates
+    svgMinX = vbX + (minX - svgRect.left) * scaleX;
+    svgMinY = vbY + (minY - svgRect.top) * scaleY;
+    svgMaxX = vbX + (maxX - svgRect.left) * scaleX;
+    svgMaxY = vbY + (maxY - svgRect.top) * scaleY;
+  }
 
   const contentWidth = svgMaxX - svgMinX;
   const contentHeight = svgMaxY - svgMinY;
 
   if (contentWidth <= 0 || contentHeight <= 0) return null;
 
-  // Tight breathing padding: just 4% of dimension (minimum 4 SVG units) so frame ends closely around elements
-  const pad = Math.max(Math.max(contentWidth, contentHeight) * paddingPercent, 4);
+  // Comfortable breathing padding so the frame cuts "thodi door" from all elements
+  // Ensures at least 8% margin (or minimum 20 units) around all elements
+  const padRatio = Math.max(Number(paddingPercent) || 0.08, 0.08);
+  const maxContentDim = Math.max(contentWidth, contentHeight);
+  const pad = Math.max(maxContentDim * padRatio, Math.min(24, maxContentDim * 0.15));
+
   const paddedMinX = svgMinX - pad;
   const paddedMinY = svgMinY - pad;
   const paddedW = contentWidth + (pad * 2);
@@ -463,7 +591,7 @@ export function calculateArtworkBounds(svgContainerEl, paddingPercent = 0.04, de
     };
   }
 
-  // TIGHT CROPPED BOUNDS: Frame ends right where the outermost elements end (no massive empty void!)
+  // TIGHT CROPPED BOUNDS: Frame ends with comfortable breathing padding around outermost elements
   return {
     minX: Number(paddedMinX.toFixed(2)),
     minY: Number(paddedMinY.toFixed(2)),
