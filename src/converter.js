@@ -203,8 +203,13 @@ export async function downloadAsset({
       // Default to 1.0 (edge-to-edge, zero artificial white padding/shrinkage).
       // Only reduce padding when shadow blur, container badge shapes, or 3D tilt would otherwise clip outside canvas.
       let paddingRatio = 1.0;
-      if (adjustments.shadowBlur > 0) {
-        paddingRatio = 0.88;
+      const hasAnyBlurOrGlow = Boolean(
+        adjustments.shadowBlur > 0 ||
+        adjustments.blur > 0 ||
+        (adjustments.layerStyles && Object.values(adjustments.layerStyles).some(s => (s?.glow?.enabled && (s.glow.radius || 12) > 0) || (s?.blur && Number(s.blur) > 0)))
+      );
+      if (hasAnyBlurOrGlow) {
+        paddingRatio = 0.90;
       }
       if (adjustments.bgShape && adjustments.bgShape !== 'none') {
         const shapePad = Number(adjustments.bgShapePadding || 20) / 100;

@@ -9,7 +9,7 @@ import {
   Heart, Shapes, MessageSquarePlus, Shield, FileText, Info,
   Box, Compass, Move3d, Film, Play, Activity, GripVertical,
   Move, ArrowUp, ArrowDown, ChevronsUp, ChevronsDown, Copy,
-  Crosshair, AlignCenter
+  Crosshair, AlignCenter, HelpCircle, Smartphone, MousePointer, Keyboard
 } from 'lucide-react';
 import { INITIAL_ELEMENTS } from './initialData';
 import { downloadAsset } from './converter';
@@ -1069,6 +1069,90 @@ function Trackball3DPad({ rotateX, rotateY, onChange, onReset, appTheme }) {
   );
 }
 
+const PC_HELP_GUIDE = [
+  {
+    category: 'Canvas Navigation & View',
+    items: [
+      { title: 'Pan / Move Canvas', desc: 'Navigate and pan smoothly across the canvas in any direction', keys: ['Ctrl + Shift + Drag', 'Middle Click'] },
+      { title: 'Smooth Zoom', desc: 'Scroll your mouse wheel or use +/- buttons to zoom smoothly', keys: ['Mouse Wheel', '+ / - Buttons'] },
+      { title: 'Reset Zoom (100%)', desc: 'Reset view to 100% standard zoom and center canvas position', keys: ['Click 100% Pill'] },
+      { title: 'Center Item / View', desc: 'Align the selected element or canvas view to center', keys: ['Ctrl + E'] }
+    ]
+  },
+  {
+    category: 'Selection & Movement (Fabric.js Engine)',
+    items: [
+      { title: 'Select Part / Element', desc: 'Click on any vector shape or path to select it', keys: ['Left Click'] },
+      { title: 'Marquee Box Selection', desc: 'Drag across empty canvas background to create a selection box', keys: ['Drag Box'] },
+      { title: 'Multi-Select Toggle', desc: 'Add or remove multiple parts from your current selection', keys: ['Shift + Click', 'Ctrl + Click'] },
+      { title: 'Instant Drag & Move', desc: 'Click and drag any element or group across the canvas at 60 FPS', keys: ['Click & Drag'] },
+      { title: 'Sub-select in Group', desc: 'Double-click any part inside a group to move it independently', keys: ['Double Click'] },
+      { title: 'Deselect All', desc: 'Click on the empty canvas background to clear selection', keys: ['Click Canvas BG'] }
+    ]
+  },
+  {
+    category: 'Keyboard Shortcuts',
+    items: [
+      { title: 'Select All Elements', desc: 'Select all visual elements on the canvas simultaneously', keys: ['Ctrl + A'] },
+      { title: 'Copy Elements', desc: 'Copy selected elements along with their colors and styles', keys: ['Ctrl + C'] },
+      { title: 'Paste Elements', desc: 'Paste copied elements with automatic offset to new editable layers', keys: ['Ctrl + V'] },
+      { title: 'Cut Elements', desc: 'Cut selected elements to clipboard', keys: ['Ctrl + X'] },
+      { title: 'Duplicate Part', desc: 'Create an instant clone of the selected element', keys: ['Ctrl + D'] },
+      { title: 'Delete Selected', desc: 'Remove selected element(s) from the canvas', keys: ['Delete', 'Backspace'] },
+      { title: 'Undo Action', desc: 'Revert the last change or action', keys: ['Ctrl + Z'] },
+      { title: 'Redo Action', desc: 'Re-apply the previously undone action', keys: ['Ctrl + Y', 'Ctrl + Shift + Z'] }
+    ]
+  },
+  {
+    category: 'Transform, Handles & Layout',
+    items: [
+      { title: 'Proportional Resize', desc: 'Drag any of the 4 corner white circles to scale proportionally', keys: ['Corner Circles'] },
+      { title: 'Stretch Height / Width', desc: 'Drag top, bottom, left, or right edge pills to stretch', keys: ['Edge Pills'] },
+      { title: 'Rotate Element', desc: 'Drag the circular rotate handle on the left of the bounding box', keys: ['Rotate Handle'] },
+      { title: 'Quick 90° Rotate', desc: 'Instantly rotate the selected element by 90 degrees', keys: ['90° Button'] },
+      { title: 'Tools Panel Resizer', desc: 'Drag the vertical divider line left or right to adjust workspace width', keys: ['Divider Line'] },
+      { title: 'Color Wheel', desc: 'Double-click any color swatch to open full HEX/HSL color wheel', keys: ['Double Click Swatch'] }
+    ]
+  }
+];
+
+const MOBILE_HELP_GUIDE = [
+  {
+    category: 'Touch Gestures & Navigation',
+    items: [
+      { title: '2-Finger Pinch Zoom', desc: 'Pinch with two fingers on canvas to zoom in or out smoothly', gesture: '2-Finger Pinch' },
+      { title: '2-Finger Canvas Pan', desc: 'Slide with two fingers to pan and navigate across the canvas', gesture: '2-Finger Slide' },
+      { title: '1-Finger Tap Select', desc: 'Tap on any shape or icon part to select it', gesture: 'Single Tap' },
+      { title: 'Touch Drag & Move', desc: 'Touch and slide with one finger to move any selected element', gesture: 'Touch & Drag' },
+      { title: 'Deselect', desc: 'Tap on empty canvas background to clear active selection', gesture: 'Tap Canvas' }
+    ]
+  },
+  {
+    category: 'Mobile Quick Action Pill',
+    items: [
+      { title: 'Floating Action Bar', desc: 'Bottom pill appears with Duplicate and Delete options when an element is selected', gesture: 'Bottom Pill' },
+      { title: 'Duplicate Part', desc: 'Tap Duplicate button in the bottom quick action bar', gesture: 'Duplicate Tap' },
+      { title: 'Delete Part', desc: 'Tap Delete button in the bottom quick action bar', gesture: 'Delete Tap' }
+    ]
+  },
+  {
+    category: 'Canvas Height Resizer',
+    items: [
+      { title: 'Adjust Canvas Space', desc: 'Drag the horizontal glowing handle up or down to adjust canvas height', gesture: 'Drag Grip Bar' },
+      { title: 'Reset Canvas Height', desc: 'Double-tap the divider pill to reset to default canvas height', gesture: 'Double Tap Grip' }
+    ]
+  },
+  {
+    category: 'Touch Transform & Styling',
+    items: [
+      { title: 'Corner Resize', desc: 'Drag corner dots with your finger to scale elements', gesture: 'Corner Dots' },
+      { title: 'Touch Rotation', desc: 'Touch and rotate the handle on the bounding box', gesture: 'Rotate Handle' },
+      { title: 'Color Wheel Modal', desc: 'Double-tap any color swatch to open the mobile color picker', gesture: 'Double Tap Swatch' },
+      { title: 'Insert from Library', desc: 'Tap "Add Part" at the top to insert new vector shapes and icons', gesture: 'Top Toolbar' }
+    ]
+  }
+];
+
 export default function App() {
   const [elements, setElements] = useState(() => {
     const saved = localStorage.getItem('iconderry_assets') || localStorage.getItem('pixlflow_assets');
@@ -1340,7 +1424,7 @@ export default function App() {
           if (activeTargetLayerElRef.current?.releasePointerCapture && activePointerIdRef.current !== null) {
             activeTargetLayerElRef.current.releasePointerCapture(activePointerIdRef.current);
           }
-        } catch (_) {}
+        } catch (_) { }
         activeTargetLayerElRef.current = null;
         activePointerIdRef.current = null;
       }
@@ -1431,17 +1515,51 @@ export default function App() {
         return;
       }
 
-      const targetLayerEl = e.target.closest('[data-layer-id]');
+      let targetLayerEl = e.target.closest('[data-layer-id]');
       const currentSelected = selectedLayerIdsRef.current || [];
 
-      // Check if clicked anywhere inside the active Transform Bounding Box of selected elements
+      // Fabric.js style Proximity Hit-Testing:
+      // If mouse is clicked slightly off a thin stroke or during a rapid jerk, probe 16px radius around point
+      if (!targetLayerEl && canvasSvgContainerRef.current) {
+        const svgContainer = canvasSvgContainerRef.current;
+        const elsUnderPoint = document.elementsFromPoint ? document.elementsFromPoint(e.clientX, e.clientY) : [];
+        for (const el of elsUnderPoint) {
+          const layer = el.closest('[data-layer-id]');
+          if (layer && svgContainer.contains(layer)) {
+            targetLayerEl = layer;
+            break;
+          }
+        }
+
+        if (!targetLayerEl) {
+          const radialOffsets = [
+            [0, -8], [0, 8], [-8, 0], [8, 0],
+            [-8, -8], [8, -8], [-8, 8], [8, 8],
+            [0, -16], [0, 16], [-16, 0], [16, 0],
+            [-12, -12], [12, -12], [-12, 12], [12, 12]
+          ];
+          for (const [ox, oy] of radialOffsets) {
+            const probeEls = document.elementsFromPoint ? document.elementsFromPoint(e.clientX + ox, e.clientY + oy) : [];
+            for (const el of probeEls) {
+              const layer = el.closest('[data-layer-id]');
+              if (layer && svgContainer.contains(layer)) {
+                targetLayerEl = layer;
+                break;
+              }
+            }
+            if (targetLayerEl) break;
+          }
+        }
+      }
+
+      // Check if clicked anywhere inside the active Transform Bounding Box of selected elements (+12px tolerance)
       const isInsideTransformBox = Boolean(
         transformBox &&
         currentSelected.length > 0 &&
-        e.clientX >= (transformBox.minLeft - 4) &&
-        e.clientX <= (transformBox.maxRight + 4) &&
-        e.clientY >= (transformBox.minTop - 4) &&
-        e.clientY <= (transformBox.maxBottom + 4)
+        e.clientX >= (transformBox.minLeft - 12) &&
+        e.clientX <= (transformBox.maxRight + 12) &&
+        e.clientY >= (transformBox.minTop - 12) &&
+        e.clientY <= (transformBox.maxBottom + 12)
       );
 
       // Case A: Clicked directly on a Vector Shape / Part OR inside the active Bounding Box of selected elements
@@ -1456,9 +1574,9 @@ export default function App() {
           layerId && (
             e.detail >= 2 ||
             (lastClick &&
-             lastClick.layerId === layerId &&
-             now - lastClick.time < 380 &&
-             Math.hypot(e.clientX - lastClick.x, e.clientY - lastClick.y) < 25)
+              lastClick.layerId === layerId &&
+              now - lastClick.time < 380 &&
+              Math.hypot(e.clientX - lastClick.x, e.clientY - lastClick.y) < 25)
           )
         );
         lastCanvasClickRef.current = { time: now, layerId, x: e.clientX, y: e.clientY };
@@ -1556,7 +1674,7 @@ export default function App() {
           if (e.pointerId !== undefined && captureEl?.setPointerCapture) {
             captureEl.setPointerCapture(e.pointerId);
           }
-        } catch (_) {}
+        } catch (_) { }
 
         // Store initial transforms for all active layers so they move together in sync
         const initialTransforms = {};
@@ -1587,8 +1705,8 @@ export default function App() {
           const cleanId = String(id).replace(/^pf_studio_/i, '');
           const numOnly = cleanId.replace(/\D/g, '');
           const node = svgContainer?.querySelector(`[data-layer-id="${id}"]`) ||
-                       svgContainer?.querySelector(`[data-layer-id="${cleanId}"]`) ||
-                       (numOnly ? svgContainer?.querySelector(`[data-layer-id="layer_${numOnly}"]`) : null);
+            svgContainer?.querySelector(`[data-layer-id="${cleanId}"]`) ||
+            (numOnly ? svgContainer?.querySelector(`[data-layer-id="layer_${numOnly}"]`) : null);
           const rawOrig = node?.hasAttribute('data-orig-transform')
             ? (node.getAttribute('data-orig-transform') || '')
             : (node?.getAttribute('transform') || '');
@@ -1632,7 +1750,7 @@ export default function App() {
               if (canvasWorkspaceRef.current?.releasePointerCapture && e.pointerId !== undefined) {
                 canvasWorkspaceRef.current.releasePointerCapture(e.pointerId);
               }
-            } catch (_) {}
+            } catch (_) { }
             activeTargetLayerElRef.current = null;
             activePointerIdRef.current = null;
             return;
@@ -1722,7 +1840,7 @@ export default function App() {
               if (e.pointerId !== undefined && captureEl?.releasePointerCapture) {
                 captureEl.releasePointerCapture(e.pointerId);
               }
-            } catch (_) {}
+            } catch (_) { }
 
             if (isDraggingLayerRef.current) {
               isDraggingLayerRef.current = false;
@@ -1933,7 +2051,8 @@ export default function App() {
               if (finalHits.length > 0) {
                 setSelectedLayerIds(finalHits);
                 setSelectedLayerId(finalHits[0]);
-                setStudioTab('colors');
+                setStudioTab('adjustment');
+                setAdjustmentSubTab('colors');
               }
             } else {
               // Simple click without drag on canvas background:
@@ -2241,8 +2360,8 @@ export default function App() {
       activeIds.forEach(id => {
         const cleanId = String(id).replace(/^pf_studio_/i, '');
         const el = svgContainer.querySelector(`[data-layer-id="${id}"]`) ||
-                   svgContainer.querySelector(`[data-layer-id="${cleanId}"]`) ||
-                   svgContainer.querySelector(`[data-layer-id="pf_studio_${cleanId}"]`);
+          svgContainer.querySelector(`[data-layer-id="${cleanId}"]`) ||
+          svgContainer.querySelector(`[data-layer-id="pf_studio_${cleanId}"]`);
         if (el && typeof el.getBBox === 'function') {
           try {
             const bbox = el.getBBox();
@@ -2252,7 +2371,7 @@ export default function App() {
               maxX = Math.max(maxX, bbox.x + bbox.width);
               maxY = Math.max(maxY, bbox.y + bbox.height);
             }
-          } catch (_) {}
+          } catch (_) { }
         }
       });
 
@@ -2435,16 +2554,23 @@ export default function App() {
   const handleSelectAllLayers = () => {
     const allIds = allSvgLayers.map(l => l.id);
     setSelectedLayerIds(allIds);
-    if (allIds.length > 0) setSelectedLayerId(allIds[0]);
-    setStudioTab('colors');
+    selectedLayerIdsRef.current = allIds;
+    if (allIds.length > 0) {
+      setSelectedLayerId(allIds[0]);
+      selectedLayerIdRef.current = allIds[0];
+    }
+    setStudioTab('adjustment');
+    setAdjustmentSubTab('colors');
     setTimeout(() => {
       updateTransformBox(allIds);
-    }, 40);
+    }, 20);
   };
 
   const handleDeselectAllLayers = () => {
     setSelectedLayerIds([]);
+    selectedLayerIdsRef.current = [];
     setSelectedLayerId(null);
+    selectedLayerIdRef.current = null;
     setActiveSelectedColor(null);
     setTransformBox(null);
   };
@@ -2563,6 +2689,7 @@ export default function App() {
 
     const startX = e.clientX;
     const startWidth = sidebarWidth;
+    let rafResizeId = null;
 
     const onPointerMove = (moveEvt) => {
       const zoom = window.innerWidth >= 1024 ? 1.1 : 1;
@@ -2573,10 +2700,16 @@ export default function App() {
       const halfScreenWidth = Math.floor((window.innerWidth / zoom) * 0.5);
       const clamped = Math.min(Math.max(340, newWidth), halfScreenWidth);
       setSidebarWidth(clamped);
+
+      if (rafResizeId) cancelAnimationFrame(rafResizeId);
+      rafResizeId = requestAnimationFrame(() => {
+        updateTransformBox();
+      });
     };
 
     const onPointerUp = () => {
       setIsResizingSidebar(false);
+      if (rafResizeId) cancelAnimationFrame(rafResizeId);
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
       setSidebarWidth((finalWidth) => {
@@ -2584,6 +2717,10 @@ export default function App() {
           localStorage.setItem('iconderry_studio_sidebar_width', String(finalWidth));
         } catch { }
         return finalWidth;
+      });
+      requestAnimationFrame(() => {
+        updateTransformBox();
+        setTimeout(updateTransformBox, 50);
       });
     };
 
@@ -2599,6 +2736,7 @@ export default function App() {
     const startY = e.clientY ?? (e.touches && e.touches[0]?.clientY) ?? 0;
     const startHeight = mobileCanvasHeight;
     const windowH = window.innerHeight || 800;
+    let rafMobileResizeId = null;
 
     const onPointerMove = (moveEvt) => {
       const clientY = moveEvt.clientY ?? (moveEvt.touches && moveEvt.touches[0]?.clientY) ?? 0;
@@ -2606,10 +2744,16 @@ export default function App() {
       const deltaVh = (deltaY / windowH) * 100;
       const newHeightVh = Math.round(Math.min(75, Math.max(18, startHeight + deltaVh)));
       setMobileCanvasHeight(newHeightVh);
+
+      if (rafMobileResizeId) cancelAnimationFrame(rafMobileResizeId);
+      rafMobileResizeId = requestAnimationFrame(() => {
+        updateTransformBox();
+      });
     };
 
     const onPointerUp = () => {
       setIsResizingMobileCanvas(false);
+      if (rafMobileResizeId) cancelAnimationFrame(rafMobileResizeId);
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('pointerup', onPointerUp);
       window.removeEventListener('touchmove', onPointerMove);
@@ -2619,6 +2763,10 @@ export default function App() {
           localStorage.setItem('iconderry_mobile_canvas_height', String(finalH));
         } catch { }
         return finalH;
+      });
+      requestAnimationFrame(() => {
+        updateTransformBox();
+        setTimeout(updateTransformBox, 50);
       });
     };
 
@@ -2702,7 +2850,7 @@ export default function App() {
             if (activeTargetLayerElRef.current?.releasePointerCapture && activePointerIdRef.current !== null) {
               activeTargetLayerElRef.current.releasePointerCapture(activePointerIdRef.current);
             }
-          } catch (_) {}
+          } catch (_) { }
           activeTargetLayerElRef.current = null;
           activePointerIdRef.current = null;
         }
@@ -2776,9 +2924,10 @@ export default function App() {
   const [effectCategory, setEffectCategory] = useState('All');
   const [effectSearchTerm, setEffectSearchTerm] = useState('');
   const [effectVersionFilter, setEffectVersionFilter] = useState('all'); // 'all' | 'new' | 'old'
-  const [studioTab, setStudioTab] = useState('colors'); // 'colors' | 'filters' | 'effects' | 'dimensions' | 'transform' | 'export'
+  const [studioTab, setStudioTab] = useState('adjustment'); // 'adjustment' | 'filters' | 'effects' | 'dimensions' | 'transform' | 'export'
+  const [adjustmentSubTab, setAdjustmentSubTab] = useState('gradient'); // 'gradient' | 'colors'
   const [transformSubTab, setTransformSubTab] = useState('3d'); // '3d' | '2d' | 'skew'
-  const [effectSubTab, setEffectSubTab] = useState('effects'); // 'effects' | 'adjustment'
+  const [effectSubTab, setEffectSubTab] = useState('effects'); // 'effects'
   const [filterSubView, setFilterSubView] = useState('presets'); // 'presets' | 'materials' | 'sliders'
   const [filterCategory, setFilterCategory] = useState('All');
   const [filterSearchTerm, setFilterSearchTerm] = useState('');
@@ -2791,6 +2940,9 @@ export default function App() {
   const [isAddElementModalOpen, setIsAddElementModalOpen] = useState(false);
   const [addElementSearch, setAddElementSearch] = useState('');
   const [addElementCategory, setAddElementCategory] = useState('All');
+  const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
+  const [helpSearchQuery, setHelpSearchQuery] = useState('');
+  const [helpActiveTab, setHelpActiveTab] = useState('pc'); // 'pc' | 'mobile'
   const canvasSvgContainerRef = useRef(null);
 
   const filteredPresets = useMemo(() => {
@@ -3217,10 +3369,10 @@ export default function App() {
     const activeIds = (overrideIds && overrideIds.length > 0)
       ? overrideIds
       : (selectedLayerIdsRef.current && selectedLayerIdsRef.current.length > 0
-          ? selectedLayerIdsRef.current
-          : (selectedLayerIds && selectedLayerIds.length > 0
-              ? selectedLayerIds
-              : (selectedLayerIdRef.current ? [selectedLayerIdRef.current] : (selectedLayerId ? [selectedLayerId] : []))));
+        ? selectedLayerIdsRef.current
+        : (selectedLayerIds && selectedLayerIds.length > 0
+          ? selectedLayerIds
+          : (selectedLayerIdRef.current ? [selectedLayerIdRef.current] : (selectedLayerId ? [selectedLayerId] : []))));
 
     if (activeIds.length === 0) {
       setTransformBox(null);
@@ -3231,9 +3383,9 @@ export default function App() {
       const cleanId = String(id).replace(/^pf_studio_/i, '');
       const numOnly = cleanId.replace(/\D/g, '');
       return svgContainer.querySelector(`[data-layer-id="${id}"]`) ||
-             svgContainer.querySelector(`[data-layer-id="${cleanId}"]`) ||
-             svgContainer.querySelector(`[data-layer-id="pf_studio_${cleanId}"]`) ||
-             (numOnly ? svgContainer.querySelector(`[data-layer-id="layer_${numOnly}"]`) : null);
+        svgContainer.querySelector(`[data-layer-id="${cleanId}"]`) ||
+        svgContainer.querySelector(`[data-layer-id="pf_studio_${cleanId}"]`) ||
+        (numOnly ? svgContainer.querySelector(`[data-layer-id="layer_${numOnly}"]`) : null);
     }).filter(Boolean);
 
     if (nodes.length === 0) {
@@ -3276,7 +3428,7 @@ export default function App() {
               height: Math.max(...ys) - Math.min(...ys)
             };
           }
-        } catch (_) {}
+        } catch (_) { }
       }
 
       if (rect && (rect.width > 0 || rect.height > 0)) {
@@ -3316,6 +3468,15 @@ export default function App() {
       maxBottom
     };
 
+    // Immediately snap transform box in DOM for 60fps tracking during divider drags
+    if (transformBoxRef.current) {
+      transformBoxRef.current.style.left = `${box.x}px`;
+      transformBoxRef.current.style.top = `${box.y}px`;
+      transformBoxRef.current.style.width = `${box.width}px`;
+      transformBoxRef.current.style.height = `${box.height}px`;
+      transformBoxRef.current.style.transform = '';
+    }
+
     setTransformBox(box);
     return box;
   }, [selectedLayerIds, selectedLayerId]);
@@ -3348,7 +3509,17 @@ export default function App() {
       window.removeEventListener('resize', updateTransformBox);
       window.removeEventListener('scroll', updateTransformBox, true);
     };
-  }, [updateTransformBox, currentPreviewSvg, zoomLevel, canvasPan, layerTransforms]);
+  }, [
+    updateTransformBox,
+    currentPreviewSvg,
+    zoomLevel,
+    canvasPan,
+    layerTransforms,
+    sidebarWidth,
+    mobileCanvasHeight,
+    isResizingSidebar,
+    isResizingMobileCanvas
+  ]);
 
   // Transform handle pointer down: Handles corner proportional scaling, edge stretching, and rotation
   const handleTransformHandleDown = (e, handleType) => {
@@ -3387,8 +3558,8 @@ export default function App() {
         const cleanId = String(id).replace(/^pf_studio_/i, '');
         const numOnly = cleanId.replace(/\D/g, '');
         const el = svgContainer.querySelector(`[data-layer-id="${id}"]`) ||
-                   svgContainer.querySelector(`[data-layer-id="${cleanId}"]`) ||
-                   (numOnly ? svgContainer.querySelector(`[data-layer-id="layer_${numOnly}"]`) : null);
+          svgContainer.querySelector(`[data-layer-id="${cleanId}"]`) ||
+          (numOnly ? svgContainer.querySelector(`[data-layer-id="layer_${numOnly}"]`) : null);
         if (el && el.getBBox) {
           try {
             const bbox = el.getBBox();
@@ -3398,7 +3569,7 @@ export default function App() {
               maxX = Math.max(maxX, bbox.x + bbox.width);
               maxY = Math.max(maxY, bbox.y + bbox.height);
             }
-          } catch (_) {}
+          } catch (_) { }
         }
       });
       if (minX < Infinity && maxX > -Infinity) {
@@ -3415,14 +3586,14 @@ export default function App() {
         const cleanId = String(id).replace(/^pf_studio_/i, '');
         const numOnly = cleanId.replace(/\D/g, '');
         const el = svgContainer.querySelector(`[data-layer-id="${id}"]`) ||
-                   svgContainer.querySelector(`[data-layer-id="${cleanId}"]`) ||
-                   (numOnly ? svgContainer.querySelector(`[data-layer-id="layer_${numOnly}"]`) : null);
+          svgContainer.querySelector(`[data-layer-id="${cleanId}"]`) ||
+          (numOnly ? svgContainer.querySelector(`[data-layer-id="layer_${numOnly}"]`) : null);
         if (el && el.getBBox) {
           try {
             const bbox = el.getBBox();
             cx = bbox.x + bbox.width / 2;
             cy = bbox.y + bbox.height / 2;
-          } catch (_) {}
+          } catch (_) { }
         }
       }
       initialTransforms[id] = {
@@ -4123,7 +4294,8 @@ export default function App() {
 
         const targetOrigColor = match ? match.color : norm;
         setActiveSelectedColor(targetOrigColor);
-        setStudioTab('colors');
+        setStudioTab('adjustment');
+        setAdjustmentSubTab('colors');
         return;
       }
     }
@@ -4248,7 +4420,7 @@ export default function App() {
 
   const handleFileProcess = (file) => {
     if (!file || !file.name.endsWith('.svg')) {
-      alert('Kripya valid .svg file upload karein');
+      alert('Please upload a valid .svg file');
       return;
     }
     const derivedTitle = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
@@ -4375,7 +4547,7 @@ export default function App() {
 
         if (error) {
           console.error('Supabase insert error:', error);
-          setFormError(`Supabase par upload nahi ho paya: ${error.message || 'Error occurred'}`);
+          setFormError(`Failed to upload to Supabase: ${error.message || 'Error occurred'}`);
           setIsPublishing(false);
           return;
         }
@@ -4386,7 +4558,7 @@ export default function App() {
       setTitle('');
       setSvgInput('');
       setTags('');
-      setFormSuccess('SVG Supabase Cloud par live publish ho gaya! Ab website par sabhi log isko access kar sakte hain.');
+      setFormSuccess('SVG published successfully to Supabase Cloud! It is now accessible to all users.');
       setTimeout(() => setFormSuccess(''), 5000);
     } catch (err) {
       console.error('Publish error:', err);
@@ -4397,7 +4569,7 @@ export default function App() {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Kya aap is element ko delete karna chahte hain?')) {
+    if (window.confirm('Are you sure you want to delete this element?')) {
       setElements(prev => prev.filter(el => el.id !== id));
       if (selectedAsset?.id === id) setSelectedAsset(null);
       if (supabase) {
@@ -4424,7 +4596,7 @@ export default function App() {
         const hasX = typeof t.x === 'number' && Math.abs(t.x) > 0.5;
         const hasY = typeof t.y === 'number' && Math.abs(t.y) > 0.5;
         const hasRot = (typeof t.rotate === 'number' && Math.abs(t.rotate) > 0.5) ||
-                       (typeof t.rotation === 'number' && Math.abs(t.rotation) > 0.5);
+          (typeof t.rotation === 'number' && Math.abs(t.rotation) > 0.5);
         const hasScaleX = typeof t.scaleX === 'number' && Math.abs(t.scaleX - 1) > 0.01;
         const hasScaleY = typeof t.scaleY === 'number' && Math.abs(t.scaleY - 1) > 0.01;
         const hasScale = typeof t.scale === 'number' && Math.abs(t.scale - 1) > 0.01;
@@ -4542,7 +4714,7 @@ export default function App() {
         const hasX = typeof t.x === 'number' && Math.abs(t.x) > 0.5;
         const hasY = typeof t.y === 'number' && Math.abs(t.y) > 0.5;
         const hasRot = (typeof t.rotate === 'number' && Math.abs(t.rotate) > 0.5) ||
-                       (typeof t.rotation === 'number' && Math.abs(t.rotation) > 0.5);
+          (typeof t.rotation === 'number' && Math.abs(t.rotation) > 0.5);
         const hasScaleX = typeof t.scaleX === 'number' && Math.abs(t.scaleX - 1) > 0.01;
         const hasScaleY = typeof t.scaleY === 'number' && Math.abs(t.scaleY - 1) > 0.01;
         const hasScale = typeof t.scale === 'number' && Math.abs(t.scale - 1) > 0.01;
@@ -4838,7 +5010,7 @@ export default function App() {
               </div>
             </div>
             <p className={`text-xs sm:text-sm mb-5 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-              SVG upload karein. Ye Supabase cloud database me save hoga aur poori website par sabhi users ko instant dikhega.
+              Upload an SVG. It will be saved directly to the Supabase cloud database and visible to all users across the platform.
             </p>
 
             {formSuccess && (
@@ -4960,7 +5132,7 @@ export default function App() {
                     dangerouslySetInnerHTML={{ __html: svgInput }} />
                   <div className="text-xs">
                     <p className={`font-semibold ${appTheme === 'dark' ? 'text-slate-200' : 'text-slate-800'}`}>Live SVG Preview</p>
-                    <p className={appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}>Make sure SVG me <code>viewBox</code> mojood ho.</p>
+                    <p className={appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}>Ensure the SVG includes a valid <code>viewBox</code> attribute.</p>
                   </div>
                 </div>
               )}
@@ -5091,11 +5263,11 @@ export default function App() {
                 {selectedCategory === 'Favorites' ? (
                   <>
                     <Heart className="w-8 h-8 text-rose-500/40 mx-auto stroke-1" />
-                    <p className="font-semibold text-slate-400">Aapka koi favorite icon nahi hai.</p>
-                    <p className="text-[11px] text-slate-500">Kisi bhi icon card par ❤️ (Heart) click karke yahan save karein!</p>
+                    <p className="font-semibold text-slate-400">No favorite icons yet.</p>
+                    <p className="text-[11px] text-slate-500">Click the ❤️ (Heart) on any icon card to save it here!</p>
                   </>
                 ) : (
-                  <p>Koi asset nahi mila. Admin Upload par jaakar naya SVG dalein!</p>
+                  <p>No assets found. Visit Admin Upload to add a new SVG!</p>
                 )}
               </div>
             )}
@@ -5601,11 +5773,10 @@ export default function App() {
                             handleGroupSelected();
                           }
                         }}
-                        className={`h-6 px-2.5 rounded-full border shadow-lg flex items-center gap-1 text-[10px] font-bold transition-all hover:scale-105 active:scale-95 whitespace-nowrap cursor-pointer select-none ${
-                          isCurrentGroupSelected || isSubSelectedInGroup
+                        className={`h-6 px-2.5 rounded-full border shadow-lg flex items-center gap-1 text-[10px] font-bold transition-all hover:scale-105 active:scale-95 whitespace-nowrap cursor-pointer select-none ${isCurrentGroupSelected || isSubSelectedInGroup
                             ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 border-amber-300 shadow-amber-950/40'
                             : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 border-cyan-300 shadow-cyan-950/40'
-                        }`}
+                          }`}
                         title={isCurrentGroupSelected || isSubSelectedInGroup ? "Click to ungroup parts so they become standalone" : "Click to group selected parts"}
                       >
                         {isCurrentGroupSelected || isSubSelectedInGroup ? (
@@ -5766,18 +5937,20 @@ export default function App() {
                   >
                     <ZoomIn className="w-3.5 h-3.5" />
                   </button>
-                  {(canvasPan.x !== 0 || canvasPan.y !== 0) && (
-                    <button
-                      onClick={() => {
-                        targetPanRef.current = { x: 0, y: 0 };
-                        startSmoothZoomLoop();
-                      }}
-                      className="px-1.5 py-0.5 text-[9px] font-semibold rounded bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 transition border border-cyan-500/30"
-                      title="Reset View to Center"
-                    >
-                      Center
-                    </button>
-                  )}
+                  {/* Circular Help & Navigation Guide Button (?) */}
+                  <button
+                    onClick={() => {
+                      setIsHelpModalOpen(true);
+                      setHelpSearchQuery('');
+                    }}
+                    className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center font-bold text-[11px] sm:text-xs transition-all shadow-sm border hover:scale-110 active:scale-95 ml-0.5 ${appTheme === 'dark'
+                        ? 'bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500 hover:text-slate-950 border-cyan-400/40 shadow-cyan-950/40'
+                        : 'bg-cyan-100 text-cyan-700 hover:bg-cyan-500 hover:text-white border-cyan-300'
+                      }`}
+                    title="Navigation & Shortcuts Guide (?)"
+                  >
+                    ?
+                  </button>
                 </div>
               </div>
 
@@ -6014,14 +6187,14 @@ export default function App() {
                 <div className={`grid grid-cols-6 gap-1 p-0.5 sm:p-1 rounded-xl border ${appTheme === 'dark' ? 'bg-slate-900 border-slate-800' : 'bg-slate-200/70 border-slate-300/60'
                   }`}>
                   <button
-                    onClick={() => setStudioTab('colors')}
-                    className={`flex flex-col items-center justify-center gap-0.5 py-1.5 sm:py-2 px-0.5 sm:px-1 rounded-lg text-xs font-semibold transition active:scale-95 ${studioTab === 'colors'
+                    onClick={() => setStudioTab('adjustment')}
+                    className={`flex flex-col items-center justify-center gap-0.5 py-1.5 sm:py-2 px-0.5 sm:px-1 rounded-lg text-xs font-semibold transition active:scale-95 ${(studioTab === 'adjustment' || studioTab === 'colors')
                       ? 'bg-blue-600 text-white shadow'
                       : appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
                       }`}
                   >
-                    <Palette className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
-                    <span className="text-[9px] sm:text-[10px] lg:text-[11px] leading-tight">Colors</span>
+                    <Sliders className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
+                    <span className="text-[9px] sm:text-[10px] lg:text-[11px] leading-tight">Adjust</span>
                   </button>
 
                   <button
@@ -6083,1257 +6256,15 @@ export default function App() {
 
               {/* Scrollable Tools Body */}
               <div className="flex-1 overflow-y-auto p-3.5 sm:p-5 space-y-4 sm:space-y-5 overscroll-contain smooth-scroll">
-                {/* TAB 1: ELEMENT COLORS PALETTE */}
-                {studioTab === 'colors' && (
+                {/* TAB 1: ADJUSTMENT (WITH 2 SUB-TABS: GRADIENT ADJUSTMENT & COLOR STUDIO) */}
+                {(studioTab === 'adjustment' || studioTab === 'colors') && (
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h4 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
-                          }`}>
-                          <Paintbrush className="w-3.5 h-3.5 text-cyan-500" /> Vector Color Studio
-                        </h4>
-                        <p className={`text-[11px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                          Image par kisi bhi element ko touch karein ya dropdown se layer select karein
-                        </p>
-                      </div>
-
-                      <button
-                        onClick={handleResetColorsPanel}
-                        className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition flex items-center gap-1.5 flex-shrink-0 ${appTheme === 'dark'
-                          ? 'text-slate-300 hover:text-white bg-slate-900 border-slate-800 hover:border-slate-700'
-                          : 'text-slate-700 hover:text-slate-900 bg-white border-slate-200 hover:bg-slate-50'
-                          }`}
-                        title="Reset all custom color replacements in this panel"
-                      >
-                        <Undo2 className="w-3 h-3 text-cyan-500" />
-                        <span>Reset Colors</span>
-                      </button>
-                    </div>
-
-                    {/* Active Selected Element Direct Editor Card */}
-                    {(() => {
-                      const activeIds = (selectedLayerIds && selectedLayerIds.length > 0)
-                        ? selectedLayerIds
-                        : (selectedLayerId ? [selectedLayerId] : []);
-                      const primaryId = activeIds[0];
-                      const cleanPrimaryId = primaryId ? String(primaryId).replace(/^pf_studio_/i, '') : null;
-                      const numOnly = cleanPrimaryId ? cleanPrimaryId.replace(/\D/g, '') : null;
-                      const activeLayer = cleanPrimaryId
-                        ? svgLayers.find(l => l.id === cleanPrimaryId || l.id === primaryId || (numOnly && l.id === `layer_${numOnly}`))
-                        : null;
-                      const layerStyle = cleanPrimaryId ? (layerStyles[cleanPrimaryId] || layerStyles[primaryId] || {}) : {};
-                      const currentLayerColor = layerStyle.fill || layerStyle.stroke || (activeLayer ? activeLayer.color : null);
-
-                      const effectiveColor = (activeSelectedColor && adjustments.colorReplacements[activeSelectedColor.toLowerCase()])
-                        || activeSelectedColor
-                        || currentLayerColor
-                        || (activeIds.length > 0 ? '#38bdf8' : null);
-
-                      const originalColorDisplay = activeSelectedColor
-                        || (activeLayer ? (activeLayer.color || '#38bdf8') : (effectiveColor || '#38bdf8'));
-
-                      const hasCustomColor = (activeSelectedColor && !!adjustments.colorReplacements[activeSelectedColor.toLowerCase()])
-                        || (activeIds.length > 0 && activeIds.some(id => {
-                          const cid = String(id).replace(/^pf_studio_/i, '');
-                          const s = layerStyles[cid] || layerStyles[id];
-                          return s && (s.fill || s.stroke);
-                        }));
-
-                      const handleApplyColor = (newCol) => {
-                        const norm = normalizeColor(newCol) || newCol;
-                        if (activeSelectedColor) {
-                          handleColorChange(activeSelectedColor, norm);
-                        }
-                        if (activeIds.length > 0) {
-                          handleLayerColorChange(activeIds, norm);
-                        } else if (!activeSelectedColor && originalColorDisplay) {
-                          handleColorChange(originalColorDisplay, norm);
-                        }
-                      };
-
-                      const handleResetEffectiveColor = () => {
-                        if (activeSelectedColor) {
-                          handleResetSingleColor(activeSelectedColor);
-                        }
-                        if (activeIds.length > 0) {
-                          handleResetLayerColor(activeIds);
-                        }
-                      };
-
-                      const isAnySelected = !!activeSelectedColor || activeIds.length > 0;
-
-                      if (!isAnySelected || !effectiveColor) {
-                        return (
-                          <div className={`p-5 rounded-2xl border border-dashed text-center text-xs space-y-1 ${appTheme === 'dark' ? 'bg-slate-900/60 border-slate-800 text-slate-400' : 'bg-slate-50 border-slate-300 text-slate-600'
-                            }`}>
-                            <Sparkles className="w-5 h-5 text-cyan-500 mx-auto mb-1" />
-                            <p className={`font-semibold ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-800'}`}>Touch Element on Image</p>
-                            <p className={`text-[11px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                              Canvas par kisi bhi element ko click karein ya drag karein usko move, rotate, color aur reorder karne ke liye.
-                            </p>
-                          </div>
-                        );
-                      }
-
-                      return (
-                        <div className={`p-4 rounded-2xl border-2 shadow-xl space-y-3 animate-in fade-in duration-200 ${appTheme === 'dark'
-                          ? 'bg-slate-900 border-cyan-400/80 shadow-cyan-500/10'
-                          : 'bg-slate-50 border-cyan-500 shadow-cyan-500/10'
-                          }`}>
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <span className="w-2.5 h-2.5 rounded-full bg-cyan-500" />
-                              <span className="text-xs font-bold uppercase tracking-wider text-cyan-500">
-                                {activeIds.length > 1
-                                  ? `${activeIds.length} Parts Selected`
-                                  : (activeLayer ? `${activeLayer.name}` : 'Active Selected Element')}
-                              </span>
-                              {activeLayer && activeIds.length <= 1 && (
-                                <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-                                  &lt;{activeLayer.tag}&gt;
-                                </span>
-                              )}
-                            </div>
-
-                            {hasCustomColor && (
-                              <button
-                                onClick={handleResetEffectiveColor}
-                                className={`text-[11px] flex items-center gap-1 px-2.5 py-1 rounded-xl transition border ${appTheme === 'dark'
-                                  ? 'text-slate-400 hover:text-white bg-slate-800 border-slate-700'
-                                  : 'text-slate-600 hover:text-slate-900 bg-white border-slate-300'
-                                  }`}
-                              >
-                                <Undo2 className="w-3 h-3" /> Reset Color
-                              </button>
-                            )}
-                          </div>
-
-                          {/* Color Preview, Picker & Hex */}
-                          <div className={`flex items-center justify-between gap-3 p-3 rounded-xl border ${appTheme === 'dark' ? 'bg-[#0b0f19] border-slate-800' : 'bg-white border-slate-200 shadow-sm'
-                            }`}>
-                            <div className="flex items-center gap-3">
-                              <div
-                                className="w-11 h-11 rounded-xl border-2 border-slate-400 shadow-inner flex items-center justify-center flex-shrink-0"
-                                style={{ backgroundColor: effectiveColor }}
-                              />
-                              <div>
-                                <span className={`font-mono text-sm font-bold uppercase ${appTheme === 'dark' ? 'text-slate-100' : 'text-slate-900'
-                                  }`}>
-                                  {effectiveColor}
-                                </span>
-                                <p className={`text-[10px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                                  Original: <span className="font-mono uppercase">{originalColorDisplay}</span>
-                                </p>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                              <label className="cursor-pointer">
-                                <input
-                                  type="color"
-                                  value={effectiveColor.startsWith('#') ? effectiveColor : '#38bdf8'}
-                                  onChange={(e) => handleApplyColor(e.target.value)}
-                                  className="sr-only"
-                                />
-                                <div className="px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs transition flex items-center gap-1.5 shadow-md shadow-blue-600/30">
-                                  <Paintbrush className="w-3.5 h-3.5" />
-                                  <span>Pick</span>
-                                </div>
-                              </label>
-
-                              <input
-                                type="text"
-                                maxLength={7}
-                                value={effectiveColor.toUpperCase()}
-                                onChange={(e) => {
-                                  let val = e.target.value;
-                                  if (!val.startsWith('#')) val = '#' + val;
-                                  handleApplyColor(val);
-                                }}
-                                className={`w-20 px-2 py-2 rounded-xl text-xs font-mono text-center uppercase focus:outline-none focus:border-cyan-500 border ${appTheme === 'dark'
-                                  ? 'bg-slate-950 border-slate-800 text-slate-200'
-                                  : 'bg-slate-100 border-slate-300 text-slate-800'
-                                  }`}
-                              />
-                            </div>
-                          </div>
-
-                          {/* 1-Tap Quick Swatches */}
-                          <div className="space-y-1.5 pt-1">
-                            <span className={`text-[10px] font-medium ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                              Quick Color Presets:
-                            </span>
-                            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
-                              {QUICK_SWATCHES.map((swatch) => (
-                                <button
-                                  key={swatch.hex}
-                                  onClick={() => handleApplyColor(swatch.hex)}
-                                  title={`${swatch.name} (${swatch.hex})`}
-                                  className={`w-6 h-6 rounded-full border transition-all hover:scale-125 flex-shrink-0 ${effectiveColor.toLowerCase() === swatch.hex.toLowerCase()
-                                    ? 'border-white scale-110 shadow-lg ring-2 ring-cyan-400'
-                                    : appTheme === 'dark' ? 'border-slate-800 hover:border-slate-500' : 'border-slate-300 hover:border-slate-500'
-                                    }`}
-                                  style={{ backgroundColor: swatch.hex }}
-                                />
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })()}
-
-                    {/* Part Styling, Effects & Transform Card (Single & Multi-Part Selection) */}
-                    {(() => {
-                      const activeIds = (selectedLayerIds && selectedLayerIds.length > 0)
-                        ? selectedLayerIds
-                        : (selectedLayerId ? [selectedLayerId] : []);
-                      if (activeIds.length === 0) return null;
-
-                      const isMulti = activeIds.length > 1;
-                      const primaryId = activeIds[0];
-                      const cleanPrimaryId = String(primaryId).replace(/^pf_studio_/i, '');
-                      const numOnly = cleanPrimaryId.replace(/\D/g, '');
-                      const activeLayer = svgLayers.find(l => l.id === cleanPrimaryId || l.id === primaryId || (numOnly && l.id === `layer_${numOnly}`)) || {
-                        id: cleanPrimaryId || 'layer',
-                        name: numOnly ? `Layer ${Number(numOnly) + 1}` : (cleanPrimaryId ? cleanPrimaryId.replace('_', ' ').toUpperCase() : 'Layer'),
-                        tag: 'shape',
-                        color: '#38bdf8'
-                      };
-
-                      const firstTransform = layerTransforms[cleanPrimaryId] || layerTransforms[primaryId] || (numOnly ? layerTransforms[`layer_${numOnly}`] : null) || { x: 0, y: 0, rotate: 0 };
-                      const hasCustomTransform = activeIds.some(id => {
-                        const cid = String(id).replace(/^pf_studio_/i, '');
-                        const t = layerTransforms[cid] || layerTransforms[id];
-                        return t && (t.x !== 0 || t.y !== 0 || t.rotate !== 0);
-                      });
-
-                      const firstStyle = layerStyles[cleanPrimaryId] || layerStyles[primaryId] || {};
-                      const hasCustomColor = activeIds.some(id => {
-                        const cid = String(id).replace(/^pf_studio_/i, '');
-                        const s = layerStyles[cid] || layerStyles[id];
-                        return s && (s.fill || s.stroke);
-                      });
-                      const currentColor = firstStyle.fill || firstStyle.stroke || (isMulti ? '#38bdf8' : (activeLayer.color || '#38bdf8'));
-
-                      const glowEnabled = !!firstStyle.glow?.enabled;
-                      const glowColor = firstStyle.glow?.color || '#38bdf8';
-                      const glowRadius = firstStyle.glow?.radius !== undefined ? firstStyle.glow.radius : 12;
-                      const currentOpacity = firstStyle.opacity !== undefined ? Math.round(Number(firstStyle.opacity) * 100) : 100;
-                      const currentBlur = firstStyle.blur !== undefined ? Number(firstStyle.blur) : 0;
-                      const currentBrightness = firstStyle.brightness !== undefined ? Number(firstStyle.brightness) : 100;
-
-                      const hasCustomEffects = activeIds.some(id => {
-                        const cid = String(id).replace(/^pf_studio_/i, '');
-                        const s = layerStyles[cid] || layerStyles[id];
-                        return s && (s.glow?.enabled || s.opacity !== undefined || s.blur !== undefined || s.brightness !== undefined);
-                      });
-
-                      const currentLayerIdx = layerOrder.findIndex(id => id === cleanPrimaryId || id === primaryId || (numOnly && id === `layer_${numOnly}`));
-                      const totalLayers = layerOrder.length || svgLayers.length || 1;
-
-                      // Adaptive coordinate span based on SVG viewBox dimensions
-                      const maxOffset = (() => {
-                        const vbMatch = selectedAsset?.svgCode?.match(/viewBox=["']\s*([0-9.-]+)\s+([0-9.-]+)\s+([0-9.-]+)\s+([0-9.-]+)\s*["']/i);
-                        if (vbMatch) {
-                          const w = parseFloat(vbMatch[3]);
-                          const h = parseFloat(vbMatch[4]);
-                          if (w > 0 && h > 0) return Math.round(Math.max(w, h) * 0.85);
-                        }
-                        return 200;
-                      })();
-                      const offsetStep = maxOffset <= 40 ? 0.5 : 1;
-
-                      return (
-                        <div className={`p-4 rounded-2xl border shadow-xl space-y-4 animate-in fade-in duration-200 ${appTheme === 'dark'
-                          ? 'bg-slate-900/90 border-cyan-500/40 shadow-cyan-950/20'
-                          : 'bg-white border-cyan-400/60 shadow-slate-200'
-                          }`}>
-                          {/* Header */}
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              {isMulti ? (
-                                <div className="w-7 h-7 rounded-xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center flex-shrink-0">
-                                  <Layers className="w-4 h-4 text-cyan-400" />
-                                </div>
-                              ) : (
-                                <div
-                                  className="w-5 h-5 rounded-full border border-slate-600 shadow-sm flex-shrink-0"
-                                  style={{ backgroundColor: currentColor }}
-                                />
-                              )}
-                              <div>
-                                <div className="flex items-center gap-1.5">
-                                  <span className={`text-xs font-bold ${appTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
-                                    {isMulti ? `${activeIds.length} Parts Selected` : activeLayer.name}
-                                  </span>
-                                  {!isMulti && (
-                                    <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-                                      &lt;{activeLayer.tag}&gt;
-                                    </span>
-                                  )}
-                                </div>
-                                <p className={`text-[10px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                                  {isMulti ? 'Bulk edit color, effects & position' : `Layer ${currentLayerIdx >= 0 ? currentLayerIdx + 1 : 1} of ${totalLayers} • Drag on canvas`}
-                                </p>
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-1">
-                              {isMulti ? (
-                                <>
-                                  <button
-                                    onClick={handleSelectAllLayers}
-                                    className={`text-[9px] px-2 py-1 rounded-lg border transition font-medium ${appTheme === 'dark'
-                                      ? 'text-cyan-300 hover:text-white bg-cyan-950/50 border-cyan-700/50'
-                                      : 'text-cyan-700 bg-cyan-50 border-cyan-300'
-                                      }`}
-                                  >
-                                    All ({svgLayers.length})
-                                  </button>
-                                  <button
-                                    onClick={handleDeselectAllLayers}
-                                    className={`text-[9px] px-2 py-1 rounded-lg border transition font-medium ${appTheme === 'dark'
-                                      ? 'text-slate-400 hover:text-white bg-slate-800/80 border-slate-700'
-                                      : 'text-slate-600 bg-slate-100 border-slate-200'
-                                      }`}
-                                  >
-                                    Clear
-                                  </button>
-                                </>
-                              ) : (
-                                (hasCustomTransform || hasCustomColor || hasCustomEffects) && (
-                                  <button
-                                    onClick={() => {
-                                      handleResetLayerTransform(activeIds);
-                                      handleResetLayerColor(activeIds);
-                                      handleResetLayerEffects(activeIds);
-                                    }}
-                                    className={`text-[10px] flex items-center gap-1 px-2 py-1 rounded-lg border transition ${appTheme === 'dark'
-                                      ? 'text-slate-400 hover:text-white bg-slate-800/80 border-slate-700'
-                                      : 'text-slate-600 hover:text-slate-900 bg-slate-100 border-slate-200'
-                                      }`}
-                                    title="Reset this part to default style and position"
-                                  >
-                                    <RotateCcw className="w-3 h-3 text-cyan-400" />
-                                    <span>Reset Part</span>
-                                  </button>
-                                )
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Canvas Drag Hint */}
-                          <div className={`p-2 rounded-xl text-[10px] flex items-center justify-between border ${appTheme === 'dark'
-                            ? 'bg-cyan-950/20 text-cyan-300 border-cyan-800/30'
-                            : 'bg-cyan-50 text-cyan-800 border-cyan-200'
-                            }`}>
-                            <span className="flex items-center gap-1.5 font-medium">
-                              <Move className="w-3 h-3 text-cyan-400 flex-shrink-0" />
-                              {isMulti ? 'Canvas par drag karein — sabhi selected parts ek sath move honge!' : 'Canvas par direct mouse se drag karke move karein!'}
-                            </span>
-                            {(firstTransform.x !== 0 || firstTransform.y !== 0) && (
-                              <span className="font-mono font-bold text-cyan-400">
-                                X: {firstTransform.x}px, Y: {firstTransform.y}px
-                              </span>
-                            )}
-                          </div>
-
-                          {/* SPECIAL EFFECTS SECTION (Glow Aura, Opacity, Blur, Brightness) */}
-                          <div className="space-y-3 pt-1 border-t border-slate-800/60">
-                            <div className="flex items-center justify-between text-[11px] font-semibold">
-                              <span className="flex items-center gap-1.5 text-cyan-400">
-                                <Sparkles className="w-3.5 h-3.5" />
-                                <span>Part Special Effects</span>
-                              </span>
-                              {hasCustomEffects && (
-                                <button
-                                  onClick={() => handleResetLayerEffects(activeIds)}
-                                  className={`text-[9px] px-1.5 py-0.5 rounded border transition ${appTheme === 'dark' ? 'border-slate-800 text-slate-400 hover:text-white' : 'border-slate-200 text-slate-600 hover:text-slate-900'
-                                    }`}
-                                >
-                                  Reset Effects
-                                </button>
-                              )}
-                            </div>
-
-                            {/* Glow Aura Toggle & Controls */}
-                            <div className={`p-2.5 rounded-xl border space-y-2 ${glowEnabled
-                              ? appTheme === 'dark' ? 'bg-cyan-950/30 border-cyan-500/50' : 'bg-cyan-50 border-cyan-300'
-                              : appTheme === 'dark' ? 'bg-slate-950/50 border-slate-800' : 'bg-slate-50 border-slate-200'
-                              }`}>
-                              <div className="flex items-center justify-between">
-                                <span className="text-[11px] font-medium flex items-center gap-1.5">
-                                  <span className={`w-2 h-2 rounded-full ${glowEnabled ? 'bg-cyan-400 animate-ping' : 'bg-slate-600'}`} />
-                                  <span>Glow Aura Effect</span>
-                                </span>
-                                <button
-                                  onClick={() => handleLayerEffectChange(activeIds, 'glow', { enabled: !glowEnabled, color: glowColor, radius: glowRadius })}
-                                  className={`px-2.5 py-0.5 rounded-md text-[10px] font-semibold transition ${glowEnabled
-                                    ? 'bg-cyan-500 text-white shadow-md shadow-cyan-500/30'
-                                    : appTheme === 'dark' ? 'bg-slate-800 text-slate-400 hover:text-white' : 'bg-slate-200 text-slate-600'
-                                    }`}
-                                >
-                                  {glowEnabled ? 'Enabled' : 'Enable'}
-                                </button>
-                              </div>
-
-                              {glowEnabled && (
-                                <div className="space-y-2 pt-1 border-t border-cyan-500/20 animate-in fade-in duration-150">
-                                  <div className="flex items-center justify-between text-[10px]">
-                                    <span className="text-slate-400">Glow Radius:</span>
-                                    <span className="font-mono text-cyan-400 font-bold">{glowRadius}px</span>
-                                  </div>
-                                  <input
-                                    type="range"
-                                    min="2"
-                                    max="40"
-                                    value={glowRadius}
-                                    onChange={(e) => handleLayerEffectChange(activeIds, 'glow', { enabled: true, color: glowColor, radius: Number(e.target.value) })}
-                                    className="w-full accent-cyan-500 cursor-pointer h-1.5 bg-slate-700 rounded-lg"
-                                  />
-                                  <div className="flex items-center gap-1.5 pt-1">
-                                    <span className="text-[10px] text-slate-400">Aura Color:</span>
-                                    {['#38bdf8', '#a855f7', '#ec4899', '#10b981', '#ffffff'].map(c => (
-                                      <button
-                                        key={c}
-                                        onClick={() => handleLayerEffectChange(activeIds, 'glow', { enabled: true, color: c, radius: glowRadius })}
-                                        style={{ backgroundColor: c }}
-                                        className={`w-4 h-4 rounded-full border transition ${glowColor === c ? 'ring-2 ring-cyan-400 scale-110' : 'border-slate-700'}`}
-                                      />
-                                    ))}
-                                    <input
-                                      type="color"
-                                      value={glowColor}
-                                      onChange={(e) => handleLayerEffectChange(activeIds, 'glow', { enabled: true, color: e.target.value, radius: glowRadius })}
-                                      className="w-5 h-5 rounded cursor-pointer bg-transparent border-0 p-0 ml-auto"
-                                      title="Custom Glow Color"
-                                    />
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Opacity Slider */}
-                            <div className={`p-2 rounded-xl border ${appTheme === 'dark' ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
-                              <div className="flex items-center justify-between text-[10px] mb-1">
-                                <span className="text-slate-400 font-medium">Part Opacity:</span>
-                                <span className="font-mono text-cyan-400 font-bold">{currentOpacity}%</span>
-                              </div>
-                              <input
-                                type="range"
-                                min="0"
-                                max="100"
-                                value={currentOpacity}
-                                onChange={(e) => handleLayerEffectChange(activeIds, 'opacity', Number(e.target.value) / 100)}
-                                className="w-full accent-cyan-500 cursor-pointer h-1.5 bg-slate-700 rounded-lg"
-                              />
-                            </div>
-
-                            {/* Blur Slider */}
-                            <div className={`p-2 rounded-xl border ${appTheme === 'dark' ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
-                              <div className="flex items-center justify-between text-[10px] mb-1">
-                                <span className="text-slate-400 font-medium">Part Blur:</span>
-                                <span className="font-mono text-cyan-400 font-bold">{currentBlur}px</span>
-                              </div>
-                              <input
-                                type="range"
-                                min="0"
-                                max="20"
-                                step="0.5"
-                                value={currentBlur}
-                                onChange={(e) => handleLayerEffectChange(activeIds, 'blur', Number(e.target.value))}
-                                className="w-full accent-cyan-500 cursor-pointer h-1.5 bg-slate-700 rounded-lg"
-                              />
-                            </div>
-
-                            {/* Brightness Slider */}
-                            <div className={`p-2 rounded-xl border ${appTheme === 'dark' ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
-                              <div className="flex items-center justify-between text-[10px] mb-1">
-                                <span className="text-slate-400 font-medium">Part Brightness:</span>
-                                <span className="font-mono text-cyan-400 font-bold">{currentBrightness}%</span>
-                              </div>
-                              <input
-                                type="range"
-                                min="20"
-                                max="200"
-                                value={currentBrightness}
-                                onChange={(e) => handleLayerEffectChange(activeIds, 'brightness', Number(e.target.value))}
-                                className="w-full accent-cyan-500 cursor-pointer h-1.5 bg-slate-700 rounded-lg"
-                              />
-                            </div>
-                          </div>
-
-                          {/* 3. POSITION (X / Y) CONTROLS */}
-                          <div className="space-y-2.5 pt-1 border-t border-slate-800/60">
-                            <div className="flex items-center justify-between text-[11px] font-semibold">
-                              <span className={appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'}>
-                                {isMulti ? 'Move Selected Parts (Offset X / Y)' : 'Part Position (X / Y)'}
-                              </span>
-                              <button
-                                onClick={() => {
-                                  handleLayerPositionChange(activeIds, 'x', 0);
-                                  handleLayerPositionChange(activeIds, 'y', 0);
-                                }}
-                                className={`text-[9px] px-1.5 py-0.5 rounded border transition ${appTheme === 'dark' ? 'border-slate-800 text-slate-400 hover:text-white' : 'border-slate-200 text-slate-600 hover:text-slate-900'
-                                  }`}
-                              >
-                                Center (0, 0)
-                              </button>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-2">
-                              {/* X Axis */}
-                              <div className={`p-2 rounded-xl border ${appTheme === 'dark' ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
-                                <div className="flex items-center justify-between text-[10px] mb-1">
-                                  <span className="text-slate-400 font-medium">Offset X:</span>
-                                  <span className="font-mono text-cyan-400 font-bold">{firstTransform.x || 0}px</span>
-                                </div>
-                                <input
-                                  type="range"
-                                  min={-maxOffset}
-                                  max={maxOffset}
-                                  step={offsetStep}
-                                  value={firstTransform.x || 0}
-                                  onChange={(e) => handleLayerPositionChange(activeIds, 'x', e.target.value)}
-                                  className="w-full accent-cyan-500 cursor-pointer h-1.5 bg-slate-700 rounded-lg"
-                                />
-                              </div>
-
-                              {/* Y Axis */}
-                              <div className={`p-2 rounded-xl border ${appTheme === 'dark' ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
-                                <div className="flex items-center justify-between text-[10px] mb-1">
-                                  <span className="text-slate-400 font-medium">Offset Y:</span>
-                                  <span className="font-mono text-cyan-400 font-bold">{firstTransform.y || 0}px</span>
-                                </div>
-                                <input
-                                  type="range"
-                                  min={-maxOffset}
-                                  max={maxOffset}
-                                  step={offsetStep}
-                                  value={firstTransform.y || 0}
-                                  onChange={(e) => handleLayerPositionChange(activeIds, 'y', e.target.value)}
-                                  className="w-full accent-cyan-500 cursor-pointer h-1.5 bg-slate-700 rounded-lg"
-                                />
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* 4. ROTATION CONTROLS */}
-                          <div className="space-y-2 pt-1 border-t border-slate-800/60">
-                            <div className="flex items-center justify-between text-[11px] font-semibold">
-                              <span className={appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'}>
-                                {isMulti ? 'Rotate Selected Parts' : 'Part Rotation'}
-                              </span>
-                              <span className="font-mono text-cyan-400 text-xs font-bold">
-                                {firstTransform.rotate || 0}&deg;
-                              </span>
-                            </div>
-
-                            <div className="flex items-center gap-3">
-                              <input
-                                type="range"
-                                min="-180"
-                                max="180"
-                                step="1"
-                                value={firstTransform.rotate || 0}
-                                onChange={(e) => handleLayerRotationChange(activeIds, e.target.value)}
-                                className="flex-1 accent-cyan-500 cursor-pointer h-1.5 bg-slate-700 rounded-lg"
-                              />
-                              <div className="flex items-center gap-1">
-                                {[-90, 0, 90].map((deg) => (
-                                  <button
-                                    key={deg}
-                                    onClick={() => handleLayerRotationChange(activeIds, deg)}
-                                    className={`px-2 py-0.5 rounded text-[10px] font-mono font-medium border transition ${(firstTransform.rotate || 0) === deg
-                                      ? 'bg-cyan-500 text-white border-cyan-400'
-                                      : appTheme === 'dark' ? 'bg-slate-800 text-slate-300 border-slate-700 hover:text-white' : 'bg-slate-100 text-slate-700 border-slate-200'
-                                      }`}
-                                  >
-                                    {deg === 0 ? '0°' : `${deg > 0 ? '+' : ''}${deg}°`}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* 5. LAYER HIERARCHY / Z-INDEX ORDERING CONTROLS */}
-                          {!isMulti && (
-                            <div className="space-y-2 pt-1 border-t border-slate-800/60">
-                              <div className="flex items-center justify-between text-[11px] font-semibold">
-                                <span className={appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'}>
-                                  Layer Hierarchy (Front / Back)
-                                </span>
-                                <span className={`text-[10px] font-normal ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                                  Position: {currentLayerIdx === totalLayers - 1 ? 'Top (Front)' : currentLayerIdx === 0 ? 'Bottom (Back)' : `#${currentLayerIdx + 1}`}
-                                </span>
-                              </div>
-
-                              <div className="grid grid-cols-4 gap-1.5">
-                                <button
-                                  onClick={() => handleBringToFront(cleanPrimaryId)}
-                                  disabled={currentLayerIdx === totalLayers - 1}
-                                  title="Bring this layer to the absolute front"
-                                  className={`py-2 px-1 rounded-xl text-[10px] font-semibold flex flex-col items-center gap-1 border transition ${currentLayerIdx === totalLayers - 1
-                                    ? 'opacity-40 cursor-not-allowed border-transparent'
-                                    : appTheme === 'dark'
-                                      ? 'bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-200 hover:text-white'
-                                      : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
-                                    }`}
-                                >
-                                  <ChevronsUp className="w-3.5 h-3.5 text-cyan-400" />
-                                  <span>To Front</span>
-                                </button>
-
-                                <button
-                                  onClick={() => handleBringForward(cleanPrimaryId)}
-                                  disabled={currentLayerIdx === totalLayers - 1}
-                                  title="Move this layer 1 step forward"
-                                  className={`py-2 px-1 rounded-xl text-[10px] font-semibold flex flex-col items-center gap-1 border transition ${currentLayerIdx === totalLayers - 1
-                                    ? 'opacity-40 cursor-not-allowed border-transparent'
-                                    : appTheme === 'dark'
-                                      ? 'bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-200 hover:text-white'
-                                      : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
-                                    }`}
-                                >
-                                  <ArrowUp className="w-3.5 h-3.5 text-cyan-400" />
-                                  <span>Forward</span>
-                                </button>
-
-                                <button
-                                  onClick={() => handleSendBackward(cleanPrimaryId)}
-                                  disabled={currentLayerIdx <= 0}
-                                  title="Move this layer 1 step backward"
-                                  className={`py-2 px-1 rounded-xl text-[10px] font-semibold flex flex-col items-center gap-1 border transition ${currentLayerIdx <= 0
-                                    ? 'opacity-40 cursor-not-allowed border-transparent'
-                                    : appTheme === 'dark'
-                                      ? 'bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-200 hover:text-white'
-                                      : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
-                                    }`}
-                                >
-                                  <ArrowDown className="w-3.5 h-3.5 text-cyan-400" />
-                                  <span>Backward</span>
-                                </button>
-
-                                <button
-                                  onClick={() => handleSendToBack(cleanPrimaryId)}
-                                  disabled={currentLayerIdx <= 0}
-                                  title="Send this layer to the absolute back"
-                                  className={`py-2 px-1 rounded-xl text-[10px] font-semibold flex flex-col items-center gap-1 border transition ${currentLayerIdx <= 0
-                                    ? 'opacity-40 cursor-not-allowed border-transparent'
-                                    : appTheme === 'dark'
-                                      ? 'bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-200 hover:text-white'
-                                      : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
-                                    }`}
-                                >
-                                  <ChevronsDown className="w-3.5 h-3.5 text-cyan-400" />
-                                  <span>To Back</span>
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
-
-                    {/* Collapsible Dropdown for All Vector Layers & Colors */}
-                    {(svgLayers.length > 0 || detectedColors.length > 0) && (
-                      <div className={`rounded-2xl border overflow-hidden shadow-md ${appTheme === 'dark' ? 'border-slate-800 bg-[#131b2e]/50' : 'border-slate-200 bg-slate-50'
-                        }`}>
-                        <button
-                          onClick={() => setIsLayersListExpanded(!isLayersListExpanded)}
-                          className={`w-full p-3.5 flex items-center justify-between text-left transition text-xs font-semibold ${appTheme === 'dark' ? 'hover:bg-slate-900/60 text-slate-300' : 'hover:bg-slate-100 text-slate-700'
-                            }`}
-                        >
-                          <div className="flex items-center gap-2">
-                            <Layers className="w-4 h-4 text-cyan-500" />
-                            <span>Vector Parts & Layers</span>
-                            <span className={`text-[10px] px-2 py-0.5 rounded-full ${appTheme === 'dark' ? 'bg-slate-800 text-slate-300' : 'bg-slate-200 text-slate-700'
-                              }`}>
-                              {svgLayers.length || detectedColors.length}
-                            </span>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); setIsAddElementModalOpen(true); }}
-                              className={`ml-1 text-[10px] px-2 py-0.5 rounded-lg border font-bold flex items-center gap-1 transition ${appTheme === 'dark'
-                                ? 'bg-cyan-500/15 border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/25'
-                                : 'bg-blue-50 border-blue-200 text-blue-600 hover:bg-blue-100'
-                                }`}
-                              title="Add another element from library"
-                            >
-                              <PlusCircle className="w-3 h-3" />
-                              <span>Add</span>
-                            </button>
-                          </div>
-                          <div className={`flex items-center gap-2 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                            <span className="text-[10px] font-normal">
-                              {isLayersListExpanded ? 'Hide List' : 'Show All'}
-                            </span>
-                            {isLayersListExpanded ? (
-                              <ChevronUp className="w-4 h-4 text-cyan-500" />
-                            ) : (
-                              <ChevronDown className="w-4 h-4" />
-                            )}
-                          </div>
-                        </button>
-
-                        {/* Collapsible List Container with Tab Switch between Vector Parts and Unique Colors */}
-                        {isLayersListExpanded && (
-                          <div className={`p-3.5 pt-2 space-y-3 border-t ${appTheme === 'dark' ? 'border-slate-800/60' : 'border-slate-200'
-                            }`}>
-                            {/* Switch tabs between Vector Layers and Colors */}
-                            <div className={`flex items-center p-1 rounded-xl border ${appTheme === 'dark' ? 'bg-slate-950/80 border-slate-800' : 'bg-slate-200/70 border-slate-300'
-                              }`}>
-                              <button
-                                onClick={() => setLayerListViewMode('layers')}
-                                className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 ${layerListViewMode === 'layers'
-                                  ? 'bg-blue-600 text-white shadow-md'
-                                  : appTheme === 'dark' ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900'
-                                  }`}
-                              >
-                                <Shapes className="w-3.5 h-3.5" />
-                                <span>Vector Layers ({svgLayers.length})</span>
-                              </button>
-                              <button
-                                onClick={() => setLayerListViewMode('colors')}
-                                className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 ${layerListViewMode === 'colors'
-                                  ? 'bg-blue-600 text-white shadow-md'
-                                  : appTheme === 'dark' ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900'
-                                  }`}
-                              >
-                                <Palette className="w-3.5 h-3.5" />
-                                <span>Colors ({detectedColors.length})</span>
-                              </button>
-                            </div>
-
-                            {/* View 1: Vector Shape Layers in Hierarchy Order */}
-                            {layerListViewMode === 'layers' && (
-                              <div className="space-y-2 select-none">
-                                <div className="flex items-center justify-between text-[10px] px-1 pb-0.5 font-medium text-slate-400">
-                                  <span className="flex items-center gap-1">
-                                    <GripVertical className="w-3.5 h-3.5 text-cyan-400" />
-                                    <span>Drag layer up or down to reorder</span>
-                                  </span>
-                                  <span className="text-[9px] font-mono font-semibold text-cyan-400 px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20">
-                                    Top = Front
-                                  </span>
-                                </div>
-
-                                {[...layerOrder].reverse().filter(id => !deletedLayerIds.includes(id)).map((layerId, displayIdx) => {
-                                  const layerObj = allSvgLayers.find(l => l.id === layerId) || {
-                                    id: layerId,
-                                    name: layerId.replace('_', ' ').toUpperCase(),
-                                    tag: 'shape',
-                                    color: '#38bdf8'
-                                  };
-                                  const isSelected = selectedLayerId === layerId || (selectedLayerIds && selectedLayerIds.includes(layerId));
-                                  const transform = layerTransforms[layerId] || { x: 0, y: 0, rotate: 0 };
-                                  const isMoved = transform.x !== 0 || transform.y !== 0;
-                                  const isRotated = transform.rotate !== 0;
-                                  const isDragging = draggedLayerIdx === displayIdx;
-                                  const isDragOver = dragOverLayerIdx === displayIdx && draggedLayerIdx !== displayIdx;
-
-                                  return (
-                                    <div
-                                      key={layerId}
-                                      draggable={true}
-                                      onDragStart={(e) => {
-                                        setDraggedLayerIdx(displayIdx);
-                                        e.dataTransfer.effectAllowed = 'move';
-                                        e.dataTransfer.setData('text/plain', String(displayIdx));
-                                      }}
-                                      onDragOver={(e) => {
-                                        e.preventDefault();
-                                        e.dataTransfer.dropEffect = 'move';
-                                        if (dragOverLayerIdx !== displayIdx) {
-                                          setDragOverLayerIdx(displayIdx);
-                                        }
-                                      }}
-                                      onDragLeave={(e) => {
-                                        if (e.currentTarget.contains(e.relatedTarget)) return;
-                                        if (dragOverLayerIdx === displayIdx) {
-                                          setDragOverLayerIdx(null);
-                                        }
-                                      }}
-                                      onDrop={(e) => {
-                                        e.preventDefault();
-                                        handleReorderLayers(draggedLayerIdx, displayIdx);
-                                        setDraggedLayerIdx(null);
-                                        setDragOverLayerIdx(null);
-                                      }}
-                                      onDragEnd={() => {
-                                        setDraggedLayerIdx(null);
-                                        setDragOverLayerIdx(null);
-                                      }}
-                                      onDoubleClick={(e) => {
-                                        e.stopPropagation();
-                                        setSelectedLayerId(layerId);
-                                        setSelectedLayerIds([layerId]);
-                                      }}
-                                      onClick={(e) => {
-                                        const currentGroups = layerGroupsRef.current || {};
-                                        const belongingGroup = Object.values(currentGroups).find(ids => ids.includes(layerId));
-                                        if (belongingGroup) {
-                                          if (e.ctrlKey || e.metaKey || e.shiftKey) {
-                                            setSelectedLayerIds(prev =>
-                                              belongingGroup.every(x => prev.includes(x))
-                                                ? prev.filter(x => !belongingGroup.includes(x))
-                                                : Array.from(new Set([...prev, ...belongingGroup]))
-                                            );
-                                            setSelectedLayerId(belongingGroup[0]);
-                                          } else {
-                                            if (selectedLayerIds && selectedLayerIds.length === 1 && selectedLayerIds[0] === layerId) {
-                                              // Already sub-selected
-                                              setSelectedLayerId(layerId);
-                                              setSelectedLayerIds([layerId]);
-                                            } else {
-                                              setSelectedLayerId(belongingGroup[0]);
-                                              setSelectedLayerIds(belongingGroup);
-                                            }
-                                          }
-                                        } else {
-                                          if (e.ctrlKey || e.metaKey || e.shiftKey) {
-                                            setSelectedLayerIds(prev =>
-                                              prev.includes(layerId) ? prev.filter(x => x !== layerId) : [...prev, layerId]
-                                            );
-                                            setSelectedLayerId(layerId);
-                                          } else {
-                                            setSelectedLayerId(layerId);
-                                            setSelectedLayerIds([layerId]);
-                                          }
-                                        }
-                                      }}
-                                      className={`p-2.5 rounded-xl border transition-all cursor-grab active:cursor-grabbing flex items-center justify-between gap-2.5 select-none relative ${isDragging
-                                        ? 'opacity-30 scale-[0.98] border-dashed border-cyan-400 bg-cyan-950/20'
-                                        : isDragOver
-                                          ? 'ring-2 ring-cyan-400 bg-cyan-500/20 border-cyan-400 shadow-lg scale-[1.01]'
-                                          : isSelected
-                                            ? appTheme === 'dark'
-                                              ? 'bg-slate-900 border-cyan-400 ring-2 ring-cyan-400/40 shadow-lg'
-                                              : 'bg-white border-cyan-500 ring-2 ring-cyan-500/30 shadow-md'
-                                            : isMoved || isRotated
-                                              ? appTheme === 'dark' ? 'bg-slate-900/80 border-cyan-500/40' : 'bg-cyan-50/50 border-cyan-300'
-                                              : appTheme === 'dark' ? 'bg-[#0b0f19]/70 border-slate-800/80 hover:border-slate-700' : 'bg-white border-slate-200 hover:border-slate-300'
-                                        }`}
-                                    >
-                                      <div className="flex items-center gap-2 min-w-0 pointer-events-none">
-                                        <GripVertical className="w-4 h-4 text-slate-500 flex-shrink-0" />
-                                        <div
-                                          className="w-5 h-5 rounded-md border shadow flex-shrink-0"
-                                          style={{ backgroundColor: layerObj.color || '#38bdf8' }}
-                                        />
-                                        <div className="truncate">
-                                          <div className="flex items-center gap-1.5">
-                                            <span className={`text-xs font-semibold truncate ${appTheme === 'dark' ? 'text-slate-200' : 'text-slate-800'}`}>
-                                              {layerObj.name}
-                                            </span>
-                                            <span className="text-[9px] font-mono text-slate-500">
-                                              &lt;{layerObj.tag}&gt;
-                                            </span>
-                                            {isSelected && (
-                                              <span className="text-[8px] font-semibold bg-cyan-500/20 text-cyan-400 px-1 py-0.5 rounded border border-cyan-500/30">
-                                                Selected
-                                              </span>
-                                            )}
-                                          </div>
-                                          {(isMoved || isRotated) && (
-                                            <div className="text-[9px] text-cyan-400 font-mono">
-                                              {isMoved ? `Δ(${transform.x}, ${transform.y})` : ''} {isRotated ? `${transform.rotate}°` : ''}
-                                            </div>
-                                          )}
-                                        </div>
-                                      </div>
-
-                                      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                                        <button
-                                          onClick={() => {
-                                            setSelectedLayerIds([layerId]);
-                                            setSelectedLayerId(layerId);
-                                            handleDuplicateSelectedLayers();
-                                          }}
-                                          title="Duplicate part (Ctrl + D)"
-                                          className={`p-1 rounded hover:bg-cyan-500/20 text-cyan-400 hover:text-cyan-300 transition`}
-                                        >
-                                          <Copy className="w-3.5 h-3.5" />
-                                        </button>
-                                        <button
-                                          onClick={() => {
-                                            setSelectedLayerIds([layerId]);
-                                            setSelectedLayerId(layerId);
-                                            handleDeleteSelectedLayers();
-                                          }}
-                                          title="Delete part"
-                                          className={`p-1 rounded hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition`}
-                                        >
-                                          <Trash2 className="w-3.5 h-3.5" />
-                                        </button>
-                                        <button
-                                          onClick={() => handleBringForward(layerId)}
-                                          title="Move layer up (1 step forward)"
-                                          className={`p-1 rounded hover:bg-slate-700/60 ${appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'}`}
-                                        >
-                                          <ArrowUp className="w-3.5 h-3.5" />
-                                        </button>
-                                        <button
-                                          onClick={() => handleSendBackward(layerId)}
-                                          title="Move layer down (1 step backward)"
-                                          className={`p-1 rounded hover:bg-slate-700/60 ${appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'}`}
-                                        >
-                                          <ArrowDown className="w-3.5 h-3.5" />
-                                        </button>
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
-
-                            {/* View 2: Unique Colors List */}
-                            {layerListViewMode === 'colors' && (
-                              <div className="space-y-2">
-                                {detectedColors.map((item, idx) => {
-                                  const origColor = item.color;
-                                  const activeColor = adjustments.colorReplacements[origColor.toLowerCase()] || origColor;
-                                  const isModified = Boolean(adjustments.colorReplacements[origColor.toLowerCase()]);
-                                  const isSelected = activeSelectedColor?.toLowerCase() === origColor.toLowerCase();
-
-                                  return (
-                                    <div
-                                      key={origColor + idx}
-                                      onClick={() => {
-                                        setActiveSelectedColor(origColor);
-                                      }}
-                                      className={`p-3 rounded-xl border transition-all cursor-pointer ${isSelected
-                                        ? appTheme === 'dark' ? 'bg-slate-900 border-cyan-400 ring-2 ring-cyan-400/40 shadow-lg' : 'bg-white border-cyan-500 ring-2 ring-cyan-500/30 shadow-md'
-                                        : isModified
-                                          ? appTheme === 'dark' ? 'bg-slate-900/80 border-cyan-500/40' : 'bg-cyan-50/50 border-cyan-300'
-                                          : appTheme === 'dark' ? 'bg-[#0b0f19]/70 border-slate-800/80 hover:border-slate-700' : 'bg-white border-slate-200 hover:border-slate-300'
-                                        }`}
-                                    >
-                                      <div className="flex items-center justify-between gap-3 mb-2">
-                                        <div className="flex items-center gap-2.5">
-                                          <div
-                                            className="w-7 h-7 rounded-lg border shadow flex-shrink-0"
-                                            style={{ backgroundColor: activeColor }}
-                                          />
-                                          <div>
-                                            <div className="flex items-center gap-1.5">
-                                              <span className={`font-mono text-xs font-bold uppercase ${appTheme === 'dark' ? 'text-slate-200' : 'text-slate-800'
-                                                }`}>
-                                                {activeColor}
-                                              </span>
-                                              {isSelected && (
-                                                <span className="text-[8px] font-semibold bg-cyan-500/20 text-cyan-600 px-1.5 py-0.5 rounded border border-cyan-500/30">
-                                                  Active ✨
-                                                </span>
-                                              )}
-                                            </div>
-                                            <span className={`text-[9px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                                              Orig: {origColor} &bull; {item.count} layer{item.count > 1 ? 's' : ''}
-                                            </span>
-                                          </div>
-                                        </div>
-
-                                        <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                                          <label className="cursor-pointer">
-                                            <input
-                                              type="color"
-                                              value={activeColor}
-                                              onChange={(e) => handleColorChange(origColor, e.target.value)}
-                                              className="sr-only"
-                                            />
-                                            <div className={`px-2 py-1 rounded-lg text-[11px] font-semibold transition ${appTheme === 'dark' ? 'bg-slate-800 hover:bg-slate-700 text-slate-200' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                                              }`}>
-                                              Pick
-                                            </div>
-                                          </label>
-                                          {isModified && (
-                                            <button
-                                              onClick={() => handleResetSingleColor(origColor)}
-                                              title="Reset layer"
-                                              className={`p-1 rounded-lg ${appTheme === 'dark' ? 'bg-slate-800 text-slate-400 hover:text-white' : 'bg-slate-100 text-slate-500 hover:text-slate-900'
-                                                }`}
-                                            >
-                                              <Undo2 className="w-3 h-3" />
-                                            </button>
-                                          )}
-                                        </div>
-                                      </div>
-
-                                      {/* Quick dots */}
-                                      <div className={`flex items-center gap-1 pt-1.5 border-t overflow-x-auto no-scrollbar ${appTheme === 'dark' ? 'border-slate-800/40' : 'border-slate-100'
-                                        }`} onClick={(e) => e.stopPropagation()}>
-                                        {QUICK_SWATCHES.map((swatch) => (
-                                          <button
-                                            key={swatch.hex}
-                                            onClick={() => handleColorChange(origColor, swatch.hex)}
-                                            className="w-4 h-4 rounded-full border border-slate-400/40 hover:scale-125 transition-transform flex-shrink-0"
-                                            style={{ backgroundColor: swatch.hex }}
-                                            title={swatch.name}
-                                          />
-                                        ))}
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Global Monotone Recolor Override */}
-                    <div className={`mt-4 p-3.5 rounded-2xl border ${appTheme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'
-                      }`}>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className={`text-xs font-semibold ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-800'}`}>Global Monotone Recolor</p>
-                          <p className={`text-[10px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Pure solid monochrome tint for all paths</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="color"
-                            value={adjustments.customColor || '#38bdf8'}
-                            onChange={(e) => setAdjustments({ ...adjustments, customColor: e.target.value })}
-                            className="w-6 h-6 rounded cursor-pointer bg-transparent border-0"
-                            title="Global Custom Color"
-                          />
-                          {adjustments.customColor && (
-                            <button
-                              onClick={() => setAdjustments({ ...adjustments, customColor: '' })}
-                              className={`text-[10px] px-2 py-1 rounded ${appTheme === 'dark' ? 'text-slate-400 hover:text-white bg-slate-800' : 'text-slate-600 hover:text-slate-900 bg-slate-200'
-                                }`}
-                            >
-                              Clear
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* TAB 2: FILTERS (25+ VISUAL COLOR PRESETS) */}
-                {studioTab === 'filters' && (
-                  <div className="space-y-3.5">
-                    {/* Header & Reset Button */}
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h4 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
-                          }`}>
-                          <Wand2 className="w-3.5 h-3.5 text-cyan-500" /> {EFFECT_PRESETS.length}+ Visual Color Filters
-                        </h4>
-                        <p className={`text-[11px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                          Click any card to apply instant gradient tone &amp; aura glow
-                        </p>
-                      </div>
-
-                      <button
-                        onClick={handleResetEffectsPanel}
-                        className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition flex items-center gap-1.5 flex-shrink-0 ${appTheme === 'dark'
-                          ? 'text-slate-300 hover:text-white bg-slate-900 border-slate-800 hover:border-slate-700'
-                          : 'text-slate-700 hover:text-slate-900 bg-white border-slate-200 hover:bg-slate-50'
-                          }`}
-                        title="Reset all filters to original"
-                      >
-                        <Undo2 className="w-3 h-3 text-cyan-500" />
-                        <span>Reset</span>
-                      </button>
-                    </div>
-
-                    {/* New vs Classic / Old Version Toggle Bar */}
+                    {/* 2 Sub-Tabs Switcher: [ 🎛️ Gradient Adjustment ] | [ 🎨 Color Studio ] */}
                     <div className={`p-1 rounded-xl border flex items-center gap-1 ${appTheme === 'dark' ? 'bg-slate-900/90 border-slate-800' : 'bg-slate-100 border-slate-200'
                       }`}>
                       <button
-                        onClick={() => setFilterVersionFilter('all')}
-                        className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-semibold transition flex items-center justify-center gap-1 ${filterVersionFilter === 'all'
-                          ? (appTheme === 'dark' ? 'bg-cyan-500 text-slate-950 shadow-sm font-bold' : 'bg-blue-600 text-white shadow-sm font-bold')
-                          : (appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900')
-                          }`}
-                      >
-                        <span>All ({EFFECT_PRESETS.length})</span>
-                      </button>
-
-                      <button
-                        onClick={() => setFilterVersionFilter('new')}
-                        className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-semibold transition flex items-center justify-center gap-1 ${filterVersionFilter === 'new'
-                          ? 'bg-gradient-to-r from-amber-400 via-rose-400 to-pink-500 text-slate-950 shadow-md font-bold'
-                          : (appTheme === 'dark' ? 'text-amber-300 hover:text-white' : 'text-amber-700 hover:text-slate-900')
-                          }`}
-                      >
-                        <span>✨ New ({EFFECT_PRESETS.filter(p => p.isNew).length})</span>
-                      </button>
-
-                      <button
-                        onClick={() => setFilterVersionFilter('old')}
-                        className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-semibold transition flex items-center justify-center gap-1 ${filterVersionFilter === 'old'
-                          ? (appTheme === 'dark' ? 'bg-slate-800 text-slate-200 border border-slate-700 shadow-sm font-bold' : 'bg-white text-slate-900 border border-slate-300 shadow-sm font-bold')
-                          : (appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900')
-                          }`}
-                      >
-                        <span>📦 Classic</span>
-                      </button>
-                    </div>
-
-                    {/* Search Bar for Filters */}
-                    <div className="relative">
-                      <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
-                      <input
-                        type="text"
-                        placeholder="Search filters (e.g. Matrix, Sunset, Prism, Vintage, Gold)..."
-                        value={filterSearchTerm}
-                        onChange={(e) => setFilterSearchTerm(e.target.value)}
-                        className={`w-full pl-9 pr-8 py-2 rounded-xl text-xs border focus:outline-none focus:border-cyan-500 transition ${appTheme === 'dark'
-                          ? 'bg-slate-900 border-slate-800 text-slate-200 placeholder-slate-500'
-                          : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400'
-                          }`}
-                      />
-                      {filterSearchTerm && (
-                        <button
-                          onClick={() => setFilterSearchTerm('')}
-                          className="absolute right-2.5 top-2 text-slate-400 hover:text-white text-xs font-bold w-4 h-4 rounded-full bg-slate-800 flex items-center justify-center"
-                          title="Clear search"
-                        >
-                          &times;
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Filter Category Chips */}
-                    <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
-                      {['All', 'Neon & Cyber', 'Cinematic & Moody', 'Warm & Golden', 'Aesthetic & Pastel', 'Retro & Vintage'].map((cat) => {
-                        const isCatActive = filterCategory === cat;
-                        return (
-                          <button
-                            key={cat}
-                            onClick={() => setFilterCategory(cat)}
-                            className={`px-2.5 py-1 rounded-full text-[10px] font-semibold transition whitespace-nowrap ${isCatActive
-                              ? (appTheme === 'dark' ? 'bg-cyan-500 text-slate-950 shadow-sm font-bold' : 'bg-blue-600 text-white shadow-sm font-bold')
-                              : (appTheme === 'dark' ? 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800' : 'bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200')
-                              }`}
-                          >
-                            {cat}
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* 2-Column Visual Filter Cards with Live Visual Preview Look on Every Button */}
-                    <div className="grid grid-cols-2 gap-2.5 max-h-[480px] overflow-y-auto pr-1">
-                      {filteredPresets.map((pst) => {
-                        const isCurrentActive = activeFilterPreset === pst.id || activeFilterPreset === pst.name;
-                        return (
-                          <button
-                            key={pst.id || pst.name}
-                            onClick={() => applyPreset(pst)}
-                            className={`p-2.5 rounded-2xl border text-left transition-all duration-300 ease-out hover:-translate-y-1 flex flex-col justify-between relative overflow-hidden group ${isCurrentActive
-                              ? (appTheme === 'dark'
-                                ? 'border-cyan-400 bg-cyan-500/10 shadow-[0_0_18px_rgba(6,182,212,0.3)] ring-2 ring-cyan-400'
-                                : 'border-blue-600 bg-blue-50 shadow-md ring-2 ring-blue-600')
-                              : (appTheme === 'dark'
-                                ? 'bg-slate-900/90 border-slate-800 hover:border-slate-700/80 hover:bg-slate-900 shadow-sm hover:shadow-[0_12px_24px_-4px_rgba(255,255,255,0.07)]'
-                                : 'bg-white border-slate-200 hover:border-slate-300/80 hover:shadow-lg hover:shadow-black/10 shadow-sm')
-                              }`}
-                          >
-                            {/* Live Visual Filter Preview Box */}
-                            <FilterCardThumbnail preset={pst} />
-
-                            <div className="w-full">
-                              <div className="flex items-center justify-between gap-1 mb-1">
-                                <span className={`text-xs font-bold truncate ${isCurrentActive
-                                  ? (appTheme === 'dark' ? 'text-cyan-300' : 'text-blue-700')
-                                  : (appTheme === 'dark' ? 'text-slate-200 group-hover:text-cyan-400' : 'text-slate-900 group-hover:text-blue-600')
-                                  }`}>
-                                  {pst.name}
-                                </span>
-                                {isCurrentActive && (
-                                  <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
-                                )}
-                              </div>
-                              <p className={`text-[10px] leading-tight line-clamp-2 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'
-                                }`}>
-                                {pst.desc}
-                              </p>
-                            </div>
-                          </button>
-                        );
-                      })}
-                      {filteredPresets.length === 0 && (
-                        <div className="col-span-2 py-8 text-center text-xs text-slate-400">
-                          No filters match "{filterSearchTerm}". Try another search term.
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Quick Fine-Tuning Mini-Sliders under Filters */}
-                    <div className={`p-3.5 rounded-2xl border space-y-3 ${appTheme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'
-                      }`}>
-                      <div className="flex items-center justify-between">
-                        <span className={`text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
-                          }`}>
-                          <Sliders className="w-3 h-3 text-cyan-500" /> Quick Fine-Tune
-                        </span>
-                        <button
-                          onClick={() => setStudioTab('effects')}
-                          className="text-[10px] text-cyan-500 hover:underline font-semibold"
-                        >
-                          Effects &amp; Sliders &rarr;
-                        </button>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <div className={`flex justify-between text-[11px] mb-0.5 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                            <span>Hue Shift</span>
-                            <span className="text-cyan-500 font-mono text-[10px] font-semibold">{adjustments.hue}&deg;</span>
-                          </div>
-                          <input
-                            type="range"
-                            min="0"
-                            max="360"
-                            value={adjustments.hue}
-                            onChange={(e) => setAdjustments({ ...adjustments, hue: Number(e.target.value) })}
-                            className="hue-slider w-full"
-                          />
-                        </div>
-                        <div>
-                          <div className={`flex justify-between text-[11px] mb-0.5 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                            <span>Glow Aura</span>
-                            <span className="text-cyan-500 font-mono text-[10px] font-semibold">{adjustments.shadowBlur}px</span>
-                          </div>
-                          <input
-                            type="range"
-                            min="0"
-                            max="60"
-                            value={adjustments.shadowBlur}
-                            onChange={(e) => setAdjustments({ ...adjustments, shadowBlur: Number(e.target.value) })}
-                            className="theme-slider w-full"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* TAB 3: EFFECTS (WITH 2 SUB-TABS: EFFECTS & GRADIENT ADJUSTMENT) */}
-                {studioTab === 'effects' && (
-                  <div className="space-y-4">
-                    {/* 2 Sub-Tabs Switcher: [ ✨ Effects ] | [ 🎛️ Gradient Adjustment ] */}
-                    <div className={`p-1 rounded-xl border flex items-center gap-1 ${appTheme === 'dark' ? 'bg-slate-900/90 border-slate-800' : 'bg-slate-100 border-slate-200'
-                      }`}>
-                      <button
-                        onClick={() => setEffectSubTab('effects')}
-                        className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 ${effectSubTab === 'effects'
-                          ? (appTheme === 'dark' ? 'bg-cyan-500 text-slate-950 shadow-md font-bold' : 'bg-blue-600 text-white shadow-md font-bold')
-                          : (appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900')
-                          }`}
-                      >
-                        <Sparkles className="w-3.5 h-3.5" />
-                        <span>Effects</span>
-                      </button>
-
-                      <button
-                        onClick={() => setEffectSubTab('adjustment')}
-                        className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 ${effectSubTab === 'adjustment'
+                        onClick={() => setAdjustmentSubTab('gradient')}
+                        className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 ${adjustmentSubTab === 'gradient'
                           ? (appTheme === 'dark' ? 'bg-cyan-500 text-slate-950 shadow-md font-bold' : 'bg-blue-600 text-white shadow-md font-bold')
                           : (appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900')
                           }`}
@@ -7341,210 +6272,21 @@ export default function App() {
                         <Sliders className="w-3.5 h-3.5" />
                         <span>Gradient Adjustment</span>
                       </button>
+
+                      <button
+                        onClick={() => setAdjustmentSubTab('colors')}
+                        className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 ${adjustmentSubTab === 'colors'
+                          ? (appTheme === 'dark' ? 'bg-cyan-500 text-slate-950 shadow-md font-bold' : 'bg-blue-600 text-white shadow-md font-bold')
+                          : (appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900')
+                          }`}
+                      >
+                        <Palette className="w-3.5 h-3.5" />
+                        <span>Color Studio</span>
+                      </button>
                     </div>
 
-                    {/* SUB-TAB 1: 29+ 3D MATERIAL STYLES */}
-                    {effectSubTab === 'effects' && (
-                      <div className="space-y-4">
-                        {/* Header with count and reset */}
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h4 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
-                              }`}>
-                              <Sparkles className="w-3.5 h-3.5 text-cyan-500" /> {STYLE_RENDER_MODES.length}+ 3D Material Styles &amp; FX
-                            </h4>
-                            <p className={`text-[11px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                              Diamond, Velvet, Wood, Lava, Clay, Mercury, Origami &amp; more
-                            </p>
-                          </div>
-
-                          <button
-                            onClick={handleResetEffectsPanel}
-                            className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition flex items-center gap-1.5 flex-shrink-0 ${appTheme === 'dark'
-                              ? 'text-slate-300 hover:text-white bg-slate-900 border-slate-800 hover:border-slate-700'
-                              : 'text-slate-700 hover:text-slate-900 bg-white border-slate-200 hover:bg-slate-50'
-                              }`}
-                            title="Reset all effects to original"
-                          >
-                            <Undo2 className="w-3 h-3 text-cyan-500" />
-                            <span>Reset</span>
-                          </button>
-                        </div>
-
-                        {/* New vs Classic / Old Version Toggle Bar for Effects */}
-                        <div className={`p-1 rounded-xl border flex items-center gap-1 ${appTheme === 'dark' ? 'bg-slate-900/90 border-slate-800' : 'bg-slate-100 border-slate-200'
-                          }`}>
-                          <button
-                            onClick={() => setEffectVersionFilter('all')}
-                            className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-semibold transition flex items-center justify-center gap-1 ${effectVersionFilter === 'all'
-                              ? (appTheme === 'dark' ? 'bg-cyan-500 text-slate-950 shadow-sm font-bold' : 'bg-blue-600 text-white shadow-sm font-bold')
-                              : (appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900')
-                              }`}
-                          >
-                            <span>All ({STYLE_RENDER_MODES.length})</span>
-                          </button>
-
-                          <button
-                            onClick={() => setEffectVersionFilter('new')}
-                            className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-semibold transition flex items-center justify-center gap-1 ${effectVersionFilter === 'new'
-                              ? 'bg-gradient-to-r from-amber-400 via-rose-400 to-pink-500 text-slate-950 shadow-md font-bold'
-                              : (appTheme === 'dark' ? 'text-amber-300 hover:text-white' : 'text-amber-700 hover:text-slate-900')
-                              }`}
-                          >
-                            <span>✨ New ({STYLE_RENDER_MODES.filter(m => m.isNew || NEW_EFFECT_IDS.has(m.id)).length})</span>
-                          </button>
-
-                          <button
-                            onClick={() => setEffectVersionFilter('old')}
-                            className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-semibold transition flex items-center justify-center gap-1 ${effectVersionFilter === 'old'
-                              ? (appTheme === 'dark' ? 'bg-slate-800 text-slate-200 border border-slate-700 shadow-sm font-bold' : 'bg-white text-slate-900 border border-slate-300 shadow-sm font-bold')
-                              : (appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900')
-                              }`}
-                          >
-                            <span>📦 Classic</span>
-                          </button>
-                        </div>
-
-                        {/* Search Bar for Effects */}
-                        <div className="relative">
-                          <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
-                          <input
-                            type="text"
-                            placeholder="Search material effects (e.g. Gold, Glass, Neon, Metal)..."
-                            value={effectSearchTerm}
-                            onChange={(e) => setEffectSearchTerm(e.target.value)}
-                            className={`w-full pl-9 pr-8 py-2 rounded-xl text-xs border focus:outline-none focus:border-cyan-500 transition ${appTheme === 'dark'
-                              ? 'bg-slate-900 border-slate-800 text-slate-200 placeholder-slate-500'
-                              : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400'
-                              }`}
-                          />
-                          {effectSearchTerm && (
-                            <button
-                              onClick={() => setEffectSearchTerm('')}
-                              className="absolute right-2.5 top-2 text-slate-400 hover:text-white text-xs font-bold w-4 h-4 rounded-full bg-slate-800 flex items-center justify-center"
-                              title="Clear search"
-                            >
-                              &times;
-                            </button>
-                          )}
-                        </div>
-
-                        {/* Style Category Filter Chips */}
-                        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
-                          {['All', 'Anime & Manga', 'Cartoon & Comic', '3D & Inflatable', 'Glass & Water', 'Fire & Metal', 'Craft & Texture', 'Cyber & Neon', 'Silhouette & Vector'].map((cat) => {
-                            const isCatActive = effectCategory === cat;
-                            return (
-                              <button
-                                key={cat}
-                                onClick={() => setEffectCategory(cat)}
-                                className={`px-2.5 py-1 rounded-full text-[10px] font-semibold transition whitespace-nowrap ${isCatActive
-                                  ? (appTheme === 'dark' ? 'bg-cyan-500 text-slate-950 shadow-sm font-bold' : 'bg-blue-600 text-white shadow-sm font-bold')
-                                  : (appTheme === 'dark' ? 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800' : 'bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200')
-                                  }`}
-                              >
-                                {cat}
-                              </button>
-                            );
-                          })}
-                        </div>
-
-                        {/* Status banner: Shows whether effect is applying to Selected Part or Entire Canvas */}
-                        {(() => {
-                          const targetIds = (selectedLayerIds && selectedLayerIds.length > 0)
-                            ? selectedLayerIds
-                            : (selectedLayerId ? [selectedLayerId] : []);
-                          const isPartSelected = targetIds.length > 0;
-                          const primaryId = isPartSelected ? String(targetIds[0]).replace(/^pf_studio_/i, '') : null;
-                          const selectedPart = primaryId ? svgLayers.find(l => String(l.id).replace(/^pf_studio_/i, '') === primaryId) : null;
-
-                          return isPartSelected ? (
-                            <div className={`p-2.5 rounded-xl border flex items-center justify-between text-xs transition ${
-                              appTheme === 'dark' ? 'bg-cyan-500/10 border-cyan-500/30' : 'bg-blue-50 border-blue-200'
-                            }`}>
-                              <div className="flex items-center gap-2 min-w-0">
-                                <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse flex-shrink-0" />
-                                <span className={`font-semibold truncate text-[11px] ${appTheme === 'dark' ? 'text-cyan-300' : 'text-blue-800'}`}>
-                                  Selected Part: <span className="underline">{targetIds.length === 1 ? (selectedPart?.name || 'Part 1') : `${targetIds.length} Parts`}</span> (Effect applies only here)
-                                </span>
-                              </div>
-                              <button
-                                onClick={() => { setSelectedLayerIds([]); setSelectedLayerId(null); }}
-                                className={`text-[10px] font-bold underline flex-shrink-0 ml-2 ${
-                                  appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
-                                }`}
-                                title="Deselect to apply effect to entire canvas"
-                              >
-                                Deselect
-                              </button>
-                            </div>
-                          ) : (
-                            <div className={`p-2 rounded-xl border flex items-center gap-1.5 text-[11px] ${
-                              appTheme === 'dark' ? 'bg-slate-900/60 border-slate-800 text-slate-400' : 'bg-slate-100 border-slate-200 text-slate-600'
-                            }`}>
-                              <Layers className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                              <span>Applying to Entire Canvas. Click any part on canvas to apply effect only to that part.</span>
-                            </div>
-                          );
-                        })()}
-
-                        {/* 2-Column Material & Style Cards with Live Visual Preview */}
-                        <div className="grid grid-cols-2 gap-2.5 max-h-[500px] overflow-y-auto pr-1">
-                          {filteredStyleModes.map((preset) => {
-                            const targetIds = (selectedLayerIds && selectedLayerIds.length > 0)
-                              ? selectedLayerIds
-                              : (selectedLayerId ? [selectedLayerId] : []);
-                            const isPartSelected = targetIds.length > 0;
-                            const primaryId = isPartSelected ? String(targetIds[0]).replace(/^pf_studio_/i, '') : null;
-                            const currentPartLook = primaryId && layerStyles[primaryId]?.styleMode;
-                            const effectiveActiveLook = isPartSelected ? (currentPartLook || 'original') : activeStyleMode;
-                            const isCurrentActive = effectiveActiveLook === preset.id;
-                            const isNew = preset.isNew || NEW_EFFECT_IDS.has(preset.id);
-                            return (
-                              <button
-                                key={preset.id}
-                                onClick={() => handleSelectStyleLook(preset)}
-                                className={`p-2.5 rounded-2xl border text-left transition-all duration-300 ease-out hover:-translate-y-1 flex flex-col justify-between relative overflow-hidden group ${isCurrentActive
-                                  ? (appTheme === 'dark'
-                                    ? 'border-cyan-400 bg-cyan-500/10 shadow-[0_0_18px_rgba(6,182,212,0.3)] ring-2 ring-cyan-400'
-                                    : 'border-blue-600 bg-blue-50 shadow-md ring-2 ring-blue-600')
-                                  : (appTheme === 'dark'
-                                    ? 'bg-slate-900/90 border-slate-800 hover:border-slate-700/80 hover:bg-slate-900 shadow-sm hover:shadow-[0_12px_24px_-4px_rgba(255,255,255,0.07)]'
-                                    : 'bg-white border-slate-200 hover:border-slate-300/80 hover:shadow-lg hover:shadow-black/10 shadow-sm')
-                                  }`}
-                              >
-                                <EffectCardThumbnail preset={preset} />
-
-                                <div className="w-full">
-                                  <div className="flex items-center justify-between gap-1 mb-1">
-                                    <span className={`text-xs font-bold truncate ${isCurrentActive
-                                      ? (appTheme === 'dark' ? 'text-cyan-300' : 'text-blue-700')
-                                      : (appTheme === 'dark' ? 'text-slate-200 group-hover:text-cyan-400' : 'text-slate-900 group-hover:text-blue-600')
-                                      }`}>
-                                      {preset.name}
-                                    </span>
-                                    {isCurrentActive && (
-                                      <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
-                                    )}
-                                  </div>
-                                  <p className={`text-[10px] leading-tight line-clamp-2 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'
-                                    }`}>
-                                    {preset.desc}
-                                  </p>
-                                </div>
-                              </button>
-                            );
-                          })}
-                          {filteredStyleModes.length === 0 && (
-                            <div className="col-span-2 py-8 text-center text-xs text-slate-400">
-                              No effects match "{effectSearchTerm}". Try another search term.
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* SUB-TAB 2: GRADIENT ADJUSTMENT (GRANULAR SLIDERS) */}
-                    {effectSubTab === 'adjustment' && (
+                    {/* SUB-TAB 1: GRADIENT ADJUSTMENT (GRANULAR SLIDERS) */}
+                    {adjustmentSubTab === 'gradient' && (
                       <div className={`p-4 rounded-2xl border space-y-4 ${appTheme === 'dark' ? 'bg-[#131b2e]/40 border-slate-800' : 'bg-slate-50 border-slate-200'
                         }`}>
                         <div className="flex items-center justify-between">
@@ -7730,6 +6472,1437 @@ export default function App() {
                         </div>
                       </div>
                     )}
+
+                    {/* SUB-TAB 2: VECTOR COLOR STUDIO */}
+                    {adjustmentSubTab === 'colors' && (
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h4 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
+                              }`}>
+                              <Paintbrush className="w-3.5 h-3.5 text-cyan-500" /> Vector Color Studio
+                            </h4>
+                            <p className={`text-[11px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                              Touch or click any element on the canvas or select a layer from below
+                            </p>
+                          </div>
+
+                          <button
+                            onClick={handleResetColorsPanel}
+                            className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition flex items-center gap-1.5 flex-shrink-0 ${appTheme === 'dark'
+                              ? 'text-slate-300 hover:text-white bg-slate-900 border-slate-800 hover:border-slate-700'
+                              : 'text-slate-700 hover:text-slate-900 bg-white border-slate-200 hover:bg-slate-50'
+                              }`}
+                            title="Reset all custom color replacements in this panel"
+                          >
+                            <Undo2 className="w-3 h-3 text-cyan-500" />
+                            <span>Reset Colors</span>
+                          </button>
+                        </div>
+
+                        {/* Active Selected Element Direct Editor Card */}
+                        {(() => {
+                          const activeIds = (selectedLayerIds && selectedLayerIds.length > 0)
+                            ? selectedLayerIds
+                            : (selectedLayerId ? [selectedLayerId] : []);
+                          const primaryId = activeIds[0];
+                          const cleanPrimaryId = primaryId ? String(primaryId).replace(/^pf_studio_/i, '') : null;
+                          const numOnly = cleanPrimaryId ? cleanPrimaryId.replace(/\D/g, '') : null;
+                          const activeLayer = cleanPrimaryId
+                            ? svgLayers.find(l => l.id === cleanPrimaryId || l.id === primaryId || (numOnly && l.id === `layer_${numOnly}`))
+                            : null;
+                          const layerStyle = cleanPrimaryId ? (layerStyles[cleanPrimaryId] || layerStyles[primaryId] || {}) : {};
+                          const currentLayerColor = layerStyle.fill || layerStyle.stroke || (activeLayer ? activeLayer.color : null);
+
+                          const effectiveColor = (activeSelectedColor && adjustments.colorReplacements[activeSelectedColor.toLowerCase()])
+                            || activeSelectedColor
+                            || currentLayerColor
+                            || (activeIds.length > 0 ? '#38bdf8' : null);
+
+                          const originalColorDisplay = activeSelectedColor
+                            || (activeLayer ? (activeLayer.color || '#38bdf8') : (effectiveColor || '#38bdf8'));
+
+                          const hasCustomColor = (activeSelectedColor && !!adjustments.colorReplacements[activeSelectedColor.toLowerCase()])
+                            || (activeIds.length > 0 && activeIds.some(id => {
+                              const cid = String(id).replace(/^pf_studio_/i, '');
+                              const s = layerStyles[cid] || layerStyles[id];
+                              return s && (s.fill || s.stroke);
+                            }));
+
+                          const handleApplyColor = (newCol) => {
+                            const norm = normalizeColor(newCol) || newCol;
+                            if (activeSelectedColor) {
+                              handleColorChange(activeSelectedColor, norm);
+                            }
+                            if (activeIds.length > 0) {
+                              handleLayerColorChange(activeIds, norm);
+                            } else if (!activeSelectedColor && originalColorDisplay) {
+                              handleColorChange(originalColorDisplay, norm);
+                            }
+                          };
+
+                          const handleResetEffectiveColor = () => {
+                            if (activeSelectedColor) {
+                              handleResetSingleColor(activeSelectedColor);
+                            }
+                            if (activeIds.length > 0) {
+                              handleResetLayerColor(activeIds);
+                            }
+                          };
+
+                          const isAnySelected = !!activeSelectedColor || activeIds.length > 0;
+
+                          if (!isAnySelected || !effectiveColor) {
+                            return (
+                              <div className={`p-5 rounded-2xl border border-dashed text-center text-xs space-y-1 ${appTheme === 'dark' ? 'bg-slate-900/60 border-slate-800 text-slate-400' : 'bg-slate-50 border-slate-300 text-slate-600'
+                                }`}>
+                                <Sparkles className="w-5 h-5 text-cyan-500 mx-auto mb-1" />
+                                <p className={`font-semibold ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-800'}`}>Touch Element on Canvas</p>
+                                <p className={`text-[11px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                                  Click or drag any element on the canvas to move, rotate, recolor, and style it.
+                                </p>
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <div className={`p-4 rounded-2xl border-2 shadow-xl space-y-3 animate-in fade-in duration-200 ${appTheme === 'dark'
+                              ? 'bg-slate-900 border-cyan-400/80 shadow-cyan-500/10'
+                              : 'bg-slate-50 border-cyan-500 shadow-cyan-500/10'
+                              }`}>
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <span className="w-2.5 h-2.5 rounded-full bg-cyan-500" />
+                                  <span className="text-xs font-bold uppercase tracking-wider text-cyan-500">
+                                    {activeIds.length > 1
+                                      ? `${activeIds.length} Parts Selected`
+                                      : (activeLayer ? `${activeLayer.name}` : 'Active Selected Element')}
+                                  </span>
+                                  {activeLayer && activeIds.length <= 1 && (
+                                    <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                                      &lt;{activeLayer.tag}&gt;
+                                    </span>
+                                  )}
+                                </div>
+
+                                {hasCustomColor && (
+                                  <button
+                                    onClick={handleResetEffectiveColor}
+                                    className={`text-[11px] flex items-center gap-1 px-2.5 py-1 rounded-xl transition border ${appTheme === 'dark'
+                                      ? 'text-slate-400 hover:text-white bg-slate-800 border-slate-700'
+                                      : 'text-slate-600 hover:text-slate-900 bg-white border-slate-300'
+                                      }`}
+                                  >
+                                    <Undo2 className="w-3 h-3" /> Reset Color
+                                  </button>
+                                )}
+                              </div>
+
+                              {/* Color Preview, Picker & Hex */}
+                              <div className={`flex items-center justify-between gap-3 p-3 rounded-xl border ${appTheme === 'dark' ? 'bg-[#0b0f19] border-slate-800' : 'bg-white border-slate-200 shadow-sm'
+                                }`}>
+                                <div className="flex items-center gap-3">
+                                  <div
+                                    className="w-11 h-11 rounded-xl border-2 border-slate-400 shadow-inner flex items-center justify-center flex-shrink-0"
+                                    style={{ backgroundColor: effectiveColor }}
+                                  />
+                                  <div>
+                                    <span className={`font-mono text-sm font-bold uppercase ${appTheme === 'dark' ? 'text-slate-100' : 'text-slate-900'
+                                      }`}>
+                                      {effectiveColor}
+                                    </span>
+                                    <p className={`text-[10px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                                      Original: <span className="font-mono uppercase">{originalColorDisplay}</span>
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                  <label className="cursor-pointer">
+                                    <input
+                                      type="color"
+                                      value={effectiveColor.startsWith('#') ? effectiveColor : '#38bdf8'}
+                                      onChange={(e) => handleApplyColor(e.target.value)}
+                                      className="sr-only"
+                                    />
+                                    <div className="px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs transition flex items-center gap-1.5 shadow-md shadow-blue-600/30">
+                                      <Paintbrush className="w-3.5 h-3.5" />
+                                      <span>Pick</span>
+                                    </div>
+                                  </label>
+
+                                  <input
+                                    type="text"
+                                    maxLength={7}
+                                    value={effectiveColor.toUpperCase()}
+                                    onChange={(e) => {
+                                      let val = e.target.value;
+                                      if (!val.startsWith('#')) val = '#' + val;
+                                      handleApplyColor(val);
+                                    }}
+                                    className={`w-20 px-2 py-2 rounded-xl text-xs font-mono text-center uppercase focus:outline-none focus:border-cyan-500 border ${appTheme === 'dark'
+                                      ? 'bg-slate-950 border-slate-800 text-slate-200'
+                                      : 'bg-slate-100 border-slate-300 text-slate-800'
+                                      }`}
+                                  />
+                                </div>
+                              </div>
+
+                              {/* 1-Tap Quick Swatches */}
+                              <div className="space-y-1.5 pt-1">
+                                <span className={`text-[10px] font-medium ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                                  Quick Color Presets:
+                                </span>
+                                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
+                                  {QUICK_SWATCHES.map((swatch) => (
+                                    <button
+                                      key={swatch.hex}
+                                      onClick={() => handleApplyColor(swatch.hex)}
+                                      title={`${swatch.name} (${swatch.hex})`}
+                                      className={`w-6 h-6 rounded-full border transition-all hover:scale-125 flex-shrink-0 ${effectiveColor.toLowerCase() === swatch.hex.toLowerCase()
+                                        ? 'border-white scale-110 shadow-lg ring-2 ring-cyan-400'
+                                        : appTheme === 'dark' ? 'border-slate-800 hover:border-slate-500' : 'border-slate-300 hover:border-slate-500'
+                                        }`}
+                                      style={{ backgroundColor: swatch.hex }}
+                                    />
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
+
+                        {/* Part Styling, Effects & Transform Card (Single & Multi-Part Selection) */}
+                        {(() => {
+                          const activeIds = (selectedLayerIds && selectedLayerIds.length > 0)
+                            ? selectedLayerIds
+                            : (selectedLayerId ? [selectedLayerId] : []);
+                          if (activeIds.length === 0) return null;
+
+                          const isMulti = activeIds.length > 1;
+                          const primaryId = activeIds[0];
+                          const cleanPrimaryId = String(primaryId).replace(/^pf_studio_/i, '');
+                          const numOnly = cleanPrimaryId.replace(/\D/g, '');
+                          const activeLayer = svgLayers.find(l => l.id === cleanPrimaryId || l.id === primaryId || (numOnly && l.id === `layer_${numOnly}`)) || {
+                            id: cleanPrimaryId || 'layer',
+                            name: numOnly ? `Layer ${Number(numOnly) + 1}` : (cleanPrimaryId ? cleanPrimaryId.replace('_', ' ').toUpperCase() : 'Layer'),
+                            tag: 'shape',
+                            color: '#38bdf8'
+                          };
+
+                          const firstTransform = layerTransforms[cleanPrimaryId] || layerTransforms[primaryId] || (numOnly ? layerTransforms[`layer_${numOnly}`] : null) || { x: 0, y: 0, rotate: 0 };
+                          const hasCustomTransform = activeIds.some(id => {
+                            const cid = String(id).replace(/^pf_studio_/i, '');
+                            const t = layerTransforms[cid] || layerTransforms[id];
+                            return t && (t.x !== 0 || t.y !== 0 || t.rotate !== 0);
+                          });
+
+                          const firstStyle = layerStyles[cleanPrimaryId] || layerStyles[primaryId] || {};
+                          const hasCustomColor = activeIds.some(id => {
+                            const cid = String(id).replace(/^pf_studio_/i, '');
+                            const s = layerStyles[cid] || layerStyles[id];
+                            return s && (s.fill || s.stroke);
+                          });
+                          const currentColor = firstStyle.fill || firstStyle.stroke || (isMulti ? '#38bdf8' : (activeLayer.color || '#38bdf8'));
+
+                          const glowEnabled = !!firstStyle.glow?.enabled;
+                          const glowColor = firstStyle.glow?.color || '#38bdf8';
+                          const glowRadius = firstStyle.glow?.radius !== undefined ? firstStyle.glow.radius : 12;
+                          const currentOpacity = firstStyle.opacity !== undefined ? Math.round(Number(firstStyle.opacity) * 100) : 100;
+                          const currentBlur = firstStyle.blur !== undefined ? Number(firstStyle.blur) : 0;
+                          const currentBrightness = firstStyle.brightness !== undefined ? Number(firstStyle.brightness) : 100;
+
+                          const hasCustomEffects = activeIds.some(id => {
+                            const cid = String(id).replace(/^pf_studio_/i, '');
+                            const s = layerStyles[cid] || layerStyles[id];
+                            return s && (s.glow?.enabled || s.opacity !== undefined || s.blur !== undefined || s.brightness !== undefined);
+                          });
+
+                          const currentLayerIdx = layerOrder.findIndex(id => id === cleanPrimaryId || id === primaryId || (numOnly && id === `layer_${numOnly}`));
+                          const totalLayers = layerOrder.length || svgLayers.length || 1;
+
+                          // Adaptive coordinate span based on SVG viewBox dimensions
+                          const maxOffset = (() => {
+                            const vbMatch = selectedAsset?.svgCode?.match(/viewBox=["']\s*([0-9.-]+)\s+([0-9.-]+)\s+([0-9.-]+)\s+([0-9.-]+)\s*["']/i);
+                            if (vbMatch) {
+                              const w = parseFloat(vbMatch[3]);
+                              const h = parseFloat(vbMatch[4]);
+                              if (w > 0 && h > 0) return Math.round(Math.max(w, h) * 0.85);
+                            }
+                            return 200;
+                          })();
+                          const offsetStep = maxOffset <= 40 ? 0.5 : 1;
+
+                          return (
+                            <div className={`p-4 rounded-2xl border shadow-xl space-y-4 animate-in fade-in duration-200 ${appTheme === 'dark'
+                              ? 'bg-slate-900/90 border-cyan-500/40 shadow-cyan-950/20'
+                              : 'bg-white border-cyan-400/60 shadow-slate-200'
+                              }`}>
+                              {/* Header */}
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  {isMulti ? (
+                                    <div className="w-7 h-7 rounded-xl bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center flex-shrink-0">
+                                      <Layers className="w-4 h-4 text-cyan-400" />
+                                    </div>
+                                  ) : (
+                                    <div
+                                      className="w-5 h-5 rounded-full border border-slate-600 shadow-sm flex-shrink-0"
+                                      style={{ backgroundColor: currentColor }}
+                                    />
+                                  )}
+                                  <div>
+                                    <div className="flex items-center gap-1.5">
+                                      <span className={`text-xs font-bold ${appTheme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                                        {isMulti ? `${activeIds.length} Parts Selected` : activeLayer.name}
+                                      </span>
+                                      {!isMulti && (
+                                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                                          &lt;{activeLayer.tag}&gt;
+                                        </span>
+                                      )}
+                                    </div>
+                                    <p className={`text-[10px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                                      {isMulti ? 'Bulk edit color, effects & position' : `Layer ${currentLayerIdx >= 0 ? currentLayerIdx + 1 : 1} of ${totalLayers} • Drag on canvas`}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-1">
+                                  {isMulti ? (
+                                    <>
+                                      <button
+                                        onClick={handleSelectAllLayers}
+                                        className={`text-[9px] px-2 py-1 rounded-lg border transition font-medium ${appTheme === 'dark'
+                                          ? 'text-cyan-300 hover:text-white bg-cyan-950/50 border-cyan-700/50'
+                                          : 'text-cyan-700 bg-cyan-50 border-cyan-300'
+                                          }`}
+                                      >
+                                        All ({svgLayers.length})
+                                      </button>
+                                      <button
+                                        onClick={handleDeselectAllLayers}
+                                        className={`text-[9px] px-2 py-1 rounded-lg border transition font-medium ${appTheme === 'dark'
+                                          ? 'text-slate-400 hover:text-white bg-slate-800/80 border-slate-700'
+                                          : 'text-slate-600 bg-slate-100 border-slate-200'
+                                          }`}
+                                      >
+                                        Clear
+                                      </button>
+                                    </>
+                                  ) : (
+                                    (hasCustomTransform || hasCustomColor || hasCustomEffects) && (
+                                      <button
+                                        onClick={() => {
+                                          handleResetLayerTransform(activeIds);
+                                          handleResetLayerColor(activeIds);
+                                          handleResetLayerEffects(activeIds);
+                                        }}
+                                        className={`text-[10px] flex items-center gap-1 px-2 py-1 rounded-lg border transition ${appTheme === 'dark'
+                                          ? 'text-slate-400 hover:text-white bg-slate-800/80 border-slate-700'
+                                          : 'text-slate-600 hover:text-slate-900 bg-slate-100 border-slate-200'
+                                          }`}
+                                        title="Reset this part to default style and position"
+                                      >
+                                        <RotateCcw className="w-3 h-3 text-cyan-400" />
+                                        <span>Reset Part</span>
+                                      </button>
+                                    )
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Canvas Drag Hint */}
+                              <div className={`p-2 rounded-xl text-[10px] flex items-center justify-between border ${appTheme === 'dark'
+                                ? 'bg-cyan-950/20 text-cyan-300 border-cyan-800/30'
+                                : 'bg-cyan-50 text-cyan-800 border-cyan-200'
+                                }`}>
+                                <span className="flex items-center gap-1.5 font-medium">
+                                  <Move className="w-3 h-3 text-cyan-400 flex-shrink-0" />
+                                  {isMulti ? 'Drag on canvas — all selected parts will move together!' : 'Click and drag on canvas to reposition this part!'}
+                                </span>
+                                {(firstTransform.x !== 0 || firstTransform.y !== 0) && (
+                                  <span className="font-mono font-bold text-cyan-400">
+                                    X: {firstTransform.x}px, Y: {firstTransform.y}px
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* SPECIAL EFFECTS SECTION (Glow Aura, Opacity, Blur, Brightness) */}
+                              <div className="space-y-3 pt-1 border-t border-slate-800/60">
+                                <div className="flex items-center justify-between text-[11px] font-semibold">
+                                  <span className="flex items-center gap-1.5 text-cyan-400">
+                                    <Sparkles className="w-3.5 h-3.5" />
+                                    <span>Part Special Effects</span>
+                                  </span>
+                                  {hasCustomEffects && (
+                                    <button
+                                      onClick={() => handleResetLayerEffects(activeIds)}
+                                      className={`text-[9px] px-1.5 py-0.5 rounded border transition ${appTheme === 'dark' ? 'border-slate-800 text-slate-400 hover:text-white' : 'border-slate-200 text-slate-600 hover:text-slate-900'
+                                        }`}
+                                    >
+                                      Reset Effects
+                                    </button>
+                                  )}
+                                </div>
+
+                                {/* Glow Aura Toggle & Controls */}
+                                <div className={`p-2.5 rounded-xl border space-y-2 ${glowEnabled
+                                  ? appTheme === 'dark' ? 'bg-cyan-950/30 border-cyan-500/50' : 'bg-cyan-50 border-cyan-300'
+                                  : appTheme === 'dark' ? 'bg-slate-950/50 border-slate-800' : 'bg-slate-50 border-slate-200'
+                                  }`}>
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[11px] font-medium flex items-center gap-1.5">
+                                      <span className={`w-2 h-2 rounded-full ${glowEnabled ? 'bg-cyan-400 animate-ping' : 'bg-slate-600'}`} />
+                                      <span>Glow Aura Effect</span>
+                                    </span>
+                                    <button
+                                      onClick={() => handleLayerEffectChange(activeIds, 'glow', { enabled: !glowEnabled, color: glowColor, radius: glowRadius })}
+                                      className={`px-2.5 py-0.5 rounded-md text-[10px] font-semibold transition ${glowEnabled
+                                        ? 'bg-cyan-500 text-white shadow-md shadow-cyan-500/30'
+                                        : appTheme === 'dark' ? 'bg-slate-800 text-slate-400 hover:text-white' : 'bg-slate-200 text-slate-600'
+                                        }`}
+                                    >
+                                      {glowEnabled ? 'Enabled' : 'Enable'}
+                                    </button>
+                                  </div>
+
+                                  {glowEnabled && (
+                                    <div className="space-y-2 pt-1 border-t border-cyan-500/20 animate-in fade-in duration-150">
+                                      <div className="flex items-center justify-between text-[10px]">
+                                        <span className="text-slate-400">Glow Radius:</span>
+                                        <span className="font-mono text-cyan-400 font-bold">{glowRadius}px</span>
+                                      </div>
+                                      <input
+                                        type="range"
+                                        min="2"
+                                        max="40"
+                                        value={glowRadius}
+                                        onChange={(e) => handleLayerEffectChange(activeIds, 'glow', { enabled: true, color: glowColor, radius: Number(e.target.value) })}
+                                        className="w-full accent-cyan-500 cursor-pointer h-1.5 bg-slate-700 rounded-lg"
+                                      />
+                                      <div className="flex items-center gap-1.5 pt-1">
+                                        <span className="text-[10px] text-slate-400">Aura Color:</span>
+                                        {['#38bdf8', '#a855f7', '#ec4899', '#10b981', '#ffffff'].map(c => (
+                                          <button
+                                            key={c}
+                                            onClick={() => handleLayerEffectChange(activeIds, 'glow', { enabled: true, color: c, radius: glowRadius })}
+                                            style={{ backgroundColor: c }}
+                                            className={`w-4 h-4 rounded-full border transition ${glowColor === c ? 'ring-2 ring-cyan-400 scale-110' : 'border-slate-700'}`}
+                                          />
+                                        ))}
+                                        <input
+                                          type="color"
+                                          value={glowColor}
+                                          onChange={(e) => handleLayerEffectChange(activeIds, 'glow', { enabled: true, color: e.target.value, radius: glowRadius })}
+                                          className="w-5 h-5 rounded cursor-pointer bg-transparent border-0 p-0 ml-auto"
+                                          title="Custom Glow Color"
+                                        />
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Opacity Slider */}
+                                <div className={`p-2 rounded-xl border ${appTheme === 'dark' ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                                  <div className="flex items-center justify-between text-[10px] mb-1">
+                                    <span className="text-slate-400 font-medium">Part Opacity:</span>
+                                    <span className="font-mono text-cyan-400 font-bold">{currentOpacity}%</span>
+                                  </div>
+                                  <input
+                                    type="range"
+                                    min="0"
+                                    max="100"
+                                    value={currentOpacity}
+                                    onChange={(e) => handleLayerEffectChange(activeIds, 'opacity', Number(e.target.value) / 100)}
+                                    className="w-full accent-cyan-500 cursor-pointer h-1.5 bg-slate-700 rounded-lg"
+                                  />
+                                </div>
+
+                                {/* Blur Slider */}
+                                <div className={`p-2 rounded-xl border ${appTheme === 'dark' ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                                  <div className="flex items-center justify-between text-[10px] mb-1">
+                                    <span className="text-slate-400 font-medium">Part Blur:</span>
+                                    <span className="font-mono text-cyan-400 font-bold">{currentBlur}px</span>
+                                  </div>
+                                  <input
+                                    type="range"
+                                    min="0"
+                                    max="20"
+                                    step="0.5"
+                                    value={currentBlur}
+                                    onChange={(e) => handleLayerEffectChange(activeIds, 'blur', Number(e.target.value))}
+                                    className="w-full accent-cyan-500 cursor-pointer h-1.5 bg-slate-700 rounded-lg"
+                                  />
+                                </div>
+
+                                {/* Brightness Slider */}
+                                <div className={`p-2 rounded-xl border ${appTheme === 'dark' ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                                  <div className="flex items-center justify-between text-[10px] mb-1">
+                                    <span className="text-slate-400 font-medium">Part Brightness:</span>
+                                    <span className="font-mono text-cyan-400 font-bold">{currentBrightness}%</span>
+                                  </div>
+                                  <input
+                                    type="range"
+                                    min="20"
+                                    max="200"
+                                    value={currentBrightness}
+                                    onChange={(e) => handleLayerEffectChange(activeIds, 'brightness', Number(e.target.value))}
+                                    className="w-full accent-cyan-500 cursor-pointer h-1.5 bg-slate-700 rounded-lg"
+                                  />
+                                </div>
+                              </div>
+
+                              {/* 3. POSITION (X / Y) CONTROLS */}
+                              <div className="space-y-2.5 pt-1 border-t border-slate-800/60">
+                                <div className="flex items-center justify-between text-[11px] font-semibold">
+                                  <span className={appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'}>
+                                    {isMulti ? 'Move Selected Parts (Offset X / Y)' : 'Part Position (X / Y)'}
+                                  </span>
+                                  <button
+                                    onClick={() => {
+                                      handleLayerPositionChange(activeIds, 'x', 0);
+                                      handleLayerPositionChange(activeIds, 'y', 0);
+                                    }}
+                                    className={`text-[9px] px-1.5 py-0.5 rounded border transition ${appTheme === 'dark' ? 'border-slate-800 text-slate-400 hover:text-white' : 'border-slate-200 text-slate-600 hover:text-slate-900'
+                                      }`}
+                                  >
+                                    Center (0, 0)
+                                  </button>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-2">
+                                  {/* X Axis */}
+                                  <div className={`p-2 rounded-xl border ${appTheme === 'dark' ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                                    <div className="flex items-center justify-between text-[10px] mb-1">
+                                      <span className="text-slate-400 font-medium">Offset X:</span>
+                                      <span className="font-mono text-cyan-400 font-bold">{firstTransform.x || 0}px</span>
+                                    </div>
+                                    <input
+                                      type="range"
+                                      min={-maxOffset}
+                                      max={maxOffset}
+                                      step={offsetStep}
+                                      value={firstTransform.x || 0}
+                                      onChange={(e) => handleLayerPositionChange(activeIds, 'x', e.target.value)}
+                                      className="w-full accent-cyan-500 cursor-pointer h-1.5 bg-slate-700 rounded-lg"
+                                    />
+                                  </div>
+
+                                  {/* Y Axis */}
+                                  <div className={`p-2 rounded-xl border ${appTheme === 'dark' ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                                    <div className="flex items-center justify-between text-[10px] mb-1">
+                                      <span className="text-slate-400 font-medium">Offset Y:</span>
+                                      <span className="font-mono text-cyan-400 font-bold">{firstTransform.y || 0}px</span>
+                                    </div>
+                                    <input
+                                      type="range"
+                                      min={-maxOffset}
+                                      max={maxOffset}
+                                      step={offsetStep}
+                                      value={firstTransform.y || 0}
+                                      onChange={(e) => handleLayerPositionChange(activeIds, 'y', e.target.value)}
+                                      className="w-full accent-cyan-500 cursor-pointer h-1.5 bg-slate-700 rounded-lg"
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* 4. ROTATION CONTROLS */}
+                              <div className="space-y-2 pt-1 border-t border-slate-800/60">
+                                <div className="flex items-center justify-between text-[11px] font-semibold">
+                                  <span className={appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'}>
+                                    {isMulti ? 'Rotate Selected Parts' : 'Part Rotation'}
+                                  </span>
+                                  <span className="font-mono text-cyan-400 text-xs font-bold">
+                                    {firstTransform.rotate || 0}&deg;
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center gap-3">
+                                  <input
+                                    type="range"
+                                    min="-180"
+                                    max="180"
+                                    step="1"
+                                    value={firstTransform.rotate || 0}
+                                    onChange={(e) => handleLayerRotationChange(activeIds, e.target.value)}
+                                    className="flex-1 accent-cyan-500 cursor-pointer h-1.5 bg-slate-700 rounded-lg"
+                                  />
+                                  <div className="flex items-center gap-1">
+                                    {[-90, 0, 90].map((deg) => (
+                                      <button
+                                        key={deg}
+                                        onClick={() => handleLayerRotationChange(activeIds, deg)}
+                                        className={`px-2 py-0.5 rounded text-[10px] font-mono font-medium border transition ${(firstTransform.rotate || 0) === deg
+                                          ? 'bg-cyan-500 text-white border-cyan-400'
+                                          : appTheme === 'dark' ? 'bg-slate-800 text-slate-300 border-slate-700 hover:text-white' : 'bg-slate-100 text-slate-700 border-slate-200'
+                                          }`}
+                                      >
+                                        {deg === 0 ? '0°' : `${deg > 0 ? '+' : ''}${deg}°`}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* 5. LAYER HIERARCHY / Z-INDEX ORDERING CONTROLS */}
+                              {!isMulti && (
+                                <div className="space-y-2 pt-1 border-t border-slate-800/60">
+                                  <div className="flex items-center justify-between text-[11px] font-semibold">
+                                    <span className={appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'}>
+                                      Layer Hierarchy (Front / Back)
+                                    </span>
+                                    <span className={`text-[10px] font-normal ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                                      Position: {currentLayerIdx === totalLayers - 1 ? 'Top (Front)' : currentLayerIdx === 0 ? 'Bottom (Back)' : `#${currentLayerIdx + 1}`}
+                                    </span>
+                                  </div>
+
+                                  <div className="grid grid-cols-4 gap-1.5">
+                                    <button
+                                      onClick={() => handleBringToFront(cleanPrimaryId)}
+                                      disabled={currentLayerIdx === totalLayers - 1}
+                                      title="Bring this layer to the absolute front"
+                                      className={`py-2 px-1 rounded-xl text-[10px] font-semibold flex flex-col items-center gap-1 border transition ${currentLayerIdx === totalLayers - 1
+                                        ? 'opacity-40 cursor-not-allowed border-transparent'
+                                        : appTheme === 'dark'
+                                          ? 'bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-200 hover:text-white'
+                                          : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
+                                        }`}
+                                    >
+                                      <ChevronsUp className="w-3.5 h-3.5 text-cyan-400" />
+                                      <span>To Front</span>
+                                    </button>
+
+                                    <button
+                                      onClick={() => handleBringForward(cleanPrimaryId)}
+                                      disabled={currentLayerIdx === totalLayers - 1}
+                                      title="Move this layer 1 step forward"
+                                      className={`py-2 px-1 rounded-xl text-[10px] font-semibold flex flex-col items-center gap-1 border transition ${currentLayerIdx === totalLayers - 1
+                                        ? 'opacity-40 cursor-not-allowed border-transparent'
+                                        : appTheme === 'dark'
+                                          ? 'bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-200 hover:text-white'
+                                          : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
+                                        }`}
+                                    >
+                                      <ArrowUp className="w-3.5 h-3.5 text-cyan-400" />
+                                      <span>Forward</span>
+                                    </button>
+
+                                    <button
+                                      onClick={() => handleSendBackward(cleanPrimaryId)}
+                                      disabled={currentLayerIdx <= 0}
+                                      title="Move this layer 1 step backward"
+                                      className={`py-2 px-1 rounded-xl text-[10px] font-semibold flex flex-col items-center gap-1 border transition ${currentLayerIdx <= 0
+                                        ? 'opacity-40 cursor-not-allowed border-transparent'
+                                        : appTheme === 'dark'
+                                          ? 'bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-200 hover:text-white'
+                                          : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
+                                        }`}
+                                    >
+                                      <ArrowDown className="w-3.5 h-3.5 text-cyan-400" />
+                                      <span>Backward</span>
+                                    </button>
+
+                                    <button
+                                      onClick={() => handleSendToBack(cleanPrimaryId)}
+                                      disabled={currentLayerIdx <= 0}
+                                      title="Send this layer to the absolute back"
+                                      className={`py-2 px-1 rounded-xl text-[10px] font-semibold flex flex-col items-center gap-1 border transition ${currentLayerIdx <= 0
+                                        ? 'opacity-40 cursor-not-allowed border-transparent'
+                                        : appTheme === 'dark'
+                                          ? 'bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-200 hover:text-white'
+                                          : 'bg-slate-100 hover:bg-slate-200 border-slate-200 text-slate-700'
+                                        }`}
+                                    >
+                                      <ChevronsDown className="w-3.5 h-3.5 text-cyan-400" />
+                                      <span>To Back</span>
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+
+                        {/* Collapsible Dropdown for All Vector Layers & Colors */}
+                        {(svgLayers.length > 0 || detectedColors.length > 0) && (
+                          <div className={`rounded-2xl border overflow-hidden shadow-md ${appTheme === 'dark' ? 'border-slate-800 bg-[#131b2e]/50' : 'border-slate-200 bg-slate-50'
+                            }`}>
+                            <button
+                              onClick={() => setIsLayersListExpanded(!isLayersListExpanded)}
+                              className={`w-full p-3.5 flex items-center justify-between text-left transition text-xs font-semibold ${appTheme === 'dark' ? 'hover:bg-slate-900/60 text-slate-300' : 'hover:bg-slate-100 text-slate-700'
+                                }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <Layers className="w-4 h-4 text-cyan-500" />
+                                <span>Vector Parts & Layers</span>
+                                <span className={`text-[10px] px-2 py-0.5 rounded-full ${appTheme === 'dark' ? 'bg-slate-800 text-slate-300' : 'bg-slate-200 text-slate-700'
+                                  }`}>
+                                  {svgLayers.length || detectedColors.length}
+                                </span>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); setIsAddElementModalOpen(true); }}
+                                  className={`ml-1 text-[10px] px-2 py-0.5 rounded-lg border font-bold flex items-center gap-1 transition ${appTheme === 'dark'
+                                    ? 'bg-cyan-500/15 border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/25'
+                                    : 'bg-blue-50 border-blue-200 text-blue-600 hover:bg-blue-100'
+                                    }`}
+                                  title="Add another element from library"
+                                >
+                                  <PlusCircle className="w-3 h-3" />
+                                  <span>Add</span>
+                                </button>
+                              </div>
+                              <div className={`flex items-center gap-2 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                                <span className="text-[10px] font-normal">
+                                  {isLayersListExpanded ? 'Hide List' : 'Show All'}
+                                </span>
+                                {isLayersListExpanded ? (
+                                  <ChevronUp className="w-4 h-4 text-cyan-500" />
+                                ) : (
+                                  <ChevronDown className="w-4 h-4" />
+                                )}
+                              </div>
+                            </button>
+
+                            {/* Collapsible List Container with Tab Switch between Vector Parts and Unique Colors */}
+                            {isLayersListExpanded && (
+                              <div className={`p-3.5 pt-2 space-y-3 border-t ${appTheme === 'dark' ? 'border-slate-800/60' : 'border-slate-200'
+                                }`}>
+                                {/* Switch tabs between Vector Layers and Colors */}
+                                <div className={`flex items-center p-1 rounded-xl border ${appTheme === 'dark' ? 'bg-slate-950/80 border-slate-800' : 'bg-slate-200/70 border-slate-300'
+                                  }`}>
+                                  <button
+                                    onClick={() => setLayerListViewMode('layers')}
+                                    className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 ${layerListViewMode === 'layers'
+                                      ? 'bg-blue-600 text-white shadow-md'
+                                      : appTheme === 'dark' ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900'
+                                      }`}
+                                  >
+                                    <Shapes className="w-3.5 h-3.5" />
+                                    <span>Vector Layers ({svgLayers.length})</span>
+                                  </button>
+                                  <button
+                                    onClick={() => setLayerListViewMode('colors')}
+                                    className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5 ${layerListViewMode === 'colors'
+                                      ? 'bg-blue-600 text-white shadow-md'
+                                      : appTheme === 'dark' ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900'
+                                      }`}
+                                  >
+                                    <Palette className="w-3.5 h-3.5" />
+                                    <span>Colors ({detectedColors.length})</span>
+                                  </button>
+                                </div>
+
+                                {/* View 1: Vector Shape Layers in Hierarchy Order */}
+                                {layerListViewMode === 'layers' && (
+                                  <div className="space-y-2 select-none">
+                                    <div className="flex items-center justify-between text-[10px] px-1 pb-0.5 font-medium text-slate-400">
+                                      <span className="flex items-center gap-1">
+                                        <GripVertical className="w-3.5 h-3.5 text-cyan-400" />
+                                        <span>Drag layer up or down to reorder</span>
+                                      </span>
+                                      <span className="text-[9px] font-mono font-semibold text-cyan-400 px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20">
+                                        Top = Front
+                                      </span>
+                                    </div>
+
+                                    {[...layerOrder].reverse().filter(id => !deletedLayerIds.includes(id)).map((layerId, displayIdx) => {
+                                      const layerObj = allSvgLayers.find(l => l.id === layerId) || {
+                                        id: layerId,
+                                        name: layerId.replace('_', ' ').toUpperCase(),
+                                        tag: 'shape',
+                                        color: '#38bdf8'
+                                      };
+                                      const isSelected = selectedLayerId === layerId || (selectedLayerIds && selectedLayerIds.includes(layerId));
+                                      const transform = layerTransforms[layerId] || { x: 0, y: 0, rotate: 0 };
+                                      const isMoved = transform.x !== 0 || transform.y !== 0;
+                                      const isRotated = transform.rotate !== 0;
+                                      const isDragging = draggedLayerIdx === displayIdx;
+                                      const isDragOver = dragOverLayerIdx === displayIdx && draggedLayerIdx !== displayIdx;
+
+                                      return (
+                                        <div
+                                          key={layerId}
+                                          draggable={true}
+                                          onDragStart={(e) => {
+                                            setDraggedLayerIdx(displayIdx);
+                                            e.dataTransfer.effectAllowed = 'move';
+                                            e.dataTransfer.setData('text/plain', String(displayIdx));
+                                          }}
+                                          onDragOver={(e) => {
+                                            e.preventDefault();
+                                            e.dataTransfer.dropEffect = 'move';
+                                            if (dragOverLayerIdx !== displayIdx) {
+                                              setDragOverLayerIdx(displayIdx);
+                                            }
+                                          }}
+                                          onDragLeave={(e) => {
+                                            if (e.currentTarget.contains(e.relatedTarget)) return;
+                                            if (dragOverLayerIdx === displayIdx) {
+                                              setDragOverLayerIdx(null);
+                                            }
+                                          }}
+                                          onDrop={(e) => {
+                                            e.preventDefault();
+                                            handleReorderLayers(draggedLayerIdx, displayIdx);
+                                            setDraggedLayerIdx(null);
+                                            setDragOverLayerIdx(null);
+                                          }}
+                                          onDragEnd={() => {
+                                            setDraggedLayerIdx(null);
+                                            setDragOverLayerIdx(null);
+                                          }}
+                                          onDoubleClick={(e) => {
+                                            e.stopPropagation();
+                                            setSelectedLayerId(layerId);
+                                            setSelectedLayerIds([layerId]);
+                                          }}
+                                          onClick={(e) => {
+                                            const currentGroups = layerGroupsRef.current || {};
+                                            const belongingGroup = Object.values(currentGroups).find(ids => ids.includes(layerId));
+                                            if (belongingGroup) {
+                                              if (e.ctrlKey || e.metaKey || e.shiftKey) {
+                                                setSelectedLayerIds(prev =>
+                                                  belongingGroup.every(x => prev.includes(x))
+                                                    ? prev.filter(x => !belongingGroup.includes(x))
+                                                    : Array.from(new Set([...prev, ...belongingGroup]))
+                                                );
+                                                setSelectedLayerId(belongingGroup[0]);
+                                              } else {
+                                                if (selectedLayerIds && selectedLayerIds.length === 1 && selectedLayerIds[0] === layerId) {
+                                                  // Already sub-selected
+                                                  setSelectedLayerId(layerId);
+                                                  setSelectedLayerIds([layerId]);
+                                                } else {
+                                                  setSelectedLayerId(belongingGroup[0]);
+                                                  setSelectedLayerIds(belongingGroup);
+                                                }
+                                              }
+                                            } else {
+                                              if (e.ctrlKey || e.metaKey || e.shiftKey) {
+                                                setSelectedLayerIds(prev =>
+                                                  prev.includes(layerId) ? prev.filter(x => x !== layerId) : [...prev, layerId]
+                                                );
+                                                setSelectedLayerId(layerId);
+                                              } else {
+                                                setSelectedLayerId(layerId);
+                                                setSelectedLayerIds([layerId]);
+                                              }
+                                            }
+                                          }}
+                                          className={`p-2.5 rounded-xl border transition-all cursor-grab active:cursor-grabbing flex items-center justify-between gap-2.5 select-none relative ${isDragging
+                                            ? 'opacity-30 scale-[0.98] border-dashed border-cyan-400 bg-cyan-950/20'
+                                            : isDragOver
+                                              ? 'ring-2 ring-cyan-400 bg-cyan-500/20 border-cyan-400 shadow-lg scale-[1.01]'
+                                              : isSelected
+                                                ? appTheme === 'dark'
+                                                  ? 'bg-slate-900 border-cyan-400 ring-2 ring-cyan-400/40 shadow-lg'
+                                                  : 'bg-white border-cyan-500 ring-2 ring-cyan-500/30 shadow-md'
+                                                : isMoved || isRotated
+                                                  ? appTheme === 'dark' ? 'bg-slate-900/80 border-cyan-500/40' : 'bg-cyan-50/50 border-cyan-300'
+                                                  : appTheme === 'dark' ? 'bg-[#0b0f19]/70 border-slate-800/80 hover:border-slate-700' : 'bg-white border-slate-200 hover:border-slate-300'
+                                            }`}
+                                        >
+                                          <div className="flex items-center gap-2 min-w-0 pointer-events-none">
+                                            <GripVertical className="w-4 h-4 text-slate-500 flex-shrink-0" />
+                                            <div
+                                              className="w-5 h-5 rounded-md border shadow flex-shrink-0"
+                                              style={{ backgroundColor: layerObj.color || '#38bdf8' }}
+                                            />
+                                            <div className="truncate">
+                                              <div className="flex items-center gap-1.5">
+                                                <span className={`text-xs font-semibold truncate ${appTheme === 'dark' ? 'text-slate-200' : 'text-slate-800'}`}>
+                                                  {layerObj.name}
+                                                </span>
+                                                <span className="text-[9px] font-mono text-slate-500">
+                                                  &lt;{layerObj.tag}&gt;
+                                                </span>
+                                                {isSelected && (
+                                                  <span className="text-[8px] font-semibold bg-cyan-500/20 text-cyan-400 px-1 py-0.5 rounded border border-cyan-500/30">
+                                                    Selected
+                                                  </span>
+                                                )}
+                                              </div>
+                                              {(isMoved || isRotated) && (
+                                                <div className="text-[9px] text-cyan-400 font-mono">
+                                                  {isMoved ? `Δ(${transform.x}, ${transform.y})` : ''} {isRotated ? `${transform.rotate}°` : ''}
+                                                </div>
+                                              )}
+                                            </div>
+                                          </div>
+
+                                          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                            <button
+                                              onClick={() => {
+                                                setSelectedLayerIds([layerId]);
+                                                setSelectedLayerId(layerId);
+                                                handleDuplicateSelectedLayers();
+                                              }}
+                                              title="Duplicate part (Ctrl + D)"
+                                              className={`p-1 rounded hover:bg-cyan-500/20 text-cyan-400 hover:text-cyan-300 transition`}
+                                            >
+                                              <Copy className="w-3.5 h-3.5" />
+                                            </button>
+                                            <button
+                                              onClick={() => {
+                                                setSelectedLayerIds([layerId]);
+                                                setSelectedLayerId(layerId);
+                                                handleDeleteSelectedLayers();
+                                              }}
+                                              title="Delete part"
+                                              className={`p-1 rounded hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition`}
+                                            >
+                                              <Trash2 className="w-3.5 h-3.5" />
+                                            </button>
+                                            <button
+                                              onClick={() => handleBringForward(layerId)}
+                                              title="Move layer up (1 step forward)"
+                                              className={`p-1 rounded hover:bg-slate-700/60 ${appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'}`}
+                                            >
+                                              <ArrowUp className="w-3.5 h-3.5" />
+                                            </button>
+                                            <button
+                                              onClick={() => handleSendBackward(layerId)}
+                                              title="Move layer down (1 step backward)"
+                                              className={`p-1 rounded hover:bg-slate-700/60 ${appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-slate-900'}`}
+                                            >
+                                              <ArrowDown className="w-3.5 h-3.5" />
+                                            </button>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+
+                                {/* View 2: Unique Colors List */}
+                                {layerListViewMode === 'colors' && (
+                                  <div className="space-y-2">
+                                    {detectedColors.map((item, idx) => {
+                                      const origColor = item.color;
+                                      const activeColor = adjustments.colorReplacements[origColor.toLowerCase()] || origColor;
+                                      const isModified = Boolean(adjustments.colorReplacements[origColor.toLowerCase()]);
+                                      const isSelected = activeSelectedColor?.toLowerCase() === origColor.toLowerCase();
+
+                                      return (
+                                        <div
+                                          key={origColor + idx}
+                                          onClick={() => {
+                                            setActiveSelectedColor(origColor);
+                                          }}
+                                          className={`p-3 rounded-xl border transition-all cursor-pointer ${isSelected
+                                            ? appTheme === 'dark' ? 'bg-slate-900 border-cyan-400 ring-2 ring-cyan-400/40 shadow-lg' : 'bg-white border-cyan-500 ring-2 ring-cyan-500/30 shadow-md'
+                                            : isModified
+                                              ? appTheme === 'dark' ? 'bg-slate-900/80 border-cyan-500/40' : 'bg-cyan-50/50 border-cyan-300'
+                                              : appTheme === 'dark' ? 'bg-[#0b0f19]/70 border-slate-800/80 hover:border-slate-700' : 'bg-white border-slate-200 hover:border-slate-300'
+                                            }`}
+                                        >
+                                          <div className="flex items-center justify-between gap-3 mb-2">
+                                            <div className="flex items-center gap-2.5">
+                                              <div
+                                                className="w-7 h-7 rounded-lg border shadow flex-shrink-0"
+                                                style={{ backgroundColor: activeColor }}
+                                              />
+                                              <div>
+                                                <div className="flex items-center gap-1.5">
+                                                  <span className={`font-mono text-xs font-bold uppercase ${appTheme === 'dark' ? 'text-slate-200' : 'text-slate-800'
+                                                    }`}>
+                                                    {activeColor}
+                                                  </span>
+                                                  {isSelected && (
+                                                    <span className="text-[8px] font-semibold bg-cyan-500/20 text-cyan-600 px-1.5 py-0.5 rounded border border-cyan-500/30">
+                                                      Active ✨
+                                                    </span>
+                                                  )}
+                                                </div>
+                                                <span className={`text-[9px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                                                  Orig: {origColor} &bull; {item.count} layer{item.count > 1 ? 's' : ''}
+                                                </span>
+                                              </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                                              <label className="cursor-pointer">
+                                                <input
+                                                  type="color"
+                                                  value={activeColor}
+                                                  onChange={(e) => handleColorChange(origColor, e.target.value)}
+                                                  className="sr-only"
+                                                />
+                                                <div className={`px-2 py-1 rounded-lg text-[11px] font-semibold transition ${appTheme === 'dark' ? 'bg-slate-800 hover:bg-slate-700 text-slate-200' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                                                  }`}>
+                                                  Pick
+                                                </div>
+                                              </label>
+                                              {isModified && (
+                                                <button
+                                                  onClick={() => handleResetSingleColor(origColor)}
+                                                  title="Reset layer"
+                                                  className={`p-1 rounded-lg ${appTheme === 'dark' ? 'bg-slate-800 text-slate-400 hover:text-white' : 'bg-slate-100 text-slate-500 hover:text-slate-900'
+                                                    }`}
+                                                >
+                                                  <Undo2 className="w-3 h-3" />
+                                                </button>
+                                              )}
+                                            </div>
+                                          </div>
+
+                                          {/* Quick dots */}
+                                          <div className={`flex items-center gap-1 pt-1.5 border-t overflow-x-auto no-scrollbar ${appTheme === 'dark' ? 'border-slate-800/40' : 'border-slate-100'
+                                            }`} onClick={(e) => e.stopPropagation()}>
+                                            {QUICK_SWATCHES.map((swatch) => (
+                                              <button
+                                                key={swatch.hex}
+                                                onClick={() => handleColorChange(origColor, swatch.hex)}
+                                                className="w-4 h-4 rounded-full border border-slate-400/40 hover:scale-125 transition-transform flex-shrink-0"
+                                                style={{ backgroundColor: swatch.hex }}
+                                                title={swatch.name}
+                                              />
+                                            ))}
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Global Monotone Recolor Override */}
+                        <div className={`mt-4 p-3.5 rounded-2xl border ${appTheme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'
+                          }`}>
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className={`text-xs font-semibold ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-800'}`}>Global Monotone Recolor</p>
+                              <p className={`text-[10px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>Pure solid monochrome tint for all paths</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="color"
+                                value={adjustments.customColor || '#38bdf8'}
+                                onChange={(e) => setAdjustments({ ...adjustments, customColor: e.target.value })}
+                                className="w-6 h-6 rounded cursor-pointer bg-transparent border-0"
+                                title="Global Custom Color"
+                              />
+                              {adjustments.customColor && (
+                                <button
+                                  onClick={() => setAdjustments({ ...adjustments, customColor: '' })}
+                                  className={`text-[10px] px-2 py-1 rounded ${appTheme === 'dark' ? 'text-slate-400 hover:text-white bg-slate-800' : 'text-slate-600 hover:text-slate-900 bg-slate-200'
+                                    }`}
+                                >
+                                  Clear
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* TAB 2: FILTERS (25+ VISUAL COLOR PRESETS) */}
+                {studioTab === 'filters' && (
+                  <div className="space-y-3.5">
+                    {/* Header & Reset Button */}
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
+                          }`}>
+                          <Wand2 className="w-3.5 h-3.5 text-cyan-500" /> {EFFECT_PRESETS.length}+ Visual Color Filters
+                        </h4>
+                        <p className={`text-[11px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                          Click any card to apply instant gradient tone &amp; aura glow
+                        </p>
+                      </div>
+
+                      <button
+                        onClick={handleResetEffectsPanel}
+                        className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition flex items-center gap-1.5 flex-shrink-0 ${appTheme === 'dark'
+                          ? 'text-slate-300 hover:text-white bg-slate-900 border-slate-800 hover:border-slate-700'
+                          : 'text-slate-700 hover:text-slate-900 bg-white border-slate-200 hover:bg-slate-50'
+                          }`}
+                        title="Reset all filters to original"
+                      >
+                        <Undo2 className="w-3 h-3 text-cyan-500" />
+                        <span>Reset</span>
+                      </button>
+                    </div>
+
+                    {/* New vs Classic / Old Version Toggle Bar */}
+                    <div className={`p-1 rounded-xl border flex items-center gap-1 ${appTheme === 'dark' ? 'bg-slate-900/90 border-slate-800' : 'bg-slate-100 border-slate-200'
+                      }`}>
+                      <button
+                        onClick={() => setFilterVersionFilter('all')}
+                        className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-semibold transition flex items-center justify-center gap-1 ${filterVersionFilter === 'all'
+                          ? (appTheme === 'dark' ? 'bg-cyan-500 text-slate-950 shadow-sm font-bold' : 'bg-blue-600 text-white shadow-sm font-bold')
+                          : (appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900')
+                          }`}
+                      >
+                        <span>All ({EFFECT_PRESETS.length})</span>
+                      </button>
+
+                      <button
+                        onClick={() => setFilterVersionFilter('new')}
+                        className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-semibold transition flex items-center justify-center gap-1 ${filterVersionFilter === 'new'
+                          ? 'bg-gradient-to-r from-amber-400 via-rose-400 to-pink-500 text-slate-950 shadow-md font-bold'
+                          : (appTheme === 'dark' ? 'text-amber-300 hover:text-white' : 'text-amber-700 hover:text-slate-900')
+                          }`}
+                      >
+                        <span>✨ New ({EFFECT_PRESETS.filter(p => p.isNew).length})</span>
+                      </button>
+
+                      <button
+                        onClick={() => setFilterVersionFilter('old')}
+                        className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-semibold transition flex items-center justify-center gap-1 ${filterVersionFilter === 'old'
+                          ? (appTheme === 'dark' ? 'bg-slate-800 text-slate-200 border border-slate-700 shadow-sm font-bold' : 'bg-white text-slate-900 border border-slate-300 shadow-sm font-bold')
+                          : (appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900')
+                          }`}
+                      >
+                        <span>📦 Classic</span>
+                      </button>
+                    </div>
+
+                    {/* Search Bar for Filters */}
+                    <div className="relative">
+                      <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                      <input
+                        type="text"
+                        placeholder="Search filters (e.g. Matrix, Sunset, Prism, Vintage, Gold)..."
+                        value={filterSearchTerm}
+                        onChange={(e) => setFilterSearchTerm(e.target.value)}
+                        className={`w-full pl-9 pr-8 py-2 rounded-xl text-xs border focus:outline-none focus:border-cyan-500 transition ${appTheme === 'dark'
+                          ? 'bg-slate-900 border-slate-800 text-slate-200 placeholder-slate-500'
+                          : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400'
+                          }`}
+                      />
+                      {filterSearchTerm && (
+                        <button
+                          onClick={() => setFilterSearchTerm('')}
+                          className="absolute right-2.5 top-2 text-slate-400 hover:text-white text-xs font-bold w-4 h-4 rounded-full bg-slate-800 flex items-center justify-center"
+                          title="Clear search"
+                        >
+                          &times;
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Filter Category Chips */}
+                    <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
+                      {['All', 'Neon & Cyber', 'Cinematic & Moody', 'Warm & Golden', 'Aesthetic & Pastel', 'Retro & Vintage'].map((cat) => {
+                        const isCatActive = filterCategory === cat;
+                        return (
+                          <button
+                            key={cat}
+                            onClick={() => setFilterCategory(cat)}
+                            className={`px-2.5 py-1 rounded-full text-[10px] font-semibold transition whitespace-nowrap ${isCatActive
+                              ? (appTheme === 'dark' ? 'bg-cyan-500 text-slate-950 shadow-sm font-bold' : 'bg-blue-600 text-white shadow-sm font-bold')
+                              : (appTheme === 'dark' ? 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800' : 'bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200')
+                              }`}
+                          >
+                            {cat}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* 2-Column Visual Filter Cards with Live Visual Preview Look on Every Button */}
+                    <div className="grid grid-cols-2 gap-2.5 max-h-[480px] overflow-y-auto pr-1">
+                      {filteredPresets.map((pst) => {
+                        const isCurrentActive = activeFilterPreset === pst.id || activeFilterPreset === pst.name;
+                        return (
+                          <button
+                            key={pst.id || pst.name}
+                            onClick={() => applyPreset(pst)}
+                            className={`p-2.5 rounded-2xl border text-left transition-all duration-300 ease-out hover:-translate-y-1 flex flex-col justify-between relative overflow-hidden group ${isCurrentActive
+                              ? (appTheme === 'dark'
+                                ? 'border-cyan-400 bg-cyan-500/10 shadow-[0_0_18px_rgba(6,182,212,0.3)] ring-2 ring-cyan-400'
+                                : 'border-blue-600 bg-blue-50 shadow-md ring-2 ring-blue-600')
+                              : (appTheme === 'dark'
+                                ? 'bg-slate-900/90 border-slate-800 hover:border-slate-700/80 hover:bg-slate-900 shadow-sm hover:shadow-[0_12px_24px_-4px_rgba(255,255,255,0.07)]'
+                                : 'bg-white border-slate-200 hover:border-slate-300/80 hover:shadow-lg hover:shadow-black/10 shadow-sm')
+                              }`}
+                          >
+                            {/* Live Visual Filter Preview Box */}
+                            <FilterCardThumbnail preset={pst} />
+
+                            <div className="w-full">
+                              <div className="flex items-center justify-between gap-1 mb-1">
+                                <span className={`text-xs font-bold truncate ${isCurrentActive
+                                  ? (appTheme === 'dark' ? 'text-cyan-300' : 'text-blue-700')
+                                  : (appTheme === 'dark' ? 'text-slate-200 group-hover:text-cyan-400' : 'text-slate-900 group-hover:text-blue-600')
+                                  }`}>
+                                  {pst.name}
+                                </span>
+                                {isCurrentActive && (
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
+                                )}
+                              </div>
+                              <p className={`text-[10px] leading-tight line-clamp-2 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'
+                                }`}>
+                                {pst.desc}
+                              </p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                      {filteredPresets.length === 0 && (
+                        <div className="col-span-2 py-8 text-center text-xs text-slate-400">
+                          No filters match "{filterSearchTerm}". Try another search term.
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Quick Fine-Tuning Mini-Sliders under Filters */}
+                    <div className={`p-3.5 rounded-2xl border space-y-3 ${appTheme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'
+                      }`}>
+                      <div className="flex items-center justify-between">
+                        <span className={`text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
+                          }`}>
+                          <Sliders className="w-3 h-3 text-cyan-500" /> Quick Fine-Tune
+                        </span>
+                        <button
+                          onClick={() => {
+                            setStudioTab('adjustment');
+                            setAdjustmentSubTab('gradient');
+                          }}
+                          className="text-[10px] text-cyan-500 hover:underline font-semibold"
+                        >
+                          Adjustment Sliders &rarr;
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <div className={`flex justify-between text-[11px] mb-0.5 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                            <span>Hue Shift</span>
+                            <span className="text-cyan-500 font-mono text-[10px] font-semibold">{adjustments.hue}&deg;</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="0"
+                            max="360"
+                            value={adjustments.hue}
+                            onChange={(e) => setAdjustments({ ...adjustments, hue: Number(e.target.value) })}
+                            className="hue-slider w-full"
+                          />
+                        </div>
+                        <div>
+                          <div className={`flex justify-between text-[11px] mb-0.5 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                            <span>Glow Aura</span>
+                            <span className="text-cyan-500 font-mono text-[10px] font-semibold">{adjustments.shadowBlur}px</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="0"
+                            max="60"
+                            value={adjustments.shadowBlur}
+                            onChange={(e) => setAdjustments({ ...adjustments, shadowBlur: Number(e.target.value) })}
+                            className="theme-slider w-full"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* TAB 3: EFFECTS (3D MATERIAL STYLES & FX) */}
+                {studioTab === 'effects' && (
+                  <div className="space-y-4">
+                    {/* Header with count and reset */}
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
+                          }`}>
+                          <Sparkles className="w-3.5 h-3.5 text-cyan-500" /> {STYLE_RENDER_MODES.length}+ 3D Material Styles &amp; FX
+                        </h4>
+                        <p className={`text-[11px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                          Diamond, Velvet, Wood, Lava, Clay, Mercury, Origami &amp; more
+                        </p>
+                      </div>
+
+                      <button
+                        onClick={handleResetEffectsPanel}
+                        className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition flex items-center gap-1.5 flex-shrink-0 ${appTheme === 'dark'
+                          ? 'text-slate-300 hover:text-white bg-slate-900 border-slate-800 hover:border-slate-700'
+                          : 'text-slate-700 hover:text-slate-900 bg-white border-slate-200 hover:bg-slate-50'
+                          }`}
+                        title="Reset all effects to original"
+                      >
+                        <Undo2 className="w-3 h-3 text-cyan-500" />
+                        <span>Reset</span>
+                      </button>
+                    </div>
+
+                    {/* New vs Classic / Old Version Toggle Bar for Effects */}
+                    <div className={`p-1 rounded-xl border flex items-center gap-1 ${appTheme === 'dark' ? 'bg-slate-900/90 border-slate-800' : 'bg-slate-100 border-slate-200'
+                      }`}>
+                      <button
+                        onClick={() => setEffectVersionFilter('all')}
+                        className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-semibold transition flex items-center justify-center gap-1 ${effectVersionFilter === 'all'
+                          ? (appTheme === 'dark' ? 'bg-cyan-500 text-slate-950 shadow-sm font-bold' : 'bg-blue-600 text-white shadow-sm font-bold')
+                          : (appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900')
+                          }`}
+                      >
+                        <span>All ({STYLE_RENDER_MODES.length})</span>
+                      </button>
+
+                      <button
+                        onClick={() => setEffectVersionFilter('new')}
+                        className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-semibold transition flex items-center justify-center gap-1 ${effectVersionFilter === 'new'
+                          ? 'bg-gradient-to-r from-amber-400 via-rose-400 to-pink-500 text-slate-950 shadow-md font-bold'
+                          : (appTheme === 'dark' ? 'text-amber-300 hover:text-white' : 'text-amber-700 hover:text-slate-900')
+                          }`}
+                      >
+                        <span>✨ New ({STYLE_RENDER_MODES.filter(m => m.isNew || NEW_EFFECT_IDS.has(m.id)).length})</span>
+                      </button>
+
+                      <button
+                        onClick={() => setEffectVersionFilter('old')}
+                        className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-semibold transition flex items-center justify-center gap-1 ${effectVersionFilter === 'old'
+                          ? (appTheme === 'dark' ? 'bg-slate-800 text-slate-200 border border-slate-700 shadow-sm font-bold' : 'bg-white text-slate-900 border border-slate-300 shadow-sm font-bold')
+                          : (appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900')
+                          }`}
+                      >
+                        <span>📦 Classic</span>
+                      </button>
+                    </div>
+
+                    {/* Search Bar for Effects */}
+                    <div className="relative">
+                      <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                      <input
+                        type="text"
+                        placeholder="Search material effects (e.g. Gold, Glass, Neon, Metal)..."
+                        value={effectSearchTerm}
+                        onChange={(e) => setEffectSearchTerm(e.target.value)}
+                        className={`w-full pl-9 pr-8 py-2 rounded-xl text-xs border focus:outline-none focus:border-cyan-500 transition ${appTheme === 'dark'
+                          ? 'bg-slate-900 border-slate-800 text-slate-200 placeholder-slate-500'
+                          : 'bg-white border-slate-200 text-slate-900 placeholder-slate-400'
+                          }`}
+                      />
+                      {effectSearchTerm && (
+                        <button
+                          onClick={() => setEffectSearchTerm('')}
+                          className="absolute right-2.5 top-2 text-slate-400 hover:text-white text-xs font-bold w-4 h-4 rounded-full bg-slate-800 flex items-center justify-center"
+                          title="Clear search"
+                        >
+                          &times;
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Style Category Filter Chips */}
+                    <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
+                      {['All', 'Anime & Manga', 'Cartoon & Comic', '3D & Inflatable', 'Glass & Water', 'Fire & Metal', 'Craft & Texture', 'Cyber & Neon', 'Silhouette & Vector'].map((cat) => {
+                        const isCatActive = effectCategory === cat;
+                        return (
+                          <button
+                            key={cat}
+                            onClick={() => setEffectCategory(cat)}
+                            className={`px-2.5 py-1 rounded-full text-[10px] font-semibold transition whitespace-nowrap ${isCatActive
+                              ? (appTheme === 'dark' ? 'bg-cyan-500 text-slate-950 shadow-sm font-bold' : 'bg-blue-600 text-white shadow-sm font-bold')
+                              : (appTheme === 'dark' ? 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800' : 'bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200')
+                              }`}
+                          >
+                            {cat}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Status banner: Shows whether effect is applying to Selected Part or Entire Canvas */}
+                    {(() => {
+                      const targetIds = (selectedLayerIds && selectedLayerIds.length > 0)
+                        ? selectedLayerIds
+                        : (selectedLayerId ? [selectedLayerId] : []);
+                      const isPartSelected = targetIds.length > 0;
+                      const primaryId = isPartSelected ? String(targetIds[0]).replace(/^pf_studio_/i, '') : null;
+                      const selectedPart = primaryId ? svgLayers.find(l => String(l.id).replace(/^pf_studio_/i, '') === primaryId) : null;
+
+                      return isPartSelected ? (
+                        <div className={`p-2.5 rounded-xl border flex items-center justify-between text-xs transition ${appTheme === 'dark' ? 'bg-cyan-500/10 border-cyan-500/30' : 'bg-blue-50 border-blue-200'
+                          }`}>
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse flex-shrink-0" />
+                            <span className={`font-semibold truncate text-[11px] ${appTheme === 'dark' ? 'text-cyan-300' : 'text-blue-800'}`}>
+                              Selected Part: <span className="underline">{targetIds.length === 1 ? (selectedPart?.name || 'Part 1') : `${targetIds.length} Parts`}</span> (Effect applies only here)
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => { setSelectedLayerIds([]); setSelectedLayerId(null); }}
+                            className={`text-[10px] font-bold underline flex-shrink-0 ml-2 ${appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                              }`}
+                            title="Deselect to apply effect to entire canvas"
+                          >
+                            Deselect
+                          </button>
+                        </div>
+                      ) : (
+                        <div className={`p-2 rounded-xl border flex items-center gap-1.5 text-[11px] ${appTheme === 'dark' ? 'bg-slate-900/60 border-slate-800 text-slate-400' : 'bg-slate-100 border-slate-200 text-slate-600'
+                          }`}>
+                          <Layers className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                          <span>Applying to Entire Canvas. Click any part on canvas to apply effect only to that part.</span>
+                        </div>
+                      );
+                    })()}
+
+                    {/* 2-Column Material & Style Cards with Live Visual Preview */}
+                    <div className="grid grid-cols-2 gap-2.5 max-h-[500px] overflow-y-auto pr-1">
+                      {filteredStyleModes.map((preset) => {
+                        const targetIds = (selectedLayerIds && selectedLayerIds.length > 0)
+                          ? selectedLayerIds
+                          : (selectedLayerId ? [selectedLayerId] : []);
+                        const isPartSelected = targetIds.length > 0;
+                        const primaryId = isPartSelected ? String(targetIds[0]).replace(/^pf_studio_/i, '') : null;
+                        const currentPartLook = primaryId && layerStyles[primaryId]?.styleMode;
+                        const effectiveActiveLook = isPartSelected ? (currentPartLook || 'original') : activeStyleMode;
+                        const isCurrentActive = effectiveActiveLook === preset.id;
+                        const isNew = preset.isNew || NEW_EFFECT_IDS.has(preset.id);
+                        return (
+                          <button
+                            key={preset.id}
+                            onClick={() => handleSelectStyleLook(preset)}
+                            className={`p-2.5 rounded-2xl border text-left transition-all duration-300 ease-out hover:-translate-y-1 flex flex-col justify-between relative overflow-hidden group ${isCurrentActive
+                              ? (appTheme === 'dark'
+                                ? 'border-cyan-400 bg-cyan-500/10 shadow-[0_0_18px_rgba(6,182,212,0.3)] ring-2 ring-cyan-400'
+                                : 'border-blue-600 bg-blue-50 shadow-md ring-2 ring-blue-600')
+                              : (appTheme === 'dark'
+                                ? 'bg-slate-900/90 border-slate-800 hover:border-slate-700/80 hover:bg-slate-900 shadow-sm hover:shadow-[0_12px_24px_-4px_rgba(255,255,255,0.07)]'
+                                : 'bg-white border-slate-200 hover:border-slate-300/80 hover:shadow-lg hover:shadow-black/10 shadow-sm')
+                              }`}
+                          >
+                            <EffectCardThumbnail preset={preset} />
+
+                            <div className="w-full">
+                              <div className="flex items-center justify-between gap-1 mb-1">
+                                <span className={`text-xs font-bold truncate ${isCurrentActive
+                                  ? (appTheme === 'dark' ? 'text-cyan-300' : 'text-blue-700')
+                                  : (appTheme === 'dark' ? 'text-slate-200 group-hover:text-cyan-400' : 'text-slate-900 group-hover:text-blue-600')
+                                  }`}>
+                                  {preset.name}
+                                </span>
+                                {isCurrentActive && (
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
+                                )}
+                              </div>
+                              <p className={`text-[10px] leading-tight line-clamp-2 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'
+                                }`}>
+                                {preset.desc}
+                              </p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                      {filteredStyleModes.length === 0 && (
+                        <div className="col-span-2 py-8 text-center text-xs text-slate-400">
+                          No effects match "{effectSearchTerm}". Try another search term.
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -8876,8 +9049,8 @@ export default function App() {
                         <p className={`text-xs font-semibold ${appTheme === 'dark' ? 'text-slate-200' : 'text-slate-800'}`}>Transparent Background</p>
                         <p className={`text-[11px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
                           {exportFormat === 'jpeg'
-                            ? 'JPEG transparency support nahi karta (Solid White apply hoga).'
-                            : 'Background transparent rahega bina solid color ke.'}
+                            ? 'JPEG does not support transparency (solid white will be applied).'
+                            : 'Renders transparent background without solid color.'}
                         </p>
                       </div>
                       <input
@@ -8890,16 +9063,14 @@ export default function App() {
                     </div>
 
                     {/* Auto-Fit Canvas to All Elements Toggle (Illustrator Style) */}
-                    <div className={`p-3.5 rounded-2xl border transition-all ${
-                      autoFitToElements 
+                    <div className={`p-3.5 rounded-2xl border transition-all ${autoFitToElements
                         ? (appTheme === 'dark' ? 'bg-cyan-950/20 border-cyan-500/40 shadow-sm' : 'bg-cyan-50/50 border-cyan-300 shadow-sm')
                         : (appTheme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200')
-                    }`}>
+                      }`}>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2.5 pr-2">
-                          <div className={`p-2 rounded-xl flex-shrink-0 transition-colors ${
-                            autoFitToElements ? 'bg-cyan-500/20 text-cyan-400' : 'bg-slate-800 text-slate-400'
-                          }`}>
+                          <div className={`p-2 rounded-xl flex-shrink-0 transition-colors ${autoFitToElements ? 'bg-cyan-500/20 text-cyan-400' : 'bg-slate-800 text-slate-400'
+                            }`}>
                             <Maximize2 className="w-4 h-4" />
                           </div>
                           <div>
@@ -8912,7 +9083,7 @@ export default function App() {
                               </span>
                             </div>
                             <p className={`text-[11px] leading-tight mt-0.5 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                              Door-door rakhe sabhi parts ko bina cut kiye frame me fit karega.
+                              Fits all elements into frame without clipping, even when widely spaced.
                             </p>
                           </div>
                         </div>
@@ -8940,11 +9111,10 @@ export default function App() {
                                 setAutoFitFrameMode('tight');
                                 localStorage.setItem('iconderry_autofit_mode', 'tight');
                               }}
-                              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition ${
-                                autoFitFrameMode === 'tight'
+                              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition ${autoFitFrameMode === 'tight'
                                   ? 'bg-cyan-500 text-slate-950 shadow-sm'
                                   : appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
-                              }`}
+                                }`}
                               title="Frame ends closely right where outermost elements end (No empty space)"
                             >
                               Tight Crop (No empty space)
@@ -8955,11 +9125,10 @@ export default function App() {
                                 setAutoFitFrameMode('square');
                                 localStorage.setItem('iconderry_autofit_mode', 'square');
                               }}
-                              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition ${
-                                autoFitFrameMode === 'square'
+                              className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition ${autoFitFrameMode === 'square'
                                   ? 'bg-cyan-500 text-slate-950 shadow-sm'
                                   : appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
-                              }`}
+                                }`}
                               title="Pad with equal borders into a 1:1 Square"
                             >
                               Square 1:1
@@ -9136,7 +9305,7 @@ export default function App() {
                               </span>
                             </div>
                             <p className={`text-[10px] ${appTheme === 'dark' ? 'text-slate-500' : 'text-slate-500'}`}>
-                              * WebP aur JPEG me compression image ko web speed ke liye optimize karta hai.
+                              * WebP and JPEG compression optimizes files for faster web loading.
                             </p>
                           </div>
 
@@ -9157,8 +9326,8 @@ export default function App() {
 
                             <p className={`text-[10px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
                               {isTransparent
-                                ? 'Notice: Upar "Transparent Background" uncheck karne par ye background render hoga.'
-                                : 'Active background: Download hone wali file me ye background apply hoga.'}
+                                ? 'Notice: Uncheck "Transparent Background" above to render this custom background.'
+                                : 'Active background: This background will be applied in your downloaded export.'}
                             </p>
 
                             {/* Solid vs Gradient Switcher */}
@@ -9694,9 +9863,8 @@ export default function App() {
       {isAddElementModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/75 backdrop-blur-md animate-in fade-in duration-200">
           <div
-            className={`w-full max-w-3xl max-h-[85vh] rounded-3xl border shadow-2xl flex flex-col overflow-hidden ${
-              appTheme === 'dark' ? 'bg-[#0d1527] border-slate-700/80 text-slate-100' : 'bg-white border-slate-200 text-slate-900'
-            }`}
+            className={`w-full max-w-3xl max-h-[85vh] rounded-3xl border shadow-2xl flex flex-col overflow-hidden ${appTheme === 'dark' ? 'bg-[#0d1527] border-slate-700/80 text-slate-100' : 'bg-white border-slate-200 text-slate-900'
+              }`}
           >
             {/* Header */}
             <div className="p-4 sm:p-5 border-b border-slate-700/30 flex items-center justify-between flex-shrink-0">
@@ -9713,9 +9881,8 @@ export default function App() {
               </div>
               <button
                 onClick={() => setIsAddElementModalOpen(false)}
-                className={`p-2 rounded-xl border transition ${
-                  appTheme === 'dark' ? 'border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-white' : 'border-slate-200 hover:bg-slate-100 text-slate-600'
-                }`}
+                className={`p-2 rounded-xl border transition ${appTheme === 'dark' ? 'border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-white' : 'border-slate-200 hover:bg-slate-100 text-slate-600'
+                  }`}
               >
                 <X className="w-4 h-4" />
               </button>
@@ -9730,9 +9897,8 @@ export default function App() {
                   placeholder="Search elements by title or tag..."
                   value={addElementSearch}
                   onChange={(e) => setAddElementSearch(e.target.value)}
-                  className={`w-full border rounded-xl pl-10 pr-3.5 py-2 text-xs focus:outline-none focus:border-cyan-500 transition ${
-                    appTheme === 'dark' ? 'bg-slate-900/90 border-slate-800 text-slate-100 placeholder-slate-500' : 'bg-slate-50 border-slate-200 text-slate-900'
-                  }`}
+                  className={`w-full border rounded-xl pl-10 pr-3.5 py-2 text-xs focus:outline-none focus:border-cyan-500 transition ${appTheme === 'dark' ? 'bg-slate-900/90 border-slate-800 text-slate-100 placeholder-slate-500' : 'bg-slate-50 border-slate-200 text-slate-900'
+                    }`}
                 />
               </div>
               <div className="flex gap-1.5 overflow-x-auto no-scrollbar py-0.5">
@@ -9740,11 +9906,10 @@ export default function App() {
                   <button
                     key={cat}
                     onClick={() => setAddElementCategory(cat)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
-                      addElementCategory === cat
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition ${addElementCategory === cat
                         ? 'bg-cyan-500 text-slate-950 font-bold shadow'
                         : appTheme === 'dark' ? 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800' : 'bg-slate-100 text-slate-600 border border-slate-200'
-                    }`}
+                      }`}
                   >
                     {cat}
                   </button>
@@ -9767,11 +9932,10 @@ export default function App() {
                 <button
                   key={item.id}
                   onClick={() => handleInsertElementFromLibrary(item)}
-                  className={`p-3 rounded-2xl border text-left flex flex-col items-center justify-between transition-all duration-200 hover:-translate-y-1 group relative ${
-                    appTheme === 'dark'
+                  className={`p-3 rounded-2xl border text-left flex flex-col items-center justify-between transition-all duration-200 hover:-translate-y-1 group relative ${appTheme === 'dark'
                       ? 'bg-slate-900/80 border-slate-800 hover:border-cyan-400 hover:shadow-lg hover:shadow-cyan-950/40'
                       : 'bg-slate-50 border-slate-200 hover:border-blue-500 hover:shadow-lg'
-                  }`}
+                    }`}
                 >
                   <div
                     className="w-20 h-20 sm:w-24 sm:h-24 flex items-center justify-center p-2 mb-2 [&>svg]:w-full [&>svg]:h-full transition-transform group-hover:scale-105 pointer-events-none"
@@ -9790,6 +9954,198 @@ export default function App() {
                   </div>
                 </button>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Canvas Help & Navigation Guide Modal */}
+      {isHelpModalOpen && (
+        <div
+          onClick={() => setIsHelpModalOpen(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className={`w-full max-w-3xl max-h-[88vh] rounded-3xl border shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-150 ${appTheme === 'dark' ? 'bg-[#0d1527] border-slate-700/80 text-slate-100' : 'bg-white border-slate-200 text-slate-900'
+              }`}
+          >
+            {/* Modal Header */}
+            <div className="p-4 sm:p-5 border-b border-slate-700/30 flex items-center justify-between flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 shadow-sm">
+                  <HelpCircle className="w-5 h-5 sm:w-6 sm:h-6" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-bold flex items-center gap-2">
+                    <span>Navigation & Shortcuts Guide</span>
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
+                      Help
+                    </span>
+                  </h3>
+                  <p className={`text-xs ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                    Complete guide for canvas navigation, gestures, and keyboard shortcuts
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsHelpModalOpen(false)}
+                className={`p-2 rounded-xl border transition ${appTheme === 'dark' ? 'border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-white' : 'border-slate-200 hover:bg-slate-100 text-slate-600'
+                  }`}
+                title="Close (Esc)"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Search Bar & Mode Tabs */}
+            <div className="p-3.5 sm:p-4 border-b border-slate-700/20 flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between flex-shrink-0">
+              {/* Real-time Search Bar */}
+              <div className="relative flex-1">
+                <Search className="absolute left-3.5 top-2.5 text-slate-400 w-4 h-4" />
+                <input
+                  type="text"
+                  placeholder="Search shortcuts, gestures, or actions (e.g. zoom, copy, drag, rotate)..."
+                  value={helpSearchQuery}
+                  onChange={(e) => setHelpSearchQuery(e.target.value)}
+                  className={`w-full border rounded-xl pl-10 pr-9 py-2 text-xs focus:outline-none focus:border-cyan-500 transition ${appTheme === 'dark' ? 'bg-slate-900/90 border-slate-800 text-slate-100 placeholder-slate-500' : 'bg-slate-50 border-slate-200 text-slate-900'
+                    }`}
+                  autoFocus
+                />
+                {helpSearchQuery && (
+                  <button
+                    onClick={() => setHelpSearchQuery('')}
+                    className="absolute right-3 top-2.5 text-slate-400 hover:text-white"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* 1st Tab: PC (Default), 2nd Tab: Mobile */}
+              <div className={`flex items-center p-1 rounded-2xl border flex-shrink-0 ${appTheme === 'dark' ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-100 border-slate-200'
+                }`}>
+                <button
+                  type="button"
+                  onClick={() => setHelpActiveTab('pc')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${helpActiveTab === 'pc'
+                      ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/30'
+                      : appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                >
+                  <Monitor className="w-3.5 h-3.5" />
+                  <span>PC / Desktop</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHelpActiveTab('mobile')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${helpActiveTab === 'mobile'
+                      ? 'bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/30'
+                      : appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                >
+                  <Smartphone className="w-3.5 h-3.5" />
+                  <span>Mobile / Touch</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Body Content List */}
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-6">
+              {(() => {
+                const q = helpSearchQuery.trim().toLowerCase();
+                const sourceList = helpActiveTab === 'pc' ? PC_HELP_GUIDE : MOBILE_HELP_GUIDE;
+                const filtered = sourceList.map(cat => ({
+                  ...cat,
+                  items: cat.items.filter(item => {
+                    if (!q) return true;
+                    const matchTitle = item.title.toLowerCase().includes(q);
+                    const matchDesc = item.desc.toLowerCase().includes(q);
+                    const matchKeys = (item.keys || [item.gesture || '']).some(k => k.toLowerCase().includes(q));
+                    const matchCat = cat.category.toLowerCase().includes(q);
+                    return matchTitle || matchDesc || matchKeys || matchCat;
+                  })
+                })).filter(cat => cat.items.length > 0);
+
+                if (filtered.length === 0) {
+                  return (
+                    <div className="py-12 text-center">
+                      <p className="text-sm font-semibold text-slate-400">No shortcuts or commands found matching "{helpSearchQuery}".</p>
+                      <button
+                        onClick={() => setHelpSearchQuery('')}
+                        className="mt-3 text-xs text-cyan-400 hover:underline"
+                      >
+                        Clear search
+                      </button>
+                    </div>
+                  );
+                }
+
+                return filtered.map((cat, idx) => (
+                  <div key={idx} className="space-y-2.5">
+                    <h4 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-2 ${appTheme === 'dark' ? 'text-cyan-400/90' : 'text-cyan-700'
+                      }`}>
+                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                      <span>{cat.category}</span>
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                      {cat.items.map((item, itemIdx) => (
+                        <div
+                          key={itemIdx}
+                          className={`p-3 rounded-2xl border transition-all flex flex-col justify-between gap-2 ${appTheme === 'dark'
+                              ? 'bg-slate-900/60 border-slate-800/80 hover:border-slate-700'
+                              : 'bg-slate-50/80 border-slate-200/90 hover:border-slate-300'
+                            }`}
+                        >
+                          <div>
+                            <span className="text-xs font-bold block">{item.title}</span>
+                            <span className={`text-[11px] block mt-0.5 leading-relaxed ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'
+                              }`}>
+                              {item.desc}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-1.5 flex-wrap pt-1">
+                            {item.keys ? (
+                              item.keys.map((k, kIdx) => (
+                                <span
+                                  key={kIdx}
+                                  className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-md border shadow-sm ${appTheme === 'dark'
+                                      ? 'bg-slate-950 text-cyan-300 border-slate-700'
+                                      : 'bg-white text-slate-800 border-slate-300'
+                                    }`}
+                                >
+                                  {k}
+                                </span>
+                              ))
+                            ) : (
+                              <span
+                                className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border shadow-sm ${appTheme === 'dark'
+                                    ? 'bg-cyan-950/40 text-cyan-300 border-cyan-800/50'
+                                    : 'bg-cyan-50 text-cyan-700 border-cyan-200'
+                                  }`}
+                              >
+                                {item.gesture}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ));
+              })()}
+            </div>
+
+            {/* Modal Footer Tip */}
+            <div className={`p-3.5 px-5 border-t border-slate-700/20 text-center flex items-center justify-between text-xs flex-shrink-0 ${appTheme === 'dark' ? 'bg-slate-950/40 text-slate-400' : 'bg-slate-50 text-slate-600'
+              }`}>
+              <span>Tip: Click or drag any element on the canvas for instant live editing.</span>
+              <button
+                onClick={() => setIsHelpModalOpen(false)}
+                className="font-bold text-cyan-400 hover:text-cyan-300 text-xs px-3 py-1 rounded-lg hover:bg-cyan-500/10 transition"
+              >
+                Got it
+              </button>
             </div>
           </div>
         </div>
@@ -9963,11 +10319,10 @@ function ColorWheelPopover({ popover, onClose, onColorChange, appTheme }) {
       ref={popoverRef}
       role="dialog"
       aria-label="Color Wheel Popover"
-      className={`fixed z-[9999] rounded-2xl border p-3.5 shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150 select-none ${
-        appTheme === 'dark'
+      className={`fixed z-[9999] rounded-2xl border p-3.5 shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150 select-none ${appTheme === 'dark'
           ? 'bg-slate-950/95 border-slate-800 text-slate-100 ring-1 ring-white/10'
           : 'bg-white/95 border-slate-200 text-slate-900 ring-1 ring-black/5'
-      }`}
+        }`}
       style={{
         left: `${clampedX}px`,
         bottom: `${bottomPos}px`,
@@ -10065,11 +10420,10 @@ function ColorWheelPopover({ popover, onClose, onColorChange, appTheme }) {
             onChange={handleHexInput}
             maxLength={7}
             placeholder="#38bdf8"
-            className={`w-full text-xs font-mono font-bold px-2 py-1 rounded-lg border focus:outline-none focus:border-cyan-400 uppercase ${
-              appTheme === 'dark'
+            className={`w-full text-xs font-mono font-bold px-2 py-1 rounded-lg border focus:outline-none focus:border-cyan-400 uppercase ${appTheme === 'dark'
                 ? 'bg-slate-900 border-slate-700 text-white'
                 : 'bg-slate-50 border-slate-300 text-slate-900'
-            }`}
+              }`}
           />
         </div>
         {/* Native color picker button as quick alternative */}
@@ -10095,9 +10449,8 @@ function ColorWheelPopover({ popover, onClose, onColorChange, appTheme }) {
             key={c}
             onClick={() => handleQuickColor(c)}
             title={c}
-            className={`w-4 h-4 rounded-full border transition-transform hover:scale-125 cursor-pointer ${
-              hexVal.toLowerCase() === c.toLowerCase() ? 'ring-2 ring-cyan-400 scale-110' : 'border-black/20'
-            }`}
+            className={`w-4 h-4 rounded-full border transition-transform hover:scale-125 cursor-pointer ${hexVal.toLowerCase() === c.toLowerCase() ? 'ring-2 ring-cyan-400 scale-110' : 'border-black/20'
+              }`}
             style={{ backgroundColor: c }}
           />
         ))}

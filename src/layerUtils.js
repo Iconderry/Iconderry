@@ -442,7 +442,7 @@ export function calculateArtworkBounds(
   let maxY = -Infinity;
   let usedBBox = false;
 
-  // Helper to calculate effect spread for an element (glow, blur, stroke) in SVG viewBox space
+  // Helper to calculate effect spread for an element (glow, blur, stroke, shadow offsets) in SVG viewBox space
   const getNodeSpread = (node) => {
     const rawId = node.getAttribute('data-layer-id');
     const cleanId = rawId ? String(rawId).replace(/^pf_studio_/i, '') : '';
@@ -452,16 +452,51 @@ export function calculateArtworkBounds(
     // 1. Glow Spread (per-layer + global shadowBlur)
     let glowRadius = globalGlowRadius;
     if (style.glow && style.glow.enabled) {
-      glowRadius = Math.max(glowRadius, Number(style.glow.radius !== undefined ? style.glow.radius : 12));
+      glowRadius = Math.max(glowRadius, Number(style.glow.radius !== undefined ? style.glow.radius : 14));
     }
     const inlineFilter = (node.getAttribute('style') || '') + ' ' + (node.style?.filter || '');
-    const dsMatch = inlineFilter.match(/drop-shadow\([^)]*?\s([0-9.]+)px/i);
-    if (dsMatch && dsMatch[1]) {
-      glowRadius = Math.max(glowRadius, Number(dsMatch[1]));
+    let dsDx = 0;
+    let dsDy = 0;
+    const dsDetailedMatch = inlineFilter.match(/drop-shadow\(\s*([-\d.]+)px\s+([-\d.]+)px\s+([-\d.]+)px/i);
+    if (dsDetailedMatch) {
+      dsDx = Math.abs(parseFloat(dsDetailedMatch[1]) || 0);
+      dsDy = Math.abs(parseFloat(dsDetailedMatch[2]) || 0);
+      glowRadius = Math.max(glowRadius, parseFloat(dsDetailedMatch[3]) || 0);
+    } else {
+      const dsSimpleMatch = inlineFilter.match(/drop-shadow\([^)]*?\s([0-9.]+)px/i);
+      if (dsSimpleMatch && dsSimpleMatch[1]) {
+        glowRadius = Math.max(glowRadius, Number(dsSimpleMatch[1]));
+      }
     }
-    // Drop shadow light diffuses out to ~2.0x radius in all directions
-    const effectiveGlowRadius = Math.max(glowRadius, glowRadius * scaleX);
-    const glowSpread = glowRadius > 0 ? (effectiveGlowRadius * 2.0) : 0;
+
+    // Inspect SVG <filter> definition if element uses filter="url(#...)"
+    const filterAttr = node.getAttribute('filter') || '';
+    const filterUrlMatch = filterAttr.match(/url\(#([^)]+)\)/i);
+    if (filterUrlMatch && filterUrlMatch[1]) {
+      try {
+        const filterEl = svgEl.querySelector(`filter[id="${filterUrlMatch[1]}"]`);
+        if (filterEl) {
+          const feBlur = filterEl.querySelector('feGaussianBlur');
+          if (feBlur) {
+            const stdDev = parseFloat(feBlur.getAttribute('stdDeviation') || '0') || 0;
+            glowRadius = Math.max(glowRadius, stdDev);
+          }
+          const feDrop = filterEl.querySelector('feDropShadow');
+          if (feDrop) {
+            const stdDev = parseFloat(feDrop.getAttribute('stdDeviation') || '0') || 0;
+            const dx = Math.abs(parseFloat(feDrop.getAttribute('dx') || '0') || 0);
+            const dy = Math.abs(parseFloat(feDrop.getAttribute('dy') || '0') || 0);
+            dsDx = Math.max(dsDx, dx);
+            dsDy = Math.max(dsDy, dy);
+            glowRadius = Math.max(glowRadius, stdDev);
+          }
+        }
+      } catch (_) {}
+    }
+
+    // Drop shadow light diffuses out: Gaussian tails (3.5x radius) + shadow offset
+    const effectiveGlowRadius = Math.max(glowRadius, glowRadius * Math.max(scaleX, 1));
+    const glowSpread = glowRadius > 0 ? (effectiveGlowRadius * 3.5 + Math.max(dsDx, dsDy) + 12) : (Math.max(dsDx, dsDy) > 0 ? Math.max(dsDx, dsDy) + 8 : 0);
 
     // 2. Blur Spread (per-layer + global blur)
     let blurRadius = globalBlurRadius;
@@ -472,15 +507,15 @@ export function calculateArtworkBounds(
     if (blurMatch && blurMatch[1]) {
       blurRadius = Math.max(blurRadius, Number(blurMatch[1]));
     }
-    // Gaussian blur 3-sigma tails spread out to ~2.8x radius in all directions
-    const effectiveBlurRadius = Math.max(blurRadius, blurRadius * scaleY);
-    const blurSpread = blurRadius > 0 ? (effectiveBlurRadius * 2.8) : 0;
+    // Gaussian blur 3-sigma tails spread out to ~3.5x radius in all directions
+    const effectiveBlurRadius = Math.max(blurRadius, blurRadius * Math.max(scaleY, 1));
+    const blurSpread = blurRadius > 0 ? (effectiveBlurRadius * 3.5 + 12) : 0;
 
-    // 3. Stroke Spread (stroke-width / 2 + miter safety)
+    // 3. Stroke Spread (stroke-width + miter safety)
     const strokeAttr = parseFloat(node.getAttribute('stroke-width') || node.style?.strokeWidth || '0') || 0;
     const customStrokeW = style.strokeWidth !== undefined ? parseFloat(style.strokeWidth) : 0;
     const strokeW = Math.max(strokeAttr, customStrokeW);
-    const strokeSpread = strokeW > 0 ? strokeW : 0;
+    const strokeSpread = strokeW > 0 ? (strokeW * 1.5 + 4) : 0;
 
     return glowSpread + blurSpread + strokeSpread;
   };
@@ -566,11 +601,11 @@ export function calculateArtworkBounds(
 
   if (contentWidth <= 0 || contentHeight <= 0) return null;
 
-  // Comfortable breathing padding so the frame cuts "thodi door" from all elements
-  // Ensures at least 8% margin (or minimum 20 units) around all elements
-  const padRatio = Math.max(Number(paddingPercent) || 0.08, 0.08);
+  // Generous breathing frame padding ("thodi door par cut hona chaiye")
+  // Ensures elements, outer glows, shadows, and blur are comfortably spaced inside the frame
+  const padRatio = Math.max(Number(paddingPercent) || 0.12, 0.12);
   const maxContentDim = Math.max(contentWidth, contentHeight);
-  const pad = Math.max(maxContentDim * padRatio, Math.min(24, maxContentDim * 0.15));
+  const pad = Math.max(maxContentDim * padRatio, 28);
 
   const paddedMinX = svgMinX - pad;
   const paddedMinY = svgMinY - pad;
@@ -591,7 +626,7 @@ export function calculateArtworkBounds(
     };
   }
 
-  // TIGHT CROPPED BOUNDS: Frame ends with comfortable breathing padding around outermost elements
+  // TIGHT CROPPED BOUNDS: Frame ends with comfortable breathing padding around outermost elements and glows
   return {
     minX: Number(paddedMinX.toFixed(2)),
     minY: Number(paddedMinY.toFixed(2)),
