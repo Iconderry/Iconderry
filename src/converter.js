@@ -623,70 +623,86 @@ function mat4Multiply(out, a, b) {
   return out;
 }
 
-function render3DWithWebGL(imageSource, targetWidth, targetHeight, adjustments, drawWidth, drawHeight) {
-  // Cap WebGL canvas to max 3840 (or device MAX_TEXTURE_SIZE) for rock-solid stability and zero memory overflow at 8K
-  let maxTexSize = 4096;
-  try {
-    const testC = document.createElement('canvas');
-    const testGl = testC.getContext('webgl');
-    if (testGl) {
-      maxTexSize = testGl.getParameter(testGl.MAX_TEXTURE_SIZE) || 4096;
-    }
-  } catch (_) {}
+let _sharedGlCanvas = null;
+let _sharedGl = null;
+let _sharedGlProgram = null;
+let _sharedPosBuf = null;
+let _sharedTexBuf = null;
+let _sharedTexture = null;
+let _uMatrixLoc = null;
 
+function render3DWithWebGL(imageSource, targetWidth, targetHeight, adjustments, drawWidth, drawHeight) {
+  let maxTexSize = 4096;
+  if (!_sharedGlCanvas || !_sharedGl || _sharedGl.isContextLost()) {
+    _sharedGlCanvas = document.createElement('canvas');
+    _sharedGl = _sharedGlCanvas.getContext('webgl', { 
+      antialias: true, 
+      alpha: true, 
+      premultipliedAlpha: false,
+      preserveDrawingBuffer: true 
+    });
+    if (_sharedGl) {
+      const gl = _sharedGl;
+      maxTexSize = gl.getParameter(gl.MAX_TEXTURE_SIZE) || 4096;
+
+      const vsSource = `
+        attribute vec2 a_position;
+        attribute vec2 a_texCoord;
+        uniform mat4 u_matrix;
+        varying vec2 v_texCoord;
+        void main() {
+          gl_Position = u_matrix * vec4(a_position, 0.0, 1.0);
+          v_texCoord = a_texCoord;
+        }
+      `;
+      const fsSource = `
+        precision mediump float;
+        uniform sampler2D u_texture;
+        varying vec2 v_texCoord;
+        void main() {
+          gl_FragColor = texture2D(u_texture, v_texCoord);
+        }
+      `;
+
+      function compileShader(type, src) {
+        const s = gl.createShader(type);
+        gl.shaderSource(s, src);
+        gl.compileShader(s);
+        return s;
+      }
+
+      const vs = compileShader(gl.VERTEX_SHADER, vsSource);
+      const fs = compileShader(gl.FRAGMENT_SHADER, fsSource);
+      _sharedGlProgram = gl.createProgram();
+      gl.attachShader(_sharedGlProgram, vs);
+      gl.attachShader(_sharedGlProgram, fs);
+      gl.linkProgram(_sharedGlProgram);
+      gl.useProgram(_sharedGlProgram);
+
+      _sharedPosBuf = gl.createBuffer();
+      _sharedTexBuf = gl.createBuffer();
+      _sharedTexture = gl.createTexture();
+      _uMatrixLoc = gl.getUniformLocation(_sharedGlProgram, 'u_matrix');
+    }
+  }
+
+  const gl = _sharedGl;
+  const canvas = _sharedGlCanvas;
+  if (!gl || !canvas) return null;
+
+  maxTexSize = gl.getParameter(gl.MAX_TEXTURE_SIZE) || 4096;
   const renderW = Math.min(targetWidth, maxTexSize, 3840);
   const renderH = Math.min(targetHeight, maxTexSize, 3840);
+  if (canvas.width !== renderW || canvas.height !== renderH) {
+    canvas.width = renderW;
+    canvas.height = renderH;
+  }
   const scale = renderW / targetWidth;
-
-  const canvas = document.createElement('canvas');
-  canvas.width = renderW;
-  canvas.height = renderH;
-  const gl = canvas.getContext('webgl', { 
-    antialias: true, 
-    alpha: true, 
-    premultipliedAlpha: false,
-    preserveDrawingBuffer: true 
-  });
-  if (!gl) return null;
 
   gl.viewport(0, 0, renderW, renderH);
   gl.clearColor(0, 0, 0, 0);
   gl.clear(gl.COLOR_BUFFER_BIT);
-
-  const vsSource = `
-    attribute vec2 a_position;
-    attribute vec2 a_texCoord;
-    uniform mat4 u_matrix;
-    varying vec2 v_texCoord;
-    void main() {
-      gl_Position = u_matrix * vec4(a_position, 0.0, 1.0);
-      v_texCoord = a_texCoord;
-    }
-  `;
-
-  const fsSource = `
-    precision mediump float;
-    uniform sampler2D u_texture;
-    varying vec2 v_texCoord;
-    void main() {
-      gl_FragColor = texture2D(u_texture, v_texCoord);
-    }
-  `;
-
-  function createShader(type, src) {
-    const s = gl.createShader(type);
-    gl.shaderSource(s, src);
-    gl.compileShader(s);
-    return s;
-  }
-
-  const vs = createShader(gl.VERTEX_SHADER, vsSource);
-  const fs = createShader(gl.FRAGMENT_SHADER, fsSource);
-  const program = gl.createProgram();
-  gl.attachShader(program, vs);
-  gl.attachShader(program, fs);
-  gl.linkProgram(program);
-  gl.useProgram(program);
+  gl.useProgram(_sharedGlProgram);
 
   // Quad geometry (2 triangles) scaled to WebGL buffer
   const hw = (drawWidth * scale) / 2;
@@ -701,10 +717,9 @@ function render3DWithWebGL(imageSource, targetWidth, targetHeight, adjustments, 
      hw,  hh
   ]);
 
-  const posBuf = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, posBuf);
-  gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
-  const aPos = gl.getAttribLocation(program, 'a_position');
+  gl.bindBuffer(gl.ARRAY_BUFFER, _sharedPosBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, positions, gl.DYNAMIC_DRAW);
+  const aPos = gl.getAttribLocation(_sharedGlProgram, 'a_position');
   gl.enableVertexAttribArray(aPos);
   gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
 
@@ -717,16 +732,14 @@ function render3DWithWebGL(imageSource, targetWidth, targetHeight, adjustments, 
     1, 1
   ]);
 
-  const texBuf = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, texBuf);
-  gl.bufferData(gl.ARRAY_BUFFER, texCoords, gl.STATIC_DRAW);
-  const aTex = gl.getAttribLocation(program, 'a_texCoord');
+  gl.bindBuffer(gl.ARRAY_BUFFER, _sharedTexBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, texCoords, gl.DYNAMIC_DRAW);
+  const aTex = gl.getAttribLocation(_sharedGlProgram, 'a_texCoord');
   gl.enableVertexAttribArray(aTex);
   gl.vertexAttribPointer(aTex, 2, gl.FLOAT, false, 0, 0);
 
-  // Texture
-  const texture = gl.createTexture();
-  gl.bindTexture(gl.TEXTURE_2D, texture);
+  // Texture upload
+  gl.bindTexture(gl.TEXTURE_2D, _sharedTexture);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
@@ -807,11 +820,147 @@ function render3DWithWebGL(imageSource, targetWidth, targetHeight, adjustments, 
   const M = new Float32Array(16);
   mat4Multiply(M, P, m4);
 
-  const uMatrix = gl.getUniformLocation(program, 'u_matrix');
-  gl.uniformMatrix4fv(uMatrix, false, M);
-
+  gl.uniformMatrix4fv(_uMatrixLoc, false, M);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
   return canvas;
+}
+
+// 8x8 Bayer matrix for flicker-free, continuous-tone ordered dithering
+const BAYER_8X8 = [
+  [ 0, 32,  8, 40,  2, 34, 10, 42],
+  [48, 16, 56, 24, 50, 18, 58, 26],
+  [12, 44,  4, 36, 14, 46,  6, 38],
+  [60, 28, 52, 20, 62, 30, 54, 22],
+  [ 3, 35, 11, 43,  1, 33,  9, 41],
+  [51, 19, 59, 27, 49, 17, 57, 25],
+  [15, 47,  7, 39, 13, 45,  5, 37],
+  [63, 31, 55, 23, 61, 29, 53, 21]
+];
+
+// High-fidelity Median Cut color quantization in full 8-bit RGB color space (eliminates 5-bit color banding lines)
+function generateMedianCutPalette(sampledSolidPixels, maxColors = 256) {
+  const colorMap = new Map();
+  for (let i = 0; i < sampledSolidPixels.length; i += 4) {
+    const r = sampledSolidPixels[i];
+    const g = sampledSolidPixels[i + 1];
+    const b = sampledSolidPixels[i + 2];
+    const key = (r << 16) | (g << 8) | b;
+    colorMap.set(key, (colorMap.get(key) || 0) + 1);
+  }
+
+  const colors = [];
+  for (const [key, count] of colorMap.entries()) {
+    colors.push({
+      r: (key >> 16) & 255,
+      g: (key >> 8) & 255,
+      b: key & 255,
+      count
+    });
+  }
+
+  if (colors.length === 0) {
+    return [[255, 255, 255], [0, 0, 0]];
+  }
+
+  if (colors.length <= maxColors) {
+    const pal = colors.map(c => [c.r, c.g, c.b]);
+    while (pal.length < 2) pal.push([0, 0, 0]);
+    return pal;
+  }
+
+  let boxes = [colors];
+  while (boxes.length < maxColors) {
+    let bestBoxIdx = -1;
+    let maxRange = -1;
+
+    for (let i = 0; i < boxes.length; i++) {
+      const box = boxes[i];
+      if (box.length <= 1) continue;
+      let minR = 255, maxR = 0, minG = 255, maxG = 0, minB = 255, maxB = 0;
+      for (let j = 0; j < box.length; j++) {
+        const c = box[j];
+        if (c.r < minR) minR = c.r;
+        if (c.r > maxR) maxR = c.r;
+        if (c.g < minG) minG = c.g;
+        if (c.g > maxG) maxG = c.g;
+        if (c.b < minB) minB = c.b;
+        if (c.b > maxB) maxB = c.b;
+      }
+      const range = Math.max(maxR - minR, maxG - minG, maxB - minB);
+      if (range > maxRange) {
+        maxRange = range;
+        bestBoxIdx = i;
+      }
+    }
+
+    if (bestBoxIdx === -1 || maxRange <= 0) break;
+
+    const boxToSplit = boxes.splice(bestBoxIdx, 1)[0];
+    let minR = 255, maxR = 0, minG = 255, maxG = 0, minB = 255, maxB = 0;
+    for (let j = 0; j < boxToSplit.length; j++) {
+      const c = boxToSplit[j];
+      if (c.r < minR) minR = c.r;
+      if (c.r > maxR) maxR = c.r;
+      if (c.g < minG) minG = c.g;
+      if (c.g > maxG) maxG = c.g;
+      if (c.b < minB) minB = c.b;
+      if (c.b > maxB) maxB = c.b;
+    }
+    const rRange = maxR - minR;
+    const gRange = maxG - minG;
+    const bRange = maxB - minB;
+    const channel = (rRange >= gRange && rRange >= bRange) ? 'r' : (gRange >= bRange ? 'g' : 'b');
+
+    boxToSplit.sort((a, b) => a[channel] - b[channel]);
+    const mid = Math.floor(boxToSplit.length / 2);
+    boxes.push(boxToSplit.slice(0, mid));
+    boxes.push(boxToSplit.slice(mid));
+  }
+
+  return boxes.map(box => {
+    let totalR = 0, totalG = 0, totalB = 0, totalCount = 0;
+    for (let j = 0; j < box.length; j++) {
+      const c = box[j];
+      totalR += c.r * c.count;
+      totalG += c.g * c.count;
+      totalB += c.b * c.count;
+      totalCount += c.count;
+    }
+    return [
+      Math.round(totalR / totalCount),
+      Math.round(totalG / totalCount),
+      Math.round(totalB / totalCount)
+    ];
+  });
+}
+
+// Precomputes a 65,536-entry RGB565 LUT for ultra-fast (O(1)) nearest palette index matching
+function buildColorLUT(palette) {
+  const lut = new Uint8Array(65536);
+  for (let key = 0; key < 65536; key++) {
+    const r5 = (key >> 11) & 31;
+    const g6 = (key >> 5) & 63;
+    const b5 = key & 31;
+    const r = (r5 * 255) / 31;
+    const g = (g6 * 255) / 63;
+    const b = (b5 * 255) / 31;
+
+    let bestIdx = 0;
+    let bestDist = Infinity;
+    for (let p = 0; p < palette.length; p++) {
+      const pal = palette[p];
+      const dr = r - pal[0];
+      const dg = g - pal[1];
+      const db = b - pal[2];
+      const dist = dr * dr * 0.299 + dg * dg * 0.587 + db * db * 0.114;
+      if (dist < bestDist) {
+        bestDist = dist;
+        bestIdx = p;
+      }
+    }
+    lut[key] = bestIdx;
+  }
+  return lut;
 }
 
 async function exportAnimatedGif({
@@ -824,14 +973,40 @@ async function exportAnimatedGif({
   filterRules,
   blobUrl
 }) {
-  // Cap dimensions to max 800px so encoding is fast and GIF file size remains manageable
-  const gifW = Math.min(targetWidth, 800);
-  const gifH = Math.min(targetHeight, 800);
+  // Respect user-selected resolution (e.g. 512, 1024, 2048, 4096, 8192)
+  const gifW = targetWidth || 512;
+  const gifH = targetHeight || 512;
 
-  const fps = 20;
-  const speed = Number(adjustments.animSpeed || 2.2);
-  const totalFrames = Math.max(16, Math.min(48, Math.round(fps * speed)));
-  const delay = Math.round(1000 / fps);
+  // Animate if 3D floating is toggled OR if an animation preset is active (unless explicitly 'none')
+  const isAnimated = Boolean(adjustments.is3DFloating) ||
+    (adjustments.animPreset && adjustments.animPreset !== 'none');
+
+  const fps = Number(adjustments.animFps || 60);
+  const speed = Math.max(0.4, Number(adjustments.animSpeed || 2.2));
+  const animHeight = Number(adjustments.animHeight || 16);
+  const ampScale = animHeight / 16;
+  const animPreset = adjustments.animPreset || 'float';
+  const animShadowSync = adjustments.animShadowSync !== false;
+
+  // Target frame delay in milliseconds (rounded to GIF tick accuracy)
+  let frameDelayMs = 20;
+  if (fps <= 25) {
+    frameDelayMs = 42;
+  } else if (fps <= 35) {
+    frameDelayMs = 33;
+  } else {
+    frameDelayMs = 20;
+  }
+
+  // Calculate total frames strictly required for duration = speed * 1000 ms
+  // Adapt maximum frames at massive resolutions (4K/8K) to protect client memory & encoding time
+  const maxFramesCap = gifW >= 4096 ? 24 : (gifW >= 2048 ? 36 : (fps >= 60 ? 120 : (fps >= 30 ? 75 : 48)));
+  let totalFrames = isAnimated
+    ? Math.max(16, Math.min(maxFramesCap, Math.round((speed * 1000) / frameDelayMs)))
+    : 1;
+
+  // Recalculate exact frame delay to ensure total duration matches speed down to the millisecond
+  const delay = Math.max(10, Math.round((speed * 1000) / totalFrames));
 
   const gif = GIFEncoder();
 
@@ -842,10 +1017,8 @@ async function exportAnimatedGif({
   if (!fCtx) {
     throw new Error('Canvas 2D context unavailable for GIF export');
   }
-
-  const animPreset = adjustments.animPreset || 'float';
-  const animHeight = Number(adjustments.animHeight || 16);
-  const animShadowSync = adjustments.animShadowSync !== false;
+  fCtx.imageSmoothingEnabled = true;
+  fCtx.imageSmoothingQuality = 'high';
 
   // For transparent GIF, avoid diffuse drop-shadows because 1-bit binary alpha cannot fade to transparent and turns into solid contour rings
   const gifFilterRules = [
@@ -862,8 +1035,8 @@ async function exportAnimatedGif({
       : ''
   ].filter(Boolean).join(' ');
 
-  for (let frame = 0; frame < totalFrames; frame++) {
-    const t = frame / totalFrames; // 0 to 1
+  // Helper to render a specific animation frame state (t: 0..1)
+  function renderFrameAtProgress(t) {
     fCtx.clearRect(0, 0, gifW, gifH);
 
     // 1. Background
@@ -875,42 +1048,94 @@ async function exportAnimatedGif({
       drawCanvasBgShape(fCtx, gifW, gifH, adjustments);
     }
 
-    // 2. Compute motion state for this frame
+    // 2. Compute motion state for this frame across all 14 presets
     let frameAdj = { ...adjustments };
     let offsetY = 0;
     let offsetX = 0;
     let scalePulse = 1;
 
-    if (animPreset === 'float') {
-      const sinVal = Math.sin(t * 2 * Math.PI);
-      offsetY = -sinVal * animHeight * (gifH / 384);
-      if (animShadowSync && (frameAdj.depth3D || 0) > 0) {
-        frameAdj.depth3D = (adjustments.depth3D || 10) * Math.max(0.2, (1 - sinVal * 0.35));
+    if (isAnimated) {
+      if (animPreset === 'float') {
+        const sinVal = Math.sin(t * 2 * Math.PI);
+        offsetY = -sinVal * (animHeight * 1.0) * (gifH / 384);
+        if (animShadowSync && (frameAdj.depth3D || 0) > 0) {
+          frameAdj.depth3D = (adjustments.depth3D || 10) * Math.max(0.2, (1 - sinVal * 0.35));
+        }
+      } else if (animPreset === 'bounce') {
+        const bounceSin = Math.abs(Math.sin(t * Math.PI));
+        offsetY = -bounceSin * (animHeight * 1.5) * (gifH / 384);
+        if (bounceSin < 0.25) {
+          scalePulse = 1 + (0.25 - bounceSin) * (ampScale * 0.5);
+        }
+      } else if (animPreset === 'pulse') {
+        const sinVal = Math.sin(t * 2 * Math.PI);
+        scalePulse = 1 + sinVal * (ampScale * 0.18);
+      } else if (animPreset === 'heartbeat') {
+        let hb = 0;
+        if (t < 0.15) hb = Math.sin((t / 0.15) * Math.PI) * (ampScale * 0.22);
+        else if (t >= 0.25 && t < 0.45) hb = Math.sin(((t - 0.25) / 0.2) * Math.PI) * (ampScale * 0.28);
+        scalePulse = 1 + hb;
+      } else if (animPreset === 'spin360') {
+        frameAdj.rotateY = ((adjustments.rotateY || 0) + t * 360) % 360;
+        offsetY = -Math.sin(t * 2 * Math.PI) * (animHeight * 0.25) * (gifH / 384);
+      } else if (animPreset === 'flip3d') {
+        frameAdj.rotateX = ((adjustments.rotateX || 0) + t * 360) % 360;
+        offsetY = -Math.sin(t * 2 * Math.PI) * (animHeight * 0.25) * (gifH / 384);
+      } else if (animPreset === 'wobble') {
+        const sinVal = Math.sin(t * 2 * Math.PI);
+        const cosVal = Math.cos(t * 2 * Math.PI);
+        frameAdj.rotateY = (adjustments.rotateY || 0) + sinVal * (ampScale * 18);
+        frameAdj.rotateX = (adjustments.rotateX || 0) + cosVal * (ampScale * 12);
+      } else if (animPreset === 'twist') {
+        const sinVal = Math.sin(t * 2 * Math.PI);
+        frameAdj.rotation = (adjustments.rotation || 0) + sinVal * (ampScale * 18);
+        frameAdj.rotateY = (adjustments.rotateY || 0) + sinVal * (ampScale * 25);
+      } else if (animPreset === 'wave') {
+        const sinVal = Math.sin(t * 2 * Math.PI);
+        const cosVal = Math.cos(t * 2 * Math.PI);
+        offsetY = -sinVal * (animHeight * 1.0) * (gifH / 384);
+        frameAdj.rotation = (adjustments.rotation || 0) + cosVal * (ampScale * 8);
+      } else if (animPreset === 'swing') {
+        const sinVal = Math.sin(t * 2 * Math.PI);
+        frameAdj.rotation = (adjustments.rotation || 0) + sinVal * (ampScale * 16);
+        offsetX = sinVal * (animHeight * 0.8) * (gifW / 384);
+        offsetY = (1 - Math.cos(t * 2 * Math.PI)) * (animHeight * 0.3) * (gifH / 384);
+      } else if (animPreset === 'orbit') {
+        const sinVal = Math.sin(t * 2 * Math.PI);
+        const cosVal = Math.cos(t * 2 * Math.PI);
+        offsetX = cosVal * (animHeight * 1.0) * (gifW / 384);
+        offsetY = -sinVal * (animHeight * 1.0) * (gifH / 384);
+        frameAdj.rotation = (adjustments.rotation || 0) + sinVal * (ampScale * 5);
+      } else if (animPreset === 'hover3d') {
+        const sinVal = Math.sin(t * 2 * Math.PI);
+        const cosVal = Math.cos(t * 2 * Math.PI);
+        offsetY = -sinVal * (animHeight * 0.8) * (gifH / 384);
+        frameAdj.rotateX = (adjustments.rotateX || 0) + cosVal * (ampScale * 10);
+        frameAdj.rotateY = (adjustments.rotateY || 0) - sinVal * (ampScale * 10);
+      } else if (animPreset === 'jiggle') {
+        const sinVal = Math.sin(t * 6 * Math.PI);
+        frameAdj.rotation = (adjustments.rotation || 0) + sinVal * (ampScale * 8);
+        scalePulse = 1 + Math.abs(sinVal) * (ampScale * 0.06);
+      } else if (animPreset === 'glitch') {
+        const gPhase = (t * 3) % 1;
+        if (gPhase > 0.65 && gPhase < 0.95) {
+          const step = Math.floor((gPhase - 0.65) / 0.05);
+          offsetX = (step % 2 === 0 ? -1 : 1) * (animHeight * 0.6) * (gifW / 384);
+          offsetY = (step % 2 === 0 ? 1 : -1) * (animHeight * 0.3) * (gifH / 384);
+          frameAdj.skewX = (step % 2 === 0 ? -1 : 1) * (ampScale * 8);
+        }
       }
-    } else if (animPreset === 'spin360') {
-      frameAdj.rotateY = ((adjustments.rotateY || 0) + t * 360) % 360;
-    } else if (animPreset === 'pulse') {
-      const sinVal = Math.sin(t * 2 * Math.PI);
-      scalePulse = 1 + sinVal * 0.10;
-    } else if (animPreset === 'wobble') {
-      const sinVal = Math.sin(t * 2 * Math.PI);
-      const cosVal = Math.cos(t * 2 * Math.PI);
-      frameAdj.rotateY = (adjustments.rotateY || 0) + sinVal * 16;
-      frameAdj.rotateX = (adjustments.rotateX || 0) + cosVal * 8;
-    } else if (animPreset === 'wave') {
-      const sinVal = Math.sin(t * 2 * Math.PI);
-      const cosVal = Math.cos(t * 2 * Math.PI);
-      offsetY = -sinVal * (animHeight * 0.7) * (gifH / 384);
-      frameAdj.rotation = (adjustments.rotation || 0) + cosVal * 6;
     }
 
-    // 3. Render icon for this frame
+    // 3. Render icon for this frame (activates 3D for depth3D, perspective rotation, or 3D presets)
     const rotX = frameAdj.rotateX || 0;
     const rotY = frameAdj.rotateY || 0;
     const rotZ = frameAdj.rotation || 0;
     const skX = frameAdj.skewX || 0;
     const skY = frameAdj.skewY || 0;
-    const has3D = rotX !== 0 || rotY !== 0 || skX !== 0 || skY !== 0 || animPreset === 'spin360' || animPreset === 'wobble';
+    const has3D = rotX !== 0 || rotY !== 0 || skX !== 0 || skY !== 0 ||
+      (frameAdj.depth3D || 0) > 0 ||
+      (isAnimated && (animPreset === 'spin360' || animPreset === 'wobble' || animPreset === 'flip3d' || animPreset === 'twist' || animPreset === 'hover3d'));
 
     let paddingRatio = frameAdj.shadowBlur > 0 ? 0.82 : 0.9;
     if (frameAdj.bgShape && frameAdj.bgShape !== 'none') {
@@ -943,20 +1168,20 @@ async function exportAnimatedGif({
           const depth = (frameAdj.depth3D || 0) * (gifW / 384);
           const radX = (rotX * Math.PI) / 180;
           const radY = (rotY * Math.PI) / 180;
-          const offX = -Math.sin(radY) * depth * 1.5;
-          const offY = Math.sin(radX) * depth * 1.5 + (depth * 0.8) + offsetY;
+          const shadowOffX = -Math.sin(radY) * depth * 1.5 + offsetX;
+          const shadowOffY = Math.sin(radX) * depth * 1.5 + (depth * 0.8) + offsetY;
           const sColor = frameAdj.depth3DColor || 'rgba(0,0,0,0.55)';
 
           fCtx.save();
           fCtx.filter = `blur(${Math.max(2, Math.round(depth * 0.5))}px) drop-shadow(0 0 ${Math.round(depth * 0.4)}px ${sColor})`;
           fCtx.globalAlpha = 0.55;
-          fCtx.drawImage(webglCanvas, offX, offY);
+          fCtx.drawImage(webglCanvas, shadowOffX, shadowOffY);
           fCtx.restore();
         }
 
-        // Icon with levitation offsetY
+        // Icon with levitation offsetX & offsetY
         fCtx.save();
-        fCtx.drawImage(webglCanvas, 0, offsetY);
+        fCtx.drawImage(webglCanvas, offsetX, offsetY);
         fCtx.restore();
       }
     } else {
@@ -969,35 +1194,80 @@ async function exportAnimatedGif({
       fCtx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
       fCtx.restore();
     }
+  }
 
-    // 4. Clean Alpha Pre-quantization to eliminate ghost halos
+  // 1. Pre-pass Palette Sampling:
+  // Sample keyframes across the animation cycle without holding all full-resolution frames in memory
+  const sampleTimes = isAnimated ? [0, 0.25, 0.5, 0.75, 0.9] : [0];
+  const sampledSolidPixels = [];
+  const pixelStep = Math.max(4, Math.round(gifW / 128));
+
+  sampleTimes.forEach((sampleT) => {
+    renderFrameAtProgress(sampleT);
     const imgData = fCtx.getImageData(0, 0, gifW, gifH);
     const rgba = imgData.data;
+    const totalPixels = rgba.length >> 2;
+    for (let p = 0; p < totalPixels; p += pixelStep) {
+      const i = p << 2;
+      const a = rgba[i + 3];
+      if (!isTransparent || a >= 128) {
+        sampledSolidPixels.push(rgba[i], rgba[i + 1], rgba[i + 2], 255);
+      }
+    }
+  });
 
-    if (isTransparent) {
-      for (let i = 0; i < rgba.length; i += 4) {
-        if (rgba[i + 3] < 80) {
-          rgba[i] = 0;
-          rgba[i + 1] = 0;
-          rgba[i + 2] = 0;
-          rgba[i + 3] = 0;
-        } else {
-          rgba[i + 3] = 255;
+  const maxColors = isTransparent ? 255 : 256;
+  const rawPalette = generateMedianCutPalette(
+    sampledSolidPixels.length ? sampledSolidPixels : [255, 255, 255, 255],
+    maxColors
+  );
+  const globalPalette = isTransparent ? [[0, 0, 0], ...rawPalette] : rawPalette;
+
+  // Precompute 65,536 RGB565 LUT for ultra-fast color matching (~40ms once)
+  const lut = buildColorLUT(rawPalette);
+
+  // 2. Stream-Encode Each Frame Directly:
+  // Processes one frame at a time into the GIF stream so 2K, 4K, and 8K never exhaust browser RAM
+  for (let frame = 0; frame < totalFrames; frame++) {
+    const t = isAnimated ? (frame / totalFrames) : 0;
+    renderFrameAtProgress(t);
+
+    const imgData = fCtx.getImageData(0, 0, gifW, gifH);
+    const rgba = imgData.data;
+    const index = new Uint8Array(gifW * gifH);
+
+    for (let y = 0; y < gifH; y++) {
+      const rowOffset = y * gifW;
+      const bayerRow = BAYER_8X8[y & 7];
+      for (let x = 0; x < gifW; x++) {
+        const pixelIdx = rowOffset + x;
+        const i = pixelIdx << 2;
+        const a = rgba[i + 3];
+
+        if (isTransparent && a < 128) {
+          index[pixelIdx] = 0; // Reserved transparent slot
+          continue;
         }
+
+        // Ordered dither: deterministic offset per screen pixel (eliminates banding lines without temporal flicker)
+        const dither = (bayerRow[x & 7] / 64 - 0.5) * 8;
+        const r = Math.min(255, Math.max(0, rgba[i] + dither));
+        const g = Math.min(255, Math.max(0, rgba[i + 1] + dither * 0.7));
+        const b = Math.min(255, Math.max(0, rgba[i + 2] + dither));
+
+        const key = ((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3);
+        const palIdx = lut[key];
+
+        index[pixelIdx] = isTransparent ? (palIdx + 1) : palIdx;
       }
     }
 
-    const quantFormat = isTransparent ? 'rgba4444' : 'rgb565';
-    const palette = quantize(rgba, 256, { format: quantFormat, oneBitAlpha: isTransparent });
-    const index = applyPalette(rgba, palette, quantFormat);
-    const transparentIndex = isTransparent ? palette.findIndex(c => c[3] === 0) : -1;
-
     gif.writeFrame(index, gifW, gifH, { 
-      palette, 
-      delay, 
-      transparent: isTransparent && transparentIndex >= 0,
-      transparentIndex: Math.max(0, transparentIndex),
-      dispose: 2 // CRITICAL FIX: Restore to background to prevent ghost trails between moving frames!
+      palette: globalPalette, 
+      delay: isAnimated ? delay : 100, 
+      transparent: isTransparent,
+      transparentIndex: isTransparent ? 0 : -1,
+      dispose: 2
     });
   }
 

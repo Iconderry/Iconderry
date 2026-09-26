@@ -9,7 +9,8 @@ import {
   Heart, Shapes, MessageSquarePlus, Shield, FileText, Info,
   Box, Compass, Move3d, Film, Play, Activity, GripVertical,
   Move, ArrowUp, ArrowDown, ChevronsUp, ChevronsDown, Copy,
-  Crosshair, AlignCenter, HelpCircle, Smartphone, MousePointer, Keyboard
+  Crosshair, AlignCenter, HelpCircle, Smartphone, MousePointer, Keyboard,
+  FolderPlus, Folder, Tag, Edit2, FileUp
 } from 'lucide-react';
 import { INITIAL_ELEMENTS } from './initialData';
 import { downloadAsset } from './converter';
@@ -44,9 +45,28 @@ const DEFAULT_ADJUSTMENTS = {
   animSpeed: 2.2,
   animHeight: 16,
   animShadowSync: true,
+  animFps: 60,
   customColor: '',
   colorReplacements: {}
 };
+
+export const MOTION_PRESETS = [
+  { id: 'float', name: 'Levitate', icon: '🚀', desc: 'Smooth vertical floating' },
+  { id: 'bounce', name: 'Bounce', icon: '🏀', desc: 'Ground bounce with squash' },
+  { id: 'pulse', name: 'Pulse', icon: '💓', desc: 'Rhythmic scale expansion' },
+  { id: 'heartbeat', name: 'Heartbeat', icon: '🫀', desc: 'Living double-beat' },
+  { id: 'spin360', name: '360° Spin', icon: '🔄', desc: 'Continuous Y-axis spin' },
+  { id: 'flip3d', name: '3D Flip', icon: '🔁', desc: 'Vertical flip somersault' },
+  { id: 'wobble', name: 'Wobble 3D', icon: '🎭', desc: 'Dual-axis 3D tilt' },
+  { id: 'twist', name: '3D Twist', icon: '🌪️', desc: 'Rotational 3D twisting' },
+  { id: 'wave', name: 'Wave', icon: '🌊', desc: 'Oceanic swell & tilt' },
+  { id: 'swing', name: 'Swing', icon: '🎪', desc: 'Top-anchored pendulum' },
+  { id: 'orbit', name: 'Orbit', icon: '🪐', desc: 'Circular floating path' },
+  { id: 'hover3d', name: '3D Tilt', icon: '✨', desc: 'Subtle high-end tilt' },
+  { id: 'jiggle', name: 'Jiggle', icon: '⚡', desc: 'Rapid playful vibration' },
+  { id: 'glitch', name: 'Glitch', icon: '👾', desc: 'Cyberpunk shift jumps' },
+  { id: 'none', name: 'Static', icon: '⏸️', desc: 'Single frame still GIF' }
+];
 
 const EFFECT_PRESETS = [
   {
@@ -1156,16 +1176,38 @@ const MOBILE_HELP_GUIDE = [
 export default function App() {
   const [elements, setElements] = useState(() => {
     const saved = localStorage.getItem('iconderry_assets') || localStorage.getItem('pixlflow_assets');
+    const initialMap = new Map(INITIAL_ELEMENTS.map(el => [el.id, el]));
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (!parsed.some(el => el.id === 'elem-iconderry-official')) {
-          return [INITIAL_ELEMENTS[0], ...parsed];
+        // Guarantee that any default/initial elements always have their pristine original svgCode restored
+        const sanitized = parsed.map(item => {
+          if (initialMap.has(item.id)) {
+            const initialItem = initialMap.get(item.id);
+            return {
+              ...item,
+              title: initialItem.title,
+              category: initialItem.category,
+              svgCode: initialItem.svgCode,
+              originalSvgCode: initialItem.svgCode
+            };
+          }
+          return {
+            ...item,
+            originalSvgCode: item.originalSvgCode || item.svgCode
+          };
+        });
+        if (!sanitized.some(el => el.id === 'elem-iconderry-official')) {
+          return [{ ...INITIAL_ELEMENTS[0], originalSvgCode: INITIAL_ELEMENTS[0].svgCode }, ...sanitized];
         }
-        return parsed;
+        return sanitized;
       } catch (e) { console.error(e); }
     }
-    return INITIAL_ELEMENTS.map(el => ({ ...el, downloads: el.downloads || 0 }));
+    return INITIAL_ELEMENTS.map(el => ({
+      ...el,
+      originalSvgCode: el.svgCode,
+      downloads: el.downloads || 0
+    }));
   });
 
   const [activeTab, setActiveTab] = useState('browse');
@@ -1173,7 +1215,42 @@ export default function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
 
-  // Admin form state
+  // Dynamic Category System & Custom Categories State
+  const [customCategories, setCustomCategories] = useState(() => {
+    const saved = localStorage.getItem('iconderry_custom_categories');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { }
+    }
+    return ['UI Icons', 'Brand Logos', 'Silhouettes', 'Badges & Stickers', '3D Elements', 'Illustrations', 'Awards'];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('iconderry_custom_categories', JSON.stringify(customCategories));
+  }, [customCategories]);
+
+  // Admin panel tabs & section state
+  const [adminSection, setAdminSection] = useState('upload'); // 'upload' | 'categories'
+  const [uploadMode, setUploadMode] = useState('single'); // 'single' | 'bulk'
+  const [assetType, setAssetType] = useState('filled'); // 'silhouette' | 'linear' | 'filled' | '3d'
+  const [isAddingNewCat, setIsAddingNewCat] = useState(false);
+  const [newCatInput, setNewCatInput] = useState('');
+  const [detectedShapeNotice, setDetectedShapeNotice] = useState('');
+
+  // Bulk Upload State
+  const [bulkFiles, setBulkFiles] = useState([]);
+  const [bulkCategory, setBulkCategory] = useState('UI Icons');
+  const [bulkTags, setBulkTags] = useState('');
+  const [bulkAssetType, setBulkAssetType] = useState('filled');
+  const [isBulkPublishing, setIsBulkPublishing] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState({ current: 0, total: 0 });
+  const bulkFileInputRef = useRef(null);
+
+  // Category Manager State
+  const [categorySearchTerm, setCategorySearchTerm] = useState('');
+  const [editingCategory, setEditingCategory] = useState(null); // { oldName: '', newName: '' }
+  const [newCategoryManagerInput, setNewCategoryManagerInput] = useState('');
+
+  // Single Admin form state
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('UI Icons');
   const [tags, setTags] = useState('');
@@ -2509,10 +2586,6 @@ export default function App() {
         ...prev,
         svgCode: mergedSvg
       }));
-
-      setElements(prev => prev.map(el =>
-        el.id === selectedAsset.id ? { ...el, svgCode: mergedSvg } : el
-      ));
 
       if (newLayerIds.length > 0) {
         const newGroupId = `group_${Date.now()}`;
@@ -3937,6 +4010,12 @@ export default function App() {
   // Reset Everything back to original upload state
   const handleResetAll = () => {
     recordUndo();
+    if (selectedAsset?.originalSvgCode) {
+      setSelectedAsset(prev => ({
+        ...prev,
+        svgCode: prev.originalSvgCode
+      }));
+    }
     setAdjustments({
       ...DEFAULT_ADJUSTMENTS,
       colorReplacements: {}
@@ -4305,11 +4384,20 @@ export default function App() {
     localStorage.setItem('iconderry_assets', JSON.stringify(elements));
   }, [elements]);
 
-  const categories = ['All', 'Favorites', ...new Set(elements.map(item => item.category))];
+  const allAvailableCategories = useMemo(() => {
+    const fromElements = elements.map(item => item.category).filter(Boolean);
+    const combined = Array.from(new Set([...customCategories, ...fromElements]));
+    return combined;
+  }, [customCategories, elements]);
+
+  const categories = useMemo(() => {
+    return ['All', 'Favorites', ...allAvailableCategories];
+  }, [allAvailableCategories]);
 
   const filteredElements = elements.filter(el => {
     const matchesSearch = el.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      el.tags?.toLowerCase().includes(searchTerm.toLowerCase());
+      el.tags?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (el.assetType && el.assetType.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesCategory = selectedCategory === 'All'
       ? true
       : selectedCategory === 'Favorites'
@@ -4321,7 +4409,12 @@ export default function App() {
 
 
   const handleOpenAsset = (item) => {
-    setSelectedAsset(item);
+    const cleanSvg = item.originalSvgCode || item.svgCode;
+    setSelectedAsset({
+      ...item,
+      svgCode: cleanSvg,
+      originalSvgCode: cleanSvg
+    });
     setActiveStyleMode('original');
     setLayerTransforms({});
     setLayerOrder([]);
@@ -4418,6 +4511,104 @@ export default function App() {
     setAspectRatio(preset.w / preset.h);
   };
 
+  const handleAddNewCategory = (catName, setAsCurrent = true, target = 'single') => {
+    const trimmed = (catName || '').trim();
+    if (!trimmed) return;
+    if (!customCategories.includes(trimmed)) {
+      setCustomCategories(prev => [...prev, trimmed]);
+    }
+    if (setAsCurrent) {
+      if (target === 'bulk') {
+        setBulkCategory(trimmed);
+      } else {
+        setCategory(trimmed);
+      }
+    }
+    setIsAddingNewCat(false);
+    setNewCatInput('');
+  };
+
+  const handleRenameCategory = async (oldName, newName) => {
+    const trimmed = (newName || '').trim();
+    if (!trimmed || trimmed === oldName) {
+      setEditingCategory(null);
+      return;
+    }
+
+    setCustomCategories(prev => prev.map(c => c === oldName ? trimmed : c));
+    setElements(prev => prev.map(el => el.category === oldName ? { ...el, category: trimmed } : el));
+
+    if (category === oldName) setCategory(trimmed);
+    if (bulkCategory === oldName) setBulkCategory(trimmed);
+    if (selectedCategory === oldName) setSelectedCategory(trimmed);
+
+    if (supabase) {
+      try {
+        await supabase.from('icons').update({ category: trimmed }).eq('category', oldName);
+      } catch (err) {
+        console.error('Error updating category in Supabase:', err);
+      }
+    }
+
+    setEditingCategory(null);
+    setFormSuccess(`Category renamed to "${trimmed}" across all assets!`);
+    setTimeout(() => setFormSuccess(''), 4000);
+  };
+
+  const handleDeleteCategory = async (catName) => {
+    const count = elements.filter(el => el.category === catName).length;
+    const confirmMsg = count > 0
+      ? `Category "${catName}" has ${count} icons. Moving them to "General" category. Proceed?`
+      : `Delete category "${catName}"?`;
+
+    if (!window.confirm(confirmMsg)) return;
+
+    setCustomCategories(prev => prev.filter(c => c !== catName));
+    if (count > 0) {
+      setElements(prev => prev.map(el => el.category === catName ? { ...el, category: 'General' } : el));
+      if (supabase) {
+        try {
+          await supabase.from('icons').update({ category: 'General' }).eq('category', catName);
+        } catch (err) {
+          console.error('Error reassigning in Supabase:', err);
+        }
+      }
+    }
+
+    if (category === catName) setCategory('UI Icons');
+    if (bulkCategory === catName) setBulkCategory('UI Icons');
+    if (selectedCategory === catName) setSelectedCategory('All');
+
+    setFormSuccess(`Category "${catName}" removed.`);
+    setTimeout(() => setFormSuccess(''), 4000);
+  };
+
+  const detectSvgDetails = (code, filename = '') => {
+    const lowerCode = (code || '').toLowerCase();
+    const lowerName = (filename || '').toLowerCase();
+
+    const isSilhouetteName = lowerName.includes('silhouette') || lowerName.includes('shadow') || lowerName.includes('stencil');
+    const hasGradient = lowerCode.includes('<lineargradient') || lowerCode.includes('<radialgradient');
+    const hasFilter = lowerCode.includes('<fegaussianblur') || lowerCode.includes('<fespecularlighting');
+
+    if (isSilhouetteName || (!hasGradient && !hasFilter && (lowerCode.includes('fill="#000') || lowerCode.includes('fill="black"') || lowerCode.includes('fill="#11')))) {
+      return { category: 'Silhouettes', assetType: 'silhouette', note: '✨ Silhouette shape detected' };
+    }
+
+    if (hasFilter || hasGradient) {
+      return { category: '3D Elements', assetType: '3d', note: '✨ 3D / Gradient artwork detected' };
+    }
+
+    const hasStroke = /stroke="((?!none)[^"]+)"/i.test(code);
+    const hasFill = /fill="((?!none)[^"]+)"/i.test(code);
+
+    if (hasStroke && !hasFill) {
+      return { category: 'UI Icons', assetType: 'linear', note: '✨ Linear outline icon detected' };
+    }
+
+    return { category: category || 'UI Icons', assetType: 'filled', note: '' };
+  };
+
   const handleFileProcess = (file) => {
     if (!file || !file.name.endsWith('.svg')) {
       alert('Please upload a valid .svg file');
@@ -4428,16 +4619,150 @@ export default function App() {
 
     const reader = new FileReader();
     reader.onload = (e) => {
-      setSvgInput(e.target.result);
+      const code = e.target.result;
+      setSvgInput(code);
+
+      const detection = detectSvgDetails(code, file.name);
+      if (detection.category) {
+        if (!customCategories.includes(detection.category)) {
+          setCustomCategories(prev => [...prev, detection.category]);
+        }
+        setCategory(detection.category);
+      }
+      if (detection.assetType) {
+        setAssetType(detection.assetType);
+      }
+      if (detection.note) {
+        setDetectedShapeNotice(detection.note);
+        setTimeout(() => setDetectedShapeNotice(''), 5000);
+      }
     };
     reader.readAsText(file);
+  };
+
+  const handleBulkFilesSelect = (fileList) => {
+    const files = Array.from(fileList).filter(f => f.name.endsWith('.svg'));
+    if (files.length === 0) {
+      alert('Please select valid .svg files.');
+      return;
+    }
+
+    const loadedFiles = [];
+    let processed = 0;
+
+    files.forEach((file) => {
+      const derivedTitle = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+      const formattedTitle = derivedTitle.charAt(0).toUpperCase() + derivedTitle.slice(1);
+      const reader = new FileReader();
+
+      reader.onload = (e) => {
+        const svgContent = e.target.result;
+        loadedFiles.push({
+          id: 'bulk-' + Math.random().toString(36).substr(2, 9),
+          file,
+          title: formattedTitle,
+          svgCode: svgContent,
+          status: 'pending'
+        });
+
+        processed++;
+        if (processed === files.length) {
+          setBulkFiles(prev => [...prev, ...loadedFiles]);
+          setUploadMode('bulk');
+
+          if (files.some(f => f.name.toLowerCase().includes('silhouette'))) {
+            setBulkCategory('Silhouettes');
+            setBulkAssetType('silhouette');
+          }
+        }
+      };
+
+      reader.readAsText(file);
+    });
+  };
+
+  const handlePublishBulkSvgs = async () => {
+    if (bulkFiles.length === 0 || isBulkPublishing) return;
+
+    setIsBulkPublishing(true);
+    setFormError('');
+    setFormSuccess('');
+    setBulkProgress({ current: 0, total: bulkFiles.length });
+
+    const newElementsList = [];
+    let successCount = 0;
+
+    for (let i = 0; i < bulkFiles.length; i++) {
+      const item = bulkFiles[i];
+      const newElem = {
+        id: 'elem-' + Date.now() + '-' + i,
+        title: item.title.trim() || 'Vector Element ' + (i + 1),
+        category: bulkCategory.trim() || 'General',
+        tags: (bulkTags ? bulkTags + ', ' : '') + (bulkAssetType ? bulkAssetType + ', ' : '') + 'vector',
+        svgCode: item.svgCode.trim(),
+        originalSvgCode: item.svgCode.trim(),
+        assetType: bulkAssetType,
+        downloads: 0,
+        isCloud: true
+      };
+
+      try {
+        if (supabase) {
+          const { error } = await supabase.from('icons').insert([{
+            id: newElem.id,
+            title: newElem.title,
+            category: newElem.category,
+            tags: newElem.tags,
+            svg_code: newElem.svgCode,
+            downloads: 0
+          }]).select();
+
+          if (error) {
+            console.error('Bulk upload error on item:', item.title, error);
+            item.status = 'error';
+          } else {
+            item.status = 'success';
+            successCount++;
+            newElementsList.push(newElem);
+          }
+        } else {
+          item.status = 'success';
+          successCount++;
+          newElementsList.push(newElem);
+        }
+      } catch (err) {
+        console.error('Error on bulk item:', err);
+        item.status = 'error';
+      }
+
+      setBulkProgress({ current: i + 1, total: bulkFiles.length });
+    }
+
+    if (newElementsList.length > 0) {
+      setElements(prev => [...newElementsList, ...prev]);
+      if (!customCategories.includes(bulkCategory)) {
+        setCustomCategories(prev => [...prev, bulkCategory]);
+      }
+    }
+
+    setIsBulkPublishing(false);
+    setFormSuccess(`Successfully uploaded ${successCount} of ${bulkFiles.length} elements to Supabase Cloud!`);
+    if (successCount === bulkFiles.length) {
+      setTimeout(() => {
+        setBulkFiles([]);
+      }, 3000);
+    }
   };
 
   const handleDrop = (e) => {
     e.preventDefault();
     setIsDragging(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFileProcess(e.dataTransfer.files[0]);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      if (e.dataTransfer.files.length === 1 && uploadMode === 'single') {
+        handleFileProcess(e.dataTransfer.files[0]);
+      } else {
+        handleBulkFilesSelect(e.dataTransfer.files);
+      }
     }
   };
 
@@ -4463,6 +4788,7 @@ export default function App() {
             category: item.category,
             tags: item.tags || '',
             svgCode: item.svg_code,
+            originalSvgCode: item.svg_code,
             downloads: item.downloads || 0,
             isCloud: true
           }));
@@ -4470,7 +4796,9 @@ export default function App() {
           // Merge cloud icons with default INITIAL_ELEMENTS so all icons are available to everyone
           setElements(prev => {
             const cloudIds = new Set(mapped.map(m => m.id));
-            const defaultNonDuplicates = INITIAL_ELEMENTS.filter(d => !cloudIds.has(d.id));
+            const defaultNonDuplicates = INITIAL_ELEMENTS
+              .filter(d => !cloudIds.has(d.id))
+              .map(d => ({ ...d, originalSvgCode: d.svgCode }));
             const combined = [...mapped, ...defaultNonDuplicates];
             localStorage.setItem('iconderry_assets', JSON.stringify(combined));
             return combined;
@@ -4495,6 +4823,7 @@ export default function App() {
               category: payload.new.category,
               tags: payload.new.tags || '',
               svgCode: payload.new.svg_code,
+              originalSvgCode: payload.new.svg_code,
               downloads: payload.new.downloads || 0,
               isCloud: true
             };
@@ -4528,8 +4857,10 @@ export default function App() {
       id: 'elem-' + Date.now(),
       title: title.trim(),
       category: category.trim() || 'General',
-      tags: tags.trim(),
+      tags: (tags.trim() ? tags.trim() + ', ' : '') + (assetType ? assetType : ''),
       svgCode: svgInput.trim(),
+      originalSvgCode: svgInput.trim(),
+      assetType,
       downloads: 0,
       isCloud: true
     };
@@ -4554,6 +4885,9 @@ export default function App() {
       }
 
       setElements(prev => [newElement, ...prev.filter(x => x.id !== newElement.id)]);
+      if (!customCategories.includes(newElement.category)) {
+        setCustomCategories(prev => [...prev, newElement.category]);
+      }
 
       setTitle('');
       setSvgInput('');
@@ -4751,26 +5085,27 @@ export default function App() {
         );
       }
 
-      let finalWidth = 512;
-      let finalHeight = 512;
+      const targetSize = exportSize || 512;
+      let finalWidth = targetSize;
+      let finalHeight = targetSize;
       if (autoFitViewBox && autoFitViewBox.width > 0 && autoFitViewBox.height > 0) {
         if (autoFitFrameMode === 'square') {
-          finalWidth = 512;
-          finalHeight = 512;
+          finalWidth = targetSize;
+          finalHeight = targetSize;
         } else if (autoFitViewBox.width >= autoFitViewBox.height) {
-          finalWidth = 512;
-          finalHeight = Math.max(32, Math.round(512 * (autoFitViewBox.height / autoFitViewBox.width)));
+          finalWidth = targetSize;
+          finalHeight = Math.max(32, Math.round(targetSize * (autoFitViewBox.height / autoFitViewBox.width)));
         } else {
-          finalHeight = 512;
-          finalWidth = Math.max(32, Math.round(512 * (autoFitViewBox.width / autoFitViewBox.height)));
+          finalHeight = targetSize;
+          finalWidth = Math.max(32, Math.round(targetSize * (autoFitViewBox.width / autoFitViewBox.height)));
         }
       } else if (iconWidth && iconHeight) {
         if (iconWidth >= iconHeight) {
-          finalWidth = 512;
-          finalHeight = Math.round(512 * (iconHeight / iconWidth));
+          finalWidth = targetSize;
+          finalHeight = Math.round(targetSize * (iconHeight / iconWidth));
         } else {
-          finalHeight = 512;
-          finalWidth = Math.round(512 * (iconWidth / iconHeight));
+          finalHeight = targetSize;
+          finalWidth = Math.round(targetSize * (iconWidth / iconHeight));
         }
       }
 
@@ -4778,7 +5113,7 @@ export default function App() {
         svgCode: selectedAsset.svgCode,
         filename: selectedAsset.title,
         format: 'gif',
-        size: 512,
+        size: targetSize,
         width: finalWidth,
         height: finalHeight,
         isTransparent,
@@ -4999,159 +5334,691 @@ export default function App() {
       {/* Main Page Area */}
       <main className="flex-1 p-3 sm:p-6 max-w-7xl w-full mx-auto">
         {activeTab === 'admin' ? (
-          /* Admin Upload Panel */
-          <div className={`max-w-3xl mx-auto border rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-xl transition ${appTheme === 'dark' ? 'bg-[#131b2e] border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-900 shadow-xl'
+          /* Admin Management Panel */
+          <div className={`max-w-4xl mx-auto border rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-xl transition ${appTheme === 'dark' ? 'bg-[#131b2e] border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-900 shadow-xl'
             }`}>
-            <div className="flex items-center justify-between flex-wrap gap-2 mb-1">
-              <h2 className="text-lg sm:text-xl font-bold">Add New Element</h2>
+            {/* Top Admin Sub-Navigation */}
+            <div className="flex items-center justify-between flex-wrap gap-3 mb-6 pb-4 border-b border-slate-800/80">
+              <div className="flex items-center gap-1.5 p-1 rounded-2xl border bg-slate-900/60 border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setAdminSection('upload')}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition ${adminSection === 'upload'
+                      ? 'bg-blue-600 text-white font-bold shadow-md'
+                      : 'text-slate-400 hover:text-white'
+                    }`}
+                >
+                  <UploadCloud className="w-4 h-4" />
+                  <span>Upload Elements</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAdminSection('categories')}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition ${adminSection === 'categories'
+                      ? 'bg-blue-600 text-white font-bold shadow-md'
+                      : 'text-slate-400 hover:text-white'
+                    }`}
+                >
+                  <Folder className="w-4 h-4" />
+                  <span>Manage Categories</span>
+                  <span className="px-1.5 py-0.2 rounded-md text-[10px] bg-slate-800 text-cyan-400 font-bold">
+                    {allAvailableCategories.length}
+                  </span>
+                </button>
+              </div>
+
               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[11px] font-semibold">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                 <span>Supabase Cloud Connected</span>
               </div>
             </div>
-            <p className={`text-xs sm:text-sm mb-5 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-              Upload an SVG. It will be saved directly to the Supabase cloud database and visible to all users across the platform.
-            </p>
 
+            {/* Notification Messages */}
             {formSuccess && (
-              <div className="mb-5 p-3 sm:p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center gap-2.5 font-medium text-xs sm:text-sm">
+              <div className="mb-5 p-3 sm:p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center gap-2.5 font-medium text-xs sm:text-sm animate-fadeIn">
                 <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
                 <span>{formSuccess}</span>
               </div>
             )}
 
             {formError && (
-              <div className="mb-5 p-3 sm:p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 flex items-center gap-2.5 font-medium text-xs sm:text-sm">
+              <div className="mb-5 p-3 sm:p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 flex items-center gap-2.5 font-medium text-xs sm:text-sm animate-fadeIn">
                 <X className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
                 <span>{formError}</span>
               </div>
             )}
 
-            <div
-              onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-              onDragLeave={() => setIsDragging(false)}
-              onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
-              className={`border-2 border-dashed rounded-2xl p-5 sm:p-6 text-center cursor-pointer transition mb-5 flex flex-col items-center justify-center gap-2 ${isDragging
-                ? 'border-cyan-500 bg-cyan-500/10'
-                : appTheme === 'dark'
-                  ? 'border-slate-700 hover:border-slate-600 bg-[#0b0f19]/50'
-                  : 'border-slate-300 hover:border-slate-400 bg-slate-50'
-                }`}
-            >
-              <input
-                type="file"
-                ref={fileInputRef}
-                accept=".svg"
-                onChange={(e) => e.target.files?.[0] && handleFileProcess(e.target.files[0])}
-                className="hidden"
-              />
-              <div className={`p-2.5 sm:p-3 rounded-full ${appTheme === 'dark' ? 'bg-slate-800 text-cyan-400' : 'bg-slate-200 text-cyan-600'}`}>
-                <UploadCloud className="w-5 h-5 sm:w-6 sm:h-6" />
+            {detectedShapeNotice && (
+              <div className="mb-5 p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 flex items-center gap-2.5 text-xs font-semibold animate-pulse">
+                <Sparkles className="w-4 h-4 flex-shrink-0" />
+                <span>{detectedShapeNotice}</span>
               </div>
-              <p className={`text-xs sm:text-sm font-medium ${appTheme === 'dark' ? 'text-slate-200' : 'text-slate-700'}`}>
-                Drag and drop your <span className="text-cyan-500 font-semibold">.svg</span> file here, or browse
-              </p>
-              <p className={`text-[11px] sm:text-xs ${appTheme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Auto-populates title and parses code</p>
-            </div>
+            )}
 
-            <form onSubmit={handlePublishSvg} className="space-y-4 sm:space-y-5">
+            {adminSection === 'upload' ? (
               <div>
-                <label className={`block text-xs font-semibold uppercase tracking-wider mb-1.5 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                  Element Title
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Glowing Neon Trophy"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className={`w-full rounded-xl px-3.5 py-2.5 sm:py-3 text-sm focus:outline-none focus:border-blue-500 transition border ${appTheme === 'dark'
-                    ? 'bg-[#0b0f19] border-slate-700 text-slate-100 placeholder-slate-500'
-                    : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400'
-                    }`}
-                />
-              </div>
+                {/* Upload Mode Switcher: Single vs Bulk */}
+                <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
+                  <div>
+                    <h2 className="text-lg sm:text-xl font-bold">
+                      {uploadMode === 'single' ? 'Upload Single Element' : 'Bulk Upload Vector Elements'}
+                    </h2>
+                    <p className={`text-xs sm:text-sm ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                      {uploadMode === 'single'
+                        ? 'Upload an SVG with smart categorization & real-time preview.'
+                        : 'Upload multiple SVG files at once and assign common categories & tags.'}
+                    </p>
+                  </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-                <div>
-                  <label className={`block text-xs font-semibold uppercase tracking-wider mb-1.5 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                    Category
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. UI Icons, Badges, Logos"
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
-                    className={`w-full rounded-xl px-3.5 py-2.5 sm:py-3 text-sm focus:outline-none focus:border-blue-500 transition border ${appTheme === 'dark'
-                      ? 'bg-[#0b0f19] border-slate-700 text-slate-100 placeholder-slate-500'
-                      : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400'
-                      }`}
-                  />
-                </div>
-                <div>
-                  <label className={`block text-xs font-semibold uppercase tracking-wider mb-1.5 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                    Tags
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="neon, icon, gold, vector"
-                    value={tags}
-                    onChange={(e) => setTags(e.target.value)}
-                    className={`w-full rounded-xl px-3.5 py-2.5 sm:py-3 text-sm focus:outline-none focus:border-blue-500 transition border ${appTheme === 'dark'
-                      ? 'bg-[#0b0f19] border-slate-700 text-slate-100 placeholder-slate-500'
-                      : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400'
-                      }`}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className={`block text-xs font-semibold uppercase tracking-wider mb-1.5 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                  Raw SVG Code
-                </label>
-                <textarea
-                  required
-                  rows={5}
-                  placeholder="<svg viewBox='0 0 200 200' ...> ... </svg>"
-                  value={svgInput}
-                  onChange={(e) => setSvgInput(e.target.value)}
-                  className={`w-full font-mono text-xs rounded-xl p-3.5 sm:p-4 focus:outline-none focus:border-blue-500 transition border ${appTheme === 'dark'
-                    ? 'bg-[#0b0f19] border-slate-700 text-slate-100 placeholder-slate-500'
-                    : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400'
-                    }`}
-                />
-              </div>
-
-              {svgInput.trim() && (
-                <div className={`p-3 sm:p-4 rounded-xl border flex items-center gap-4 sm:gap-6 ${appTheme === 'dark' ? 'bg-[#0b0f19] border-slate-800' : 'bg-slate-50 border-slate-200'
-                  }`}>
-                  <div className={`w-20 h-20 sm:w-24 sm:h-24 rounded-lg flex items-center justify-center p-2 border flex-shrink-0 ${appTheme === 'dark' ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-inner'
-                    }`}
-                    dangerouslySetInnerHTML={{ __html: svgInput }} />
-                  <div className="text-xs">
-                    <p className={`font-semibold ${appTheme === 'dark' ? 'text-slate-200' : 'text-slate-800'}`}>Live SVG Preview</p>
-                    <p className={appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}>Ensure the SVG includes a valid <code>viewBox</code> attribute.</p>
+                  <div className="flex items-center gap-1 p-1 rounded-xl border bg-slate-900/40 border-slate-800 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setUploadMode('single')}
+                      className={`px-3 py-1.5 rounded-lg font-semibold transition ${uploadMode === 'single' ? 'bg-cyan-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-white'
+                        }`}
+                    >
+                      Single SVG
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setUploadMode('bulk')}
+                      className={`px-3 py-1.5 rounded-lg font-semibold flex items-center gap-1.5 transition ${uploadMode === 'bulk' ? 'bg-cyan-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-white'
+                        }`}
+                    >
+                      <FileUp className="w-3.5 h-3.5" />
+                      <span>Bulk Upload</span>
+                      {bulkFiles.length > 0 && (
+                        <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-900 text-cyan-300">
+                          {bulkFiles.length}
+                        </span>
+                      )}
+                    </button>
                   </div>
                 </div>
-              )}
 
-              <button
-                type="submit"
-                disabled={isPublishing}
-                className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white py-3 sm:py-3.5 rounded-xl font-medium text-sm transition shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2 cursor-pointer"
-              >
-                {isPublishing ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>Uploading to Supabase Cloud...</span>
-                  </>
+                {uploadMode === 'single' ? (
+                  /* Single Upload Form */
+                  <div>
+                    <div
+                      onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                      onDragLeave={() => setIsDragging(false)}
+                      onDrop={handleDrop}
+                      onClick={() => fileInputRef.current?.click()}
+                      className={`border-2 border-dashed rounded-2xl p-5 sm:p-6 text-center cursor-pointer transition mb-5 flex flex-col items-center justify-center gap-2 ${isDragging
+                          ? 'border-cyan-500 bg-cyan-500/10'
+                          : appTheme === 'dark'
+                            ? 'border-slate-700 hover:border-slate-600 bg-[#0b0f19]/50'
+                            : 'border-slate-300 hover:border-slate-400 bg-slate-50'
+                        }`}
+                    >
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        accept=".svg"
+                        onChange={(e) => e.target.files?.[0] && handleFileProcess(e.target.files[0])}
+                        className="hidden"
+                      />
+                      <div className={`p-2.5 sm:p-3 rounded-full ${appTheme === 'dark' ? 'bg-slate-800 text-cyan-400' : 'bg-slate-200 text-cyan-600'}`}>
+                        <UploadCloud className="w-5 h-5 sm:w-6 sm:h-6" />
+                      </div>
+                      <p className={`text-xs sm:text-sm font-medium ${appTheme === 'dark' ? 'text-slate-200' : 'text-slate-700'}`}>
+                        Drag and drop your <span className="text-cyan-500 font-semibold">.svg</span> file here, or browse
+                      </p>
+                      <p className={`text-[11px] sm:text-xs ${appTheme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                        Auto-detects title, silhouettes, 3D elements & category
+                      </p>
+                    </div>
+
+                    <form onSubmit={handlePublishSvg} className="space-y-4 sm:space-y-5">
+                      <div>
+                        <label className={`block text-xs font-semibold uppercase tracking-wider mb-1.5 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                          Element Title
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="e.g. Eagle Silhouette, Glowing Neon Trophy"
+                          value={title}
+                          onChange={(e) => setTitle(e.target.value)}
+                          className={`w-full rounded-xl px-3.5 py-2.5 sm:py-3 text-sm focus:outline-none focus:border-blue-500 transition border ${appTheme === 'dark'
+                              ? 'bg-[#0b0f19] border-slate-700 text-slate-100 placeholder-slate-500'
+                              : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400'
+                            }`}
+                        />
+                      </div>
+
+                      {/* Smart Category Picker */}
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <label className={`block text-xs font-semibold uppercase tracking-wider ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                            Category
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => setIsAddingNewCat(!isAddingNewCat)}
+                            className="text-xs font-semibold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 transition"
+                          >
+                            <FolderPlus className="w-3.5 h-3.5" />
+                            <span>{isAddingNewCat ? 'Close' : '+ Create New Category'}</span>
+                          </button>
+                        </div>
+
+                        {/* Inline Create Category Form */}
+                        {isAddingNewCat && (
+                          <div className="mb-3 p-3 rounded-xl border border-cyan-500/30 bg-cyan-950/20 flex items-center gap-2">
+                            <input
+                              type="text"
+                              placeholder="New category name (e.g. Silhouettes, Animal Vectors, Gaming)..."
+                              value={newCatInput}
+                              onChange={(e) => setNewCatInput(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  handleAddNewCategory(newCatInput, true, 'single');
+                                }
+                              }}
+                              className={`flex-1 rounded-lg px-3 py-1.5 text-xs focus:outline-none border ${appTheme === 'dark' ? 'bg-[#0b0f19] border-slate-700 text-white' : 'bg-white border-slate-300'
+                                }`}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleAddNewCategory(newCatInput, true, 'single')}
+                              className="px-3 py-1.5 rounded-lg bg-cyan-500 text-slate-950 text-xs font-bold hover:bg-cyan-400 transition"
+                            >
+                              Add
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => { setIsAddingNewCat(false); setNewCatInput(''); }}
+                              className="px-2 py-1.5 text-slate-400 hover:text-white text-xs"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Clickable Category Badges */}
+                        <div className="flex flex-wrap gap-1.5 mb-2.5">
+                          {allAvailableCategories.map((catName) => {
+                            const isSelected = category === catName;
+                            return (
+                              <button
+                                key={catName}
+                                type="button"
+                                onClick={() => setCategory(catName)}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition border flex items-center gap-1.5 ${isSelected
+                                    ? 'bg-blue-600 text-white border-blue-500 shadow-md font-bold'
+                                    : appTheme === 'dark'
+                                      ? 'bg-slate-900/90 text-slate-300 border-slate-800 hover:border-slate-700 hover:text-white'
+                                      : 'bg-slate-100 text-slate-700 border-slate-200 hover:border-slate-300'
+                                  }`}
+                              >
+                                <span>{catName}</span>
+                                {isSelected && <Check className="w-3 h-3 text-white" />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Asset Style / Classification */}
+                      <div>
+                        <label className={`block text-xs font-semibold uppercase tracking-wider mb-2 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                          Asset Type / Style
+                        </label>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                          {[
+                            { id: 'silhouette', label: 'Silhouette', desc: 'Flat solid vector shape' },
+                            { id: 'linear', label: 'UI Outline', desc: 'Stroked icon' },
+                            { id: 'filled', label: 'Color Filled', desc: 'Standard multi-color' },
+                            { id: '3d', label: '3D Artwork', desc: 'Gradient / Shaded layers' },
+                          ].map((item) => {
+                            const isSelected = assetType === item.id;
+                            return (
+                              <button
+                                key={item.id}
+                                type="button"
+                                onClick={() => setAssetType(item.id)}
+                                className={`p-2.5 rounded-xl border text-left transition ${isSelected
+                                    ? 'bg-cyan-500/10 border-cyan-500 text-cyan-400 font-bold'
+                                    : appTheme === 'dark' ? 'bg-slate-900/60 border-slate-800 text-slate-400 hover:border-slate-700' : 'bg-slate-50 border-slate-200 text-slate-600'
+                                  }`}
+                              >
+                                <div className="text-xs">{item.label}</div>
+                                <div className="text-[10px] opacity-75 font-normal">{item.desc}</div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Tags */}
+                      <div>
+                        <label className={`block text-xs font-semibold uppercase tracking-wider mb-1.5 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                          Tags
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="silhouette, vector, icon, shadow, black"
+                          value={tags}
+                          onChange={(e) => setTags(e.target.value)}
+                          className={`w-full rounded-xl px-3.5 py-2.5 sm:py-3 text-sm focus:outline-none focus:border-blue-500 transition border ${appTheme === 'dark'
+                              ? 'bg-[#0b0f19] border-slate-700 text-slate-100 placeholder-slate-500'
+                              : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400'
+                            }`}
+                        />
+                      </div>
+
+                      {/* Raw SVG Code */}
+                      <div>
+                        <label className={`block text-xs font-semibold uppercase tracking-wider mb-1.5 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                          Raw SVG Code
+                        </label>
+                        <textarea
+                          required
+                          rows={4}
+                          placeholder="<svg viewBox='0 0 200 200' ...> ... </svg>"
+                          value={svgInput}
+                          onChange={(e) => setSvgInput(e.target.value)}
+                          className={`w-full font-mono text-xs rounded-xl p-3.5 sm:p-4 focus:outline-none focus:border-blue-500 transition border ${appTheme === 'dark'
+                              ? 'bg-[#0b0f19] border-slate-700 text-slate-100 placeholder-slate-500'
+                              : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400'
+                            }`}
+                        />
+                      </div>
+
+                      {svgInput.trim() && (
+                        <div className={`p-3 sm:p-4 rounded-xl border flex items-center gap-4 sm:gap-6 ${appTheme === 'dark' ? 'bg-[#0b0f19] border-slate-800' : 'bg-slate-50 border-slate-200'
+                          }`}>
+                          <div className={`w-20 h-20 sm:w-24 sm:h-24 rounded-lg flex items-center justify-center p-2 border flex-shrink-0 ${appTheme === 'dark' ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-inner'
+                            }`}
+                            dangerouslySetInnerHTML={{ __html: svgInput }} />
+                          <div className="text-xs">
+                            <p className={`font-semibold ${appTheme === 'dark' ? 'text-slate-200' : 'text-slate-800'}`}>Live SVG Preview</p>
+                            <p className={appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}>Category: <span className="text-cyan-400 font-semibold">{category}</span> | Type: <span className="text-cyan-400 font-semibold">{assetType}</span></p>
+                          </div>
+                        </div>
+                      )}
+
+                      <button
+                        type="submit"
+                        disabled={isPublishing}
+                        className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white py-3 sm:py-3.5 rounded-xl font-medium text-sm transition shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        {isPublishing ? (
+                          <>
+                            <RefreshCw className="w-4 h-4 animate-spin" />
+                            <span>Uploading to Supabase Cloud...</span>
+                          </>
+                        ) : (
+                          <span>Publish to Supabase Cloud</span>
+                        )}
+                      </button>
+                    </form>
+                  </div>
                 ) : (
-                  <span>Publish to Supabase Cloud</span>
+                  /* Bulk Upload Mode */
+                  <div className="space-y-5">
+                    <div
+                      onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                      onDragLeave={() => setIsDragging(false)}
+                      onDrop={handleDrop}
+                      onClick={() => bulkFileInputRef.current?.click()}
+                      className={`border-2 border-dashed rounded-2xl p-6 sm:p-8 text-center cursor-pointer transition flex flex-col items-center justify-center gap-2 ${isDragging
+                          ? 'border-cyan-500 bg-cyan-500/10'
+                          : appTheme === 'dark'
+                            ? 'border-slate-700 hover:border-slate-600 bg-[#0b0f19]/50'
+                            : 'border-slate-300 hover:border-slate-400 bg-slate-50'
+                        }`}
+                    >
+                      <input
+                        type="file"
+                        ref={bulkFileInputRef}
+                        accept=".svg"
+                        multiple
+                        onChange={(e) => e.target.files?.length && handleBulkFilesSelect(e.target.files)}
+                        className="hidden"
+                      />
+                      <div className={`p-3 rounded-full ${appTheme === 'dark' ? 'bg-slate-800 text-cyan-400' : 'bg-slate-200 text-cyan-600'}`}>
+                        <FileUp className="w-6 h-6" />
+                      </div>
+                      <p className={`text-sm font-semibold ${appTheme === 'dark' ? 'text-slate-200' : 'text-slate-700'}`}>
+                        Choose or drag & drop <span className="text-cyan-400">multiple .svg files</span>
+                      </p>
+                      <p className={`text-xs ${appTheme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                        Upload 10, 20, or 50 icons/silhouettes in a single click!
+                      </p>
+                    </div>
+
+                    {/* Bulk Common Settings */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-2xl border border-slate-800 bg-slate-900/40">
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                            Bulk Category
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => setIsAddingNewCat(!isAddingNewCat)}
+                            className="text-[11px] text-cyan-400 hover:underline"
+                          >
+                            + New Category
+                          </button>
+                        </div>
+
+                        {isAddingNewCat && (
+                          <div className="mb-2 flex gap-1.5">
+                            <input
+                              type="text"
+                              placeholder="New category..."
+                              value={newCatInput}
+                              onChange={(e) => setNewCatInput(e.target.value)}
+                              className="flex-1 rounded-lg px-2.5 py-1 text-xs bg-slate-900 border border-slate-700 text-white"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => handleAddNewCategory(newCatInput, true, 'bulk')}
+                              className="px-2.5 py-1 rounded-lg bg-cyan-500 text-slate-950 text-xs font-bold"
+                            >
+                              Add
+                            </button>
+                          </div>
+                        )}
+
+                        <div className="flex flex-wrap gap-1">
+                          {allAvailableCategories.map((c) => (
+                            <button
+                              key={c}
+                              type="button"
+                              onClick={() => setBulkCategory(c)}
+                              className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition border ${bulkCategory === c
+                                  ? 'bg-blue-600 text-white border-blue-500 font-bold'
+                                  : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:border-slate-600'
+                                }`}
+                            >
+                              {c}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+                            Bulk Tags
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="e.g. silhouette, icons, pack1"
+                            value={bulkTags}
+                            onChange={(e) => setBulkTags(e.target.value)}
+                            className="w-full rounded-xl px-3 py-2 text-xs bg-[#0b0f19] border border-slate-700 text-slate-100"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+                            Asset Style
+                          </label>
+                          <div className="flex gap-1.5">
+                            {['silhouette', 'linear', 'filled', '3d'].map((type) => (
+                              <button
+                                key={type}
+                                type="button"
+                                onClick={() => setBulkAssetType(type)}
+                                className={`px-2.5 py-1 rounded-lg text-xs font-semibold capitalize border transition ${bulkAssetType === type
+                                    ? 'bg-cyan-500 text-slate-950 font-bold border-cyan-400'
+                                    : 'bg-slate-900 border-slate-700 text-slate-400'
+                                  }`}
+                              >
+                                {type}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Selected Files List */}
+                    {bulkFiles.length > 0 && (
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-bold text-slate-300">
+                            Selected Files ({bulkFiles.length})
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setBulkFiles([])}
+                            className="text-xs text-rose-400 hover:underline"
+                          >
+                            Clear All
+                          </button>
+                        </div>
+
+                        <div className="max-h-64 overflow-y-auto space-y-2 pr-1">
+                          {bulkFiles.map((item, idx) => (
+                            <div
+                              key={item.id}
+                              className="p-2.5 rounded-xl border border-slate-800 bg-slate-900/60 flex items-center justify-between gap-3 text-xs"
+                            >
+                              <div className="w-9 h-9 rounded-lg border border-slate-800 bg-slate-950 flex items-center justify-center p-1 flex-shrink-0"
+                                dangerouslySetInnerHTML={{ __html: item.svgCode }} />
+                              <input
+                                type="text"
+                                value={item.title}
+                                onChange={(e) => {
+                                  const updated = [...bulkFiles];
+                                  updated[idx].title = e.target.value;
+                                  setBulkFiles(updated);
+                                }}
+                                className="flex-1 bg-transparent border-b border-slate-700 focus:border-cyan-400 px-1 py-0.5 text-xs text-slate-200 outline-none"
+                              />
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                {item.status === 'success' && (
+                                  <span className="text-emerald-400 text-[10px] font-semibold flex items-center gap-1">
+                                    <Check className="w-3 h-3" /> Uploaded
+                                  </span>
+                                )}
+                                {item.status === 'error' && (
+                                  <span className="text-rose-400 text-[10px] font-semibold">Failed</span>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => setBulkFiles(bulkFiles.filter(f => f.id !== item.id))}
+                                  className="text-slate-500 hover:text-rose-400 p-1"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Bulk Upload Progress */}
+                        {isBulkPublishing && (
+                          <div className="mt-4 p-3 rounded-xl border border-cyan-500/30 bg-cyan-950/20 space-y-1.5">
+                            <div className="flex justify-between text-xs font-semibold text-cyan-300">
+                              <span>Uploading to Supabase Cloud...</span>
+                              <span>{bulkProgress.current} / {bulkProgress.total}</span>
+                            </div>
+                            <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                              <div
+                                className="bg-cyan-400 h-full transition-all duration-200"
+                                style={{ width: `${(bulkProgress.current / bulkProgress.total) * 100}%` }}
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={handlePublishBulkSvgs}
+                          disabled={isBulkPublishing}
+                          className="mt-4 w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white py-3 rounded-xl font-medium text-sm transition shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2 cursor-pointer"
+                        >
+                          {isBulkPublishing ? (
+                            <>
+                              <RefreshCw className="w-4 h-4 animate-spin" />
+                              <span>Uploading {bulkProgress.current}/{bulkProgress.total} items...</span>
+                            </>
+                          ) : (
+                            <span>Publish All {bulkFiles.length} Elements to Cloud</span>
+                          )}
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 )}
-              </button>
-            </form>
+              </div>
+            ) : (
+              /* Category Manager Section */
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-lg sm:text-xl font-bold">Category Manager</h2>
+                  <p className={`text-xs sm:text-sm ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                    Create, rename, or organize categories. Categories automatically update in the Home Gallery filter bar.
+                  </p>
+                </div>
+
+                {/* Add New Category Form */}
+                <div className="p-4 rounded-2xl border border-cyan-500/30 bg-cyan-500/5 space-y-2">
+                  <span className="text-xs font-bold text-cyan-400 uppercase tracking-wider block">
+                    Create New Category
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      placeholder="e.g. Silhouettes, Animal Shapes, Weapons, Cyberpunk, 3D Assets..."
+                      value={newCategoryManagerInput}
+                      onChange={(e) => setNewCategoryManagerInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          if (newCategoryManagerInput.trim()) {
+                            handleAddNewCategory(newCategoryManagerInput, false);
+                            setNewCategoryManagerInput('');
+                          }
+                        }
+                      }}
+                      className={`flex-1 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm border focus:outline-none focus:border-cyan-400 transition ${appTheme === 'dark' ? 'bg-[#0b0f19] border-slate-700 text-white' : 'bg-white border-slate-300'
+                        }`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (newCategoryManagerInput.trim()) {
+                          handleAddNewCategory(newCategoryManagerInput, false);
+                          setNewCategoryManagerInput('');
+                        }
+                      }}
+                      className="px-4 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs sm:text-sm transition flex items-center gap-1.5 flex-shrink-0 cursor-pointer shadow"
+                    >
+                      <FolderPlus className="w-4 h-4" />
+                      <span>Add Category</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Search Categories */}
+                <div className="relative">
+                  <Search className="absolute left-3.5 top-3 text-slate-400 w-4 h-4" />
+                  <input
+                    type="text"
+                    placeholder="Filter categories list..."
+                    value={categorySearchTerm}
+                    onChange={(e) => setCategorySearchTerm(e.target.value)}
+                    className={`w-full border rounded-xl pl-10 pr-3.5 py-2 text-xs sm:text-sm focus:outline-none focus:border-blue-500 transition ${appTheme === 'dark' ? 'bg-[#0b0f19] border-slate-800 text-slate-200' : 'bg-slate-50 border-slate-300'
+                      }`}
+                  />
+                </div>
+
+                {/* Categories Grid Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                  {allAvailableCategories
+                    .filter(c => c.toLowerCase().includes(categorySearchTerm.toLowerCase()))
+                    .map((catName) => {
+                      const count = elements.filter(el => el.category === catName).length;
+                      const isEditing = editingCategory?.oldName === catName;
+
+                      return (
+                        <div
+                          key={catName}
+                          className={`p-3.5 rounded-2xl border transition flex flex-col justify-between gap-3 ${appTheme === 'dark' ? 'bg-[#0b0f19]/80 border-slate-800' : 'bg-slate-50 border-slate-200'
+                            }`}
+                        >
+                          {isEditing ? (
+                            <div className="space-y-2">
+                              <input
+                                type="text"
+                                autoFocus
+                                value={editingCategory.newName}
+                                onChange={(e) => setEditingCategory({ ...editingCategory, newName: e.target.value })}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    handleRenameCategory(catName, editingCategory.newName);
+                                  }
+                                }}
+                                className="w-full rounded-lg px-2.5 py-1.5 text-xs bg-slate-900 border border-cyan-400 text-white outline-none font-semibold"
+                              />
+                              <div className="flex gap-1.5 justify-end">
+                                <button
+                                  type="button"
+                                  onClick={() => handleRenameCategory(catName, editingCategory.newName)}
+                                  className="px-2.5 py-1 rounded-md bg-emerald-500 text-slate-950 font-bold text-[11px]"
+                                >
+                                  Save
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingCategory(null)}
+                                  className="px-2 py-1 text-slate-400 text-[11px] hover:text-white"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className="p-2 rounded-xl bg-blue-500/10 text-blue-400 flex-shrink-0">
+                                  <Folder className="w-4 h-4" />
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="text-xs sm:text-sm font-bold truncate text-slate-200">
+                                    {catName}
+                                  </div>
+                                  <div className="text-[11px] text-slate-400 font-medium">
+                                    {count} {count === 1 ? 'element' : 'elements'}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-1 flex-shrink-0">
+                                <button
+                                  type="button"
+                                  title="Rename category"
+                                  onClick={() => setEditingCategory({ oldName: catName, newName: catName })}
+                                  className="p-1.5 rounded-lg text-slate-400 hover:text-cyan-400 hover:bg-slate-800 transition"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  title="Delete category"
+                                  onClick={() => handleDeleteCategory(catName)}
+                                  className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           /* Browse Gallery */
@@ -5191,10 +6058,22 @@ export default function App() {
                       {isFavCat ? (
                         <>
                           <Heart className={`w-3.5 h-3.5 ${isSelected ? 'fill-white' : 'fill-rose-500 text-rose-500'}`} />
-                          <span>Favorites ({favorites.length})</span>
+                          <span>Favorites</span>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${isSelected ? 'bg-white/20 text-white' : 'bg-rose-500/15 text-rose-400'}`}>
+                            {favorites.length}
+                          </span>
                         </>
                       ) : (
-                        <span>{cat}</span>
+                        <>
+                          <span>{cat}</span>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                            isSelected
+                              ? 'bg-white/20 text-white'
+                              : appTheme === 'dark' ? 'bg-slate-800 text-slate-400' : 'bg-slate-200 text-slate-600'
+                          }`}>
+                            {cat === 'All' ? elements.length : elements.filter(e => e.category === cat).length}
+                          </span>
+                        </>
                       )}
                     </button>
                   );
@@ -5231,7 +6110,12 @@ export default function App() {
 
                     <div
                       className="w-24 h-24 sm:w-32 sm:h-32 flex items-center justify-center p-2 mb-2 sm:mb-3"
-                      dangerouslySetInnerHTML={{ __html: item.svgCode }}
+                      dangerouslySetInnerHTML={{
+                        __html: scopeSvgIds(
+                          item.originalSvgCode || item.svgCode,
+                          `home_${String(item.id).replace(/[^a-zA-Z0-9_-]/g, '_')}_`
+                        )
+                      }}
                     />
                     <h3 className={`font-medium text-xs sm:text-sm text-center truncate w-full ${appTheme === 'dark' ? 'text-slate-200' : 'text-slate-800'}`}>
                       {item.title}
@@ -5539,6 +6423,39 @@ export default function App() {
                           </button>
                         ))}
                       </div>
+                      {exportFormat === 'gif' && (
+                        <div className="mt-2.5 p-2 rounded-xl border border-cyan-500/30 bg-cyan-950/20 space-y-1.5 animate-fadeIn">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-1">
+                              <Film className="w-3 h-3" /> GIF Smoothness (FPS)
+                            </span>
+                            <span className="text-[10px] font-mono text-cyan-300 font-bold">
+                              {adjustments.animFps || 60} FPS
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-1">
+                            {[
+                              { fps: 24, label: '24 FPS' },
+                              { fps: 30, label: '30 FPS' },
+                              { fps: 60, label: '60 FPS', badge: '⚡ Best' }
+                            ].map((item) => (
+                              <button
+                                key={item.fps}
+                                type="button"
+                                onClick={() => setAdjustments(prev => ({ ...prev, animFps: item.fps }))}
+                                className={`py-1 px-1 rounded-lg text-[10px] font-semibold border transition text-center ${
+                                  (adjustments.animFps || 60) === item.fps
+                                    ? 'bg-blue-600 border-blue-400 text-white font-bold shadow'
+                                    : 'bg-slate-900/80 border-slate-800 text-slate-300 hover:border-slate-700'
+                                }`}
+                              >
+                                <span>{item.label}</span>
+                                {item.badge && <span className="ml-1 text-[8px] px-1 rounded bg-amber-400 text-slate-950 font-bold">{item.badge}</span>}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Resolution Options Grid (128px to 8K) */}
@@ -5960,15 +6877,17 @@ export default function App() {
               <div
                 className={
                   adjustments.is3DFloating
-                    ? adjustments.animPreset === 'spin360'
-                      ? 'animate-spin-3d'
-                      : adjustments.animPreset === 'pulse'
-                        ? 'animate-pulse-3d'
-                        : adjustments.animPreset === 'wobble'
-                          ? 'animate-wobble-3d'
-                          : adjustments.animPreset === 'wave'
-                            ? 'animate-wave-3d'
-                            : 'animate-floating-3d'
+                    ? `animate-${
+                        adjustments.animPreset === 'float'
+                          ? 'floating'
+                          : adjustments.animPreset === 'spin360'
+                            ? 'spin'
+                            : adjustments.animPreset === 'flip3d'
+                              ? 'flip'
+                              : adjustments.animPreset === 'hover3d'
+                                ? 'hover'
+                                : (adjustments.animPreset || 'floating')
+                      }-3d`
                     : ''
                 }
                 style={{
@@ -8624,39 +9543,73 @@ export default function App() {
                             </button>
                           </div>
 
-                          {/* Motion Presets (5 dynamic motion types) */}
+                          {/* Motion Presets (14 dynamic motion types) */}
                           <div>
                             <div className="flex items-center justify-between mb-1.5">
                               <span className={`text-[11px] font-semibold uppercase tracking-wider ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'
                                 }`}>
-                                Motion Preset
+                                Motion Preset ({MOTION_PRESETS.length})
                               </span>
-                              <span className="text-[10px] font-mono text-cyan-400 font-semibold">
+                              <span className="text-[10px] font-mono text-cyan-400 font-semibold capitalize">
                                 {adjustments.animPreset || 'float'}
                               </span>
                             </div>
-                            <div className="grid grid-cols-5 gap-1.5">
-                              {[
-                                { id: 'float', name: 'Levitate', icon: '🚀' },
-                                { id: 'spin360', name: '360° Spin', icon: '🔄' },
-                                { id: 'pulse', name: 'Pulse', icon: '💓' },
-                                { id: 'wobble', name: 'Wobble', icon: '🎭' },
-                                { id: 'wave', name: 'Wave', icon: '🌊' }
-                              ].map((preset) => {
+                            <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5 max-h-56 overflow-y-auto pr-1">
+                              {MOTION_PRESETS.map((preset) => {
                                 const isSel = (adjustments.animPreset || 'float') === preset.id;
                                 return (
                                   <button
                                     key={preset.id}
+                                    type="button"
+                                    title={preset.desc}
                                     onClick={() => setAdjustments(prev => ({ ...prev, animPreset: preset.id, is3DFloating: true }))}
                                     className={`p-1.5 rounded-xl text-center border transition flex flex-col items-center gap-0.5 ${isSel
-                                      ? 'bg-blue-600 text-white border-blue-400 shadow-md shadow-blue-600/20'
+                                      ? 'bg-blue-600 text-white border-blue-400 shadow-md shadow-blue-600/20 font-bold'
                                       : appTheme === 'dark'
                                         ? 'bg-slate-800/80 border-slate-700/60 text-slate-300 hover:border-slate-600'
                                         : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
                                       }`}
                                   >
-                                    <span className="text-sm">{preset.icon}</span>
+                                    <span className="text-base leading-none">{preset.icon}</span>
                                     <span className="text-[9px] font-semibold truncate w-full">{preset.name}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* GIF Frame Rate (Smoothness) Selector */}
+                          <div className="pt-2 border-t border-slate-200/20">
+                            <div className="flex items-center justify-between mb-1.5">
+                              <span className={`text-[11px] font-semibold uppercase tracking-wider ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                                GIF Frame Rate (Smoothness)
+                              </span>
+                              <span className="text-[10px] font-mono text-cyan-400 font-bold">
+                                {adjustments.animFps || 60} FPS
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-3 gap-1.5">
+                              {[
+                                { fps: 24, label: '24 FPS', desc: 'Standard / Light' },
+                                { fps: 30, label: '30 FPS', desc: 'Smooth' },
+                                { fps: 60, label: '60 FPS', desc: 'Ultra Fluid', badge: '⚡ 60fps' }
+                              ].map((item) => {
+                                const isSel = (adjustments.animFps || 60) === item.fps;
+                                return (
+                                  <button
+                                    key={item.fps}
+                                    type="button"
+                                    onClick={() => setAdjustments(prev => ({ ...prev, animFps: item.fps }))}
+                                    className={`py-1.5 px-2 rounded-xl border text-center transition ${isSel
+                                      ? 'bg-blue-600 border-blue-400 text-white font-bold shadow-md'
+                                      : appTheme === 'dark' ? 'bg-slate-800/80 border-slate-700/60 text-slate-300 hover:border-slate-600' : 'bg-white border-slate-200 text-slate-700'
+                                    }`}
+                                  >
+                                    <div className="text-xs flex items-center justify-center gap-1 font-semibold">
+                                      <span>{item.label}</span>
+                                      {item.badge && <span className="text-[9px] px-1 py-0.2 rounded bg-amber-400 text-slate-950 font-bold">{item.badge}</span>}
+                                    </div>
+                                    <div className="text-[9px] opacity-75 font-normal">{item.desc}</div>
                                   </button>
                                 );
                               })}
@@ -8998,11 +9951,113 @@ export default function App() {
                         ))}
                       </div>
                       {exportFormat === 'gif' && (
-                        <div className="mt-2 p-2.5 rounded-xl bg-blue-600/10 border border-blue-500/30 text-[11px] flex items-center gap-2">
-                          <Film className="w-4 h-4 text-cyan-400 shrink-0" />
-                          <span className={appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'}>
-                            Animated looping GIF with active 3D motion & transparency
-                          </span>
+                        <div className="mt-3 p-3.5 rounded-2xl bg-cyan-950/20 border border-cyan-500/30 space-y-3 animate-fadeIn">
+                          {/* Motion Preset Selector */}
+                          <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <span className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-1.5">
+                                <Sparkles className="w-3.5 h-3.5" /> Motion Preset
+                              </span>
+                              <span className="text-[10px] font-mono text-cyan-300 font-semibold capitalize">
+                                {adjustments.animPreset || 'float'}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-5 gap-1 max-h-36 overflow-y-auto pr-0.5">
+                              {MOTION_PRESETS.map((preset) => {
+                                const isSel = (adjustments.animPreset || 'float') === preset.id;
+                                return (
+                                  <button
+                                    key={preset.id}
+                                    type="button"
+                                    title={preset.desc}
+                                    onClick={() => setAdjustments(prev => ({ ...prev, animPreset: preset.id, is3DFloating: preset.id !== 'none' }))}
+                                    className={`p-1 rounded-lg text-center border transition flex flex-col items-center gap-0.5 ${isSel
+                                      ? 'bg-blue-600 text-white border-blue-400 shadow-md font-bold'
+                                      : appTheme === 'dark'
+                                        ? 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700'
+                                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                                    }`}
+                                  >
+                                    <span className="text-sm leading-none">{preset.icon}</span>
+                                    <span className="text-[8px] font-semibold truncate w-full">{preset.name}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* Loop Speed & Motion Amplitude Sliders */}
+                          <div className="space-y-2 pt-1 border-t border-slate-700/40">
+                            <div>
+                              <div className={`flex justify-between text-[11px] mb-1 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                                <span className="font-semibold text-slate-300">Loop Speed</span>
+                                <span className="text-cyan-400 font-mono font-bold">{adjustments.animSpeed || 2.2}s</span>
+                              </div>
+                              <input
+                                type="range"
+                                min="0.8"
+                                max="4.0"
+                                step="0.2"
+                                value={adjustments.animSpeed || 2.2}
+                                onChange={(e) => setAdjustments(prev => ({ ...prev, animSpeed: Number(e.target.value) }))}
+                                className="theme-slider w-full"
+                              />
+                            </div>
+
+                            <div>
+                              <div className={`flex justify-between text-[11px] mb-1 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                                <span className="font-semibold text-slate-300">Motion Amplitude</span>
+                                <span className="text-cyan-400 font-mono font-bold">{adjustments.animHeight || 16}px</span>
+                              </div>
+                              <input
+                                type="range"
+                                min="4"
+                                max="32"
+                                step="2"
+                                value={adjustments.animHeight || 16}
+                                onChange={(e) => setAdjustments(prev => ({ ...prev, animHeight: Number(e.target.value) }))}
+                                className="theme-slider w-full"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Frame Rate / Smoothness */}
+                          <div className="pt-1 border-t border-slate-700/40 space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-1.5">
+                                <Film className="w-3.5 h-3.5" /> Frame Rate (Smoothness)
+                              </span>
+                              <span className="text-[10px] font-mono text-cyan-300 font-bold">
+                                {adjustments.animFps || 60} FPS
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-3 gap-1.5">
+                              {[
+                                { fps: 24, label: '24 FPS', desc: 'Standard' },
+                                { fps: 30, label: '30 FPS', desc: 'Smooth' },
+                                { fps: 60, label: '60 FPS', desc: 'Ultra Fluid', badge: '⚡ 60fps' }
+                              ].map((item) => {
+                                const isSel = (adjustments.animFps || 60) === item.fps;
+                                return (
+                                  <button
+                                    key={item.fps}
+                                    type="button"
+                                    onClick={() => setAdjustments(prev => ({ ...prev, animFps: item.fps }))}
+                                    className={`p-1.5 rounded-xl text-center border transition ${isSel
+                                      ? 'bg-blue-600 border-blue-400 text-white font-bold shadow-md'
+                                      : appTheme === 'dark' ? 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700' : 'bg-white border-slate-200 text-slate-700'
+                                    }`}
+                                  >
+                                    <div className="text-xs flex items-center justify-center gap-1 font-semibold">
+                                      <span>{item.label}</span>
+                                      {item.badge && <span className="text-[8px] px-1 py-0.2 rounded bg-amber-400 text-slate-950 font-bold">{item.badge}</span>}
+                                    </div>
+                                    <div className="text-[9px] opacity-75 font-normal">{item.desc}</div>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -9939,7 +10994,12 @@ export default function App() {
                 >
                   <div
                     className="w-20 h-20 sm:w-24 sm:h-24 flex items-center justify-center p-2 mb-2 [&>svg]:w-full [&>svg]:h-full transition-transform group-hover:scale-105 pointer-events-none"
-                    dangerouslySetInnerHTML={{ __html: item.svgCode }}
+                    dangerouslySetInnerHTML={{
+                      __html: scopeSvgIds(
+                        item.originalSvgCode || item.svgCode,
+                        `modal_${String(item.id).replace(/[^a-zA-Z0-9_-]/g, '_')}_`
+                      )
+                    }}
                   />
                   <div className="w-full text-center pointer-events-none">
                     <span className={`text-xs font-bold truncate block ${appTheme === 'dark' ? 'text-slate-200 group-hover:text-cyan-400' : 'text-slate-900 group-hover:text-blue-600'}`}>

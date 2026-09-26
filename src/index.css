@@ -271,7 +271,7 @@ button, input, select, textarea, [role="button"] {
     transform: translateY(0px);
   }
   50% {
-    transform: translateY(calc(-1 * var(--anim-amp, 14px)));
+    transform: translateY(calc(-1 * var(--anim-amp, 16px)));
   }
 }
 
@@ -289,25 +289,150 @@ button, input, select, textarea, [role="button"] {
     transform: scale(1);
   }
   50% {
-    transform: scale(1.10);
+    transform: scale(calc(1 + (var(--anim-amp, 16px) * 0.0075)));
   }
 }
 
 @keyframes wobble3d {
   0%, 100% {
-    transform: rotateX(-6deg) rotateY(10deg);
+    transform: rotateX(calc(-0.35 * var(--anim-amp, 16px) * 1deg)) rotateY(calc(0.65 * var(--anim-amp, 16px) * 1deg));
   }
   50% {
-    transform: rotateX(6deg) rotateY(-10deg);
+    transform: rotateX(calc(0.35 * var(--anim-amp, 16px) * 1deg)) rotateY(calc(-0.65 * var(--anim-amp, 16px) * 1deg));
   }
 }
 
 @keyframes wave3d {
   0%, 100% {
-    transform: translateY(-6px) rotate(3deg);
+    transform: translateY(calc(-0.4 * var(--anim-amp, 16px))) rotate(calc(0.2 * var(--anim-amp, 16px) * 1deg));
   }
   50% {
-    transform: translateY(8px) rotate(-3deg);
+    transform: translateY(calc(0.5 * var(--anim-amp, 16px))) rotate(calc(-0.2 * var(--anim-amp, 16px) * 1deg));
+  }
+}
+
+@keyframes bounce3d {
+  0%, 100% {
+    transform: translateY(0) scale(1, 1);
+  }
+  40% {
+    transform: translateY(calc(-1 * var(--anim-amp, 16px) * 1.2)) scale(0.96, 1.04);
+  }
+  75% {
+    transform: translateY(calc(var(--anim-amp, 16px) * 0.4)) scale(1.08, 0.92);
+  }
+  85% {
+    transform: translateY(calc(var(--anim-amp, 16px) * 0.1)) scale(1.02, 0.98);
+  }
+}
+
+@keyframes swing3d {
+  0%, 100% {
+    transform: rotate(calc(-0.85 * var(--anim-amp, 16px) * 1deg));
+    transform-origin: top center;
+  }
+  50% {
+    transform: rotate(calc(0.85 * var(--anim-amp, 16px) * 1deg));
+    transform-origin: top center;
+  }
+}
+
+@keyframes flip3d {
+  0% {
+    transform: rotateX(0deg);
+  }
+  100% {
+    transform: rotateX(360deg);
+  }
+}
+
+@keyframes heartbeat3d {
+  0%, 100% {
+    transform: scale(1);
+  }
+  14% {
+    transform: scale(calc(1 + (var(--anim-amp, 16px) * 0.010)));
+  }
+  28% {
+    transform: scale(1.02);
+  }
+  42% {
+    transform: scale(calc(1 + (var(--anim-amp, 16px) * 0.013)));
+  }
+  70% {
+    transform: scale(1);
+  }
+}
+
+@keyframes jiggle3d {
+  0%, 100% {
+    transform: rotate(0deg) scale(1);
+  }
+  20% {
+    transform: rotate(calc(-0.35 * var(--anim-amp, 16px) * 1deg)) scale(calc(1 + var(--anim-amp, 16px) * 0.0025));
+  }
+  40% {
+    transform: rotate(calc(0.35 * var(--anim-amp, 16px) * 1deg)) scale(calc(1 + var(--anim-amp, 16px) * 0.0025));
+  }
+  60% {
+    transform: rotate(calc(-0.25 * var(--anim-amp, 16px) * 1deg)) scale(1.02);
+  }
+  80% {
+    transform: rotate(calc(0.25 * var(--anim-amp, 16px) * 1deg)) scale(1.02);
+  }
+}
+
+@keyframes twist3d {
+  0%, 100% {
+    transform: rotate(0deg) rotateY(0deg);
+  }
+  35% {
+    transform: rotate(calc(1 * var(--anim-amp, 16px) * 1deg)) rotateY(calc(1.5 * var(--anim-amp, 16px) * 1deg));
+  }
+  70% {
+    transform: rotate(calc(-1 * var(--anim-amp, 16px) * 1deg)) rotateY(calc(-1.5 * var(--anim-amp, 16px) * 1deg));
+  }
+}
+
+@keyframes orbit3d {
+  0% {
+    transform: translate(0px, calc(-1 * var(--anim-amp, 16px))) rotate(0deg);
+  }
+  25% {
+    transform: translate(calc(var(--anim-amp, 16px) * 0.8), 0px) rotate(2deg);
+  }
+  50% {
+    transform: translate(0px, calc(var(--anim-amp, 16px))) rotate(0deg);
+  }
+  75% {
+    transform: translate(calc(-1 * var(--anim-amp, 16px) * 0.8), 0px) rotate(-2deg);
+  }
+  100% {
+    transform: translate(0px, calc(-1 * var(--anim-amp, 16px))) rotate(0deg);
+  }
+}
+
+@keyframes glitch3d {
+  0%, 78%, 100% {
+    transform: translate(0, 0) skew(0deg);
+  }
+  80% {
+    transform: translate(calc(-0.3 * var(--anim-amp, 16px)), calc(0.12 * var(--anim-amp, 16px))) skew(calc(-0.3 * var(--anim-amp, 16px) * 1deg));
+  }
+  84% {
+    transform: translate(calc(0.3 * var(--anim-amp, 16px)), calc(-0.12 * var(--anim-amp, 16px))) skew(calc(0.3 * var(--anim-amp, 16px) * 1deg));
+  }
+  88% {
+    transform: translate(calc(-0.2 * var(--anim-amp, 16px)), calc(0.06 * var(--anim-amp, 16px))) skew(calc(-0.15 * var(--anim-amp, 16px) * 1deg));
+  }
+}
+
+@keyframes hover3d {
+  0%, 100% {
+    transform: translateY(0px) rotateX(calc(0.35 * var(--anim-amp, 16px) * 1deg)) rotateY(calc(-0.35 * var(--anim-amp, 16px) * 1deg));
+  }
+  50% {
+    transform: translateY(calc(-1 * var(--anim-amp, 16px) * 0.7)) rotateX(calc(-0.35 * var(--anim-amp, 16px) * 1deg)) rotateY(calc(0.35 * var(--anim-amp, 16px) * 1deg));
   }
 }
 
@@ -329,6 +454,42 @@ button, input, select, textarea, [role="button"] {
 
 .animate-wave-3d {
   animation: wave3d var(--anim-speed, 2.8s) ease-in-out infinite;
+}
+
+.animate-bounce-3d {
+  animation: bounce3d var(--anim-speed, 1.8s) cubic-bezier(0.28, 0.84, 0.42, 1) infinite;
+}
+
+.animate-swing-3d {
+  animation: swing3d var(--anim-speed, 2.4s) ease-in-out infinite;
+}
+
+.animate-flip-3d {
+  animation: flip3d var(--anim-speed, 3.0s) linear infinite;
+}
+
+.animate-heartbeat-3d {
+  animation: heartbeat3d var(--anim-speed, 1.6s) ease-in-out infinite;
+}
+
+.animate-jiggle-3d {
+  animation: jiggle3d var(--anim-speed, 1.4s) ease-in-out infinite;
+}
+
+.animate-twist-3d {
+  animation: twist3d var(--anim-speed, 2.8s) ease-in-out infinite;
+}
+
+.animate-orbit-3d {
+  animation: orbit3d var(--anim-speed, 3.2s) ease-in-out infinite;
+}
+
+.animate-glitch-3d {
+  animation: glitch3d var(--anim-speed, 2.2s) linear infinite;
+}
+
+.animate-hover-3d {
+  animation: hover3d var(--anim-speed, 2.8s) ease-in-out infinite;
 }
 
 /* Disable accidental text selection across Studio workspace */
