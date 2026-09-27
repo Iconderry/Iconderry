@@ -266,12 +266,18 @@ button, input, select, textarea, [role="button"] {
 }
 
 /* 3D Motion & Levitation Animations */
+:root {
+  --anim-speed: 2.2s;
+  --anim-amp: 16px;
+  --anim-amp-val: 16;
+}
+
 @keyframes float3d {
   0%, 100% {
     transform: translateY(0px);
   }
   50% {
-    transform: translateY(calc(-1 * var(--anim-amp, 16px)));
+    transform: translateY(calc(-1 * var(--anim-amp-val, 16) * 1px));
   }
 }
 
@@ -289,51 +295,49 @@ button, input, select, textarea, [role="button"] {
     transform: scale(1);
   }
   50% {
-    transform: scale(calc(1 + (var(--anim-amp, 16px) * 0.0075)));
+    transform: scale(calc(1 + (var(--anim-amp-val, 16) * 0.0075)));
   }
 }
 
 @keyframes wobble3d {
   0%, 100% {
-    transform: rotateX(calc(-0.35 * var(--anim-amp, 16px) * 1deg)) rotateY(calc(0.65 * var(--anim-amp, 16px) * 1deg));
+    transform: rotateX(calc(-0.45 * var(--anim-amp-val, 16) * 1deg)) rotateY(calc(0.75 * var(--anim-amp-val, 16) * 1deg));
   }
   50% {
-    transform: rotateX(calc(0.35 * var(--anim-amp, 16px) * 1deg)) rotateY(calc(-0.65 * var(--anim-amp, 16px) * 1deg));
+    transform: rotateX(calc(0.45 * var(--anim-amp-val, 16) * 1deg)) rotateY(calc(-0.75 * var(--anim-amp-val, 16) * 1deg));
   }
 }
 
 @keyframes wave3d {
   0%, 100% {
-    transform: translateY(calc(-0.4 * var(--anim-amp, 16px))) rotate(calc(0.2 * var(--anim-amp, 16px) * 1deg));
+    transform: translateY(calc(-0.5 * var(--anim-amp-val, 16) * 1px)) rotate(calc(0.3 * var(--anim-amp-val, 16) * 1deg));
   }
   50% {
-    transform: translateY(calc(0.5 * var(--anim-amp, 16px))) rotate(calc(-0.2 * var(--anim-amp, 16px) * 1deg));
+    transform: translateY(calc(0.6 * var(--anim-amp-val, 16) * 1px)) rotate(calc(-0.3 * var(--anim-amp-val, 16) * 1deg));
   }
 }
 
 @keyframes bounce3d {
   0%, 100% {
-    transform: translateY(0) scale(1, 1);
+    transform: translateY(0px) scale(1, 1);
   }
   40% {
-    transform: translateY(calc(-1 * var(--anim-amp, 16px) * 1.2)) scale(0.96, 1.04);
+    transform: translateY(calc(-1.2 * var(--anim-amp-val, 16) * 1px)) scale(0.96, 1.04);
   }
   75% {
-    transform: translateY(calc(var(--anim-amp, 16px) * 0.4)) scale(1.08, 0.92);
+    transform: translateY(calc(0.35 * var(--anim-amp-val, 16) * 1px)) scale(1.08, 0.92);
   }
   85% {
-    transform: translateY(calc(var(--anim-amp, 16px) * 0.1)) scale(1.02, 0.98);
+    transform: translateY(calc(0.1 * var(--anim-amp-val, 16) * 1px)) scale(1.02, 0.98);
   }
 }
 
 @keyframes swing3d {
   0%, 100% {
-    transform: rotate(calc(-0.85 * var(--anim-amp, 16px) * 1deg));
-    transform-origin: top center;
+    transform: rotate(calc(-0.85 * var(--anim-amp-val, 16) * 1deg));
   }
   50% {
-    transform: rotate(calc(0.85 * var(--anim-amp, 16px) * 1deg));
-    transform-origin: top center;
+    transform: rotate(calc(0.85 * var(--anim-amp-val, 16) * 1deg));
   }
 }
 
@@ -351,13 +355,13 @@ button, input, select, textarea, [role="button"] {
     transform: scale(1);
   }
   14% {
-    transform: scale(calc(1 + (var(--anim-amp, 16px) * 0.010)));
+    transform: scale(calc(1 + (var(--anim-amp-val, 16) * 0.010)));
   }
   28% {
     transform: scale(1.02);
   }
   42% {
-    transform: scale(calc(1 + (var(--anim-amp, 16px) * 0.013)));
+    transform: scale(calc(1 + (var(--anim-amp-val, 16) * 0.013)));
   }
   70% {
     transform: scale(1);
@@ -369,16 +373,16 @@ button, input, select, textarea, [role="button"] {
     transform: rotate(0deg) scale(1);
   }
   20% {
-    transform: rotate(calc(-0.35 * var(--anim-amp, 16px) * 1deg)) scale(calc(1 + var(--anim-amp, 16px) * 0.0025));
+    transform: rotate(calc(-0.4 * var(--anim-amp-val, 16) * 1deg)) scale(calc(1 + var(--anim-amp-val, 16) * 0.003));
   }
   40% {
-    transform: rotate(calc(0.35 * var(--anim-amp, 16px) * 1deg)) scale(calc(1 + var(--anim-amp, 16px) * 0.0025));
+    transform: rotate(calc(0.4 * var(--anim-amp-val, 16) * 1deg)) scale(calc(1 + var(--anim-amp-val, 16) * 0.003));
   }
   60% {
-    transform: rotate(calc(-0.25 * var(--anim-amp, 16px) * 1deg)) scale(1.02);
+    transform: rotate(calc(-0.3 * var(--anim-amp-val, 16) * 1deg)) scale(1.02);
   }
   80% {
-    transform: rotate(calc(0.25 * var(--anim-amp, 16px) * 1deg)) scale(1.02);
+    transform: rotate(calc(0.3 * var(--anim-amp-val, 16) * 1deg)) scale(1.02);
   }
 }
 
@@ -387,52 +391,52 @@ button, input, select, textarea, [role="button"] {
     transform: rotate(0deg) rotateY(0deg);
   }
   35% {
-    transform: rotate(calc(1 * var(--anim-amp, 16px) * 1deg)) rotateY(calc(1.5 * var(--anim-amp, 16px) * 1deg));
+    transform: rotate(calc(1 * var(--anim-amp-val, 16) * 1deg)) rotateY(calc(1.8 * var(--anim-amp-val, 16) * 1deg));
   }
   70% {
-    transform: rotate(calc(-1 * var(--anim-amp, 16px) * 1deg)) rotateY(calc(-1.5 * var(--anim-amp, 16px) * 1deg));
+    transform: rotate(calc(-1 * var(--anim-amp-val, 16) * 1deg)) rotateY(calc(-1.8 * var(--anim-amp-val, 16) * 1deg));
   }
 }
 
 @keyframes orbit3d {
   0% {
-    transform: translate(0px, calc(-1 * var(--anim-amp, 16px))) rotate(0deg);
+    transform: translate(0px, calc(-1 * var(--anim-amp-val, 16) * 1px)) rotate(0deg);
   }
   25% {
-    transform: translate(calc(var(--anim-amp, 16px) * 0.8), 0px) rotate(2deg);
+    transform: translate(calc(0.8 * var(--anim-amp-val, 16) * 1px), 0px) rotate(2deg);
   }
   50% {
-    transform: translate(0px, calc(var(--anim-amp, 16px))) rotate(0deg);
+    transform: translate(0px, calc(1 * var(--anim-amp-val, 16) * 1px)) rotate(0deg);
   }
   75% {
-    transform: translate(calc(-1 * var(--anim-amp, 16px) * 0.8), 0px) rotate(-2deg);
+    transform: translate(calc(-0.8 * var(--anim-amp-val, 16) * 1px), 0px) rotate(-2deg);
   }
   100% {
-    transform: translate(0px, calc(-1 * var(--anim-amp, 16px))) rotate(0deg);
+    transform: translate(0px, calc(-1 * var(--anim-amp-val, 16) * 1px)) rotate(0deg);
   }
 }
 
 @keyframes glitch3d {
   0%, 78%, 100% {
-    transform: translate(0, 0) skew(0deg);
+    transform: translate(0px, 0px) skew(0deg);
   }
   80% {
-    transform: translate(calc(-0.3 * var(--anim-amp, 16px)), calc(0.12 * var(--anim-amp, 16px))) skew(calc(-0.3 * var(--anim-amp, 16px) * 1deg));
+    transform: translate(calc(-0.35 * var(--anim-amp-val, 16) * 1px), calc(0.15 * var(--anim-amp-val, 16) * 1px)) skew(calc(-0.35 * var(--anim-amp-val, 16) * 1deg));
   }
   84% {
-    transform: translate(calc(0.3 * var(--anim-amp, 16px)), calc(-0.12 * var(--anim-amp, 16px))) skew(calc(0.3 * var(--anim-amp, 16px) * 1deg));
+    transform: translate(calc(0.35 * var(--anim-amp-val, 16) * 1px), calc(-0.15 * var(--anim-amp-val, 16) * 1px)) skew(calc(0.35 * var(--anim-amp-val, 16) * 1deg));
   }
   88% {
-    transform: translate(calc(-0.2 * var(--anim-amp, 16px)), calc(0.06 * var(--anim-amp, 16px))) skew(calc(-0.15 * var(--anim-amp, 16px) * 1deg));
+    transform: translate(calc(-0.2 * var(--anim-amp-val, 16) * 1px), calc(0.08 * var(--anim-amp-val, 16) * 1px)) skew(calc(-0.2 * var(--anim-amp-val, 16) * 1deg));
   }
 }
 
 @keyframes hover3d {
   0%, 100% {
-    transform: translateY(0px) rotateX(calc(0.35 * var(--anim-amp, 16px) * 1deg)) rotateY(calc(-0.35 * var(--anim-amp, 16px) * 1deg));
+    transform: translateY(0px) rotateX(calc(0.4 * var(--anim-amp-val, 16) * 1deg)) rotateY(calc(-0.4 * var(--anim-amp-val, 16) * 1deg));
   }
   50% {
-    transform: translateY(calc(-1 * var(--anim-amp, 16px) * 0.7)) rotateX(calc(-0.35 * var(--anim-amp, 16px) * 1deg)) rotateY(calc(0.35 * var(--anim-amp, 16px) * 1deg));
+    transform: translateY(calc(-0.8 * var(--anim-amp-val, 16) * 1px)) rotateX(calc(-0.4 * var(--anim-amp-val, 16) * 1deg)) rotateY(calc(0.4 * var(--anim-amp-val, 16) * 1deg));
   }
 }
 
@@ -462,6 +466,7 @@ button, input, select, textarea, [role="button"] {
 
 .animate-swing-3d {
   animation: swing3d var(--anim-speed, 2.4s) ease-in-out infinite;
+  transform-origin: top center !important;
 }
 
 .animate-flip-3d {
@@ -490,6 +495,11 @@ button, input, select, textarea, [role="button"] {
 
 .animate-hover-3d {
   animation: hover3d var(--anim-speed, 2.8s) ease-in-out infinite;
+}
+
+.animate-none-3d {
+  animation: none !important;
+  transform: none !important;
 }
 
 /* Disable accidental text selection across Studio workspace */

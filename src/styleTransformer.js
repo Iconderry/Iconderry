@@ -1983,7 +1983,7 @@ export function transformSvgStyle(svgCode, styleMode, targetLayerIds = null) {
           <stop offset="100%" stop-color="#7c2d12"/>
         </linearGradient>
       `;
-      elements.forEach(({ el, score }) => {
+      elementSizes.forEach(({ el, score }) => {
         const isMain = score >= maxScore * 0.4;
         el.setAttribute('fill', isMain ? `url(#${uniqueId}_animeCel)` : '#fef08a');
         el.setAttribute('stroke', '#09090b');
@@ -2003,7 +2003,7 @@ export function transformSvgStyle(svgCode, styleMode, targetLayerIds = null) {
           <stop offset="100%" stop-color="#0f172a"/>
         </linearGradient>
       `;
-      elements.forEach(({ el, score }) => {
+      elementSizes.forEach(({ el, score }) => {
         const isMain = score >= maxScore * 0.4;
         el.setAttribute('fill', isMain ? `url(#${uniqueId}_mechaGrad)` : '#ef4444');
         el.setAttribute('stroke', '#00f0ff');
@@ -2024,7 +2024,7 @@ export function transformSvgStyle(svgCode, styleMode, targetLayerIds = null) {
           <stop offset="100%" stop-color="#dc2626"/>
         </radialGradient>
       `;
-      elements.forEach(({ el }) => {
+      elementSizes.forEach(({ el }) => {
         el.setAttribute('fill', `url(#${uniqueId}_speedBurst)`);
         el.setAttribute('stroke', '#fef08a');
         el.setAttribute('stroke-width', '2');
@@ -2042,7 +2042,7 @@ export function transformSvgStyle(svgCode, styleMode, targetLayerIds = null) {
           <stop offset="100%" stop-color="#c084fc"/>
         </linearGradient>
       `;
-      elements.forEach(({ el, score }) => {
+      elementSizes.forEach(({ el, score }) => {
         const isMain = score >= maxScore * 0.4;
         el.setAttribute('fill', isMain ? `url(#${uniqueId}_kawaiiGrad)` : '#ffffff');
         el.setAttribute('stroke', '#ec4899');
@@ -2061,7 +2061,7 @@ export function transformSvgStyle(svgCode, styleMode, targetLayerIds = null) {
           <stop offset="100%" stop-color="#ec4899"/>
         </linearGradient>
       `;
-      elements.forEach(({ el, score }) => {
+      elementSizes.forEach(({ el, score }) => {
         const isMain = score >= maxScore * 0.4;
         el.setAttribute('fill', isMain ? `url(#${uniqueId}_cyberCity)` : '#00f0ff');
         el.setAttribute('stroke', '#e0e7ff');
@@ -2082,7 +2082,7 @@ export function transformSvgStyle(svgCode, styleMode, targetLayerIds = null) {
           <stop offset="100%" stop-color="#eab308"/>
         </linearGradient>
       `;
-      elements.forEach(({ el, score }) => {
+      elementSizes.forEach(({ el, score }) => {
         const isMain = score >= maxScore * 0.4;
         el.setAttribute('fill', isMain ? `url(#${uniqueId}_popGrad)` : '#ef4444');
         el.setAttribute('stroke', '#09090b');
@@ -2102,7 +2102,7 @@ export function transformSvgStyle(svgCode, styleMode, targetLayerIds = null) {
           <stop offset="100%" stop-color="#0369a1"/>
         </radialGradient>
       `;
-      elements.forEach(({ el, score }) => {
+      elementSizes.forEach(({ el, score }) => {
         const isMain = score >= maxScore * 0.4;
         el.setAttribute('fill', isMain ? `url(#${uniqueId}_toontown)` : '#fbbf24');
         el.setAttribute('stroke', '#0f172a');
@@ -2114,7 +2114,7 @@ export function transformSvgStyle(svgCode, styleMode, targetLayerIds = null) {
     // CARTOON: 1930s RUBBER HOSE TOON
     // -------------------------------------------------------------
     else if (styleMode === 'cartoon_rubber_hose') {
-      elements.forEach(({ el, score }) => {
+      elementSizes.forEach(({ el, score }) => {
         const isMain = score >= maxScore * 0.4;
         el.setAttribute('fill', isMain ? '#09090b' : '#f8fafc');
         el.setAttribute('stroke', '#09090b');
@@ -2133,7 +2133,7 @@ export function transformSvgStyle(svgCode, styleMode, targetLayerIds = null) {
           <stop offset="100%" stop-color="#06b6d4"/>
         </linearGradient>
       `;
-      elements.forEach(({ el, score }) => {
+      elementSizes.forEach(({ el, score }) => {
         const isMain = score >= maxScore * 0.4;
         el.setAttribute('fill', isMain ? `url(#${uniqueId}_graffiti)` : '#ffffff');
         el.setAttribute('stroke', '#ffffff');
@@ -2145,7 +2145,7 @@ export function transformSvgStyle(svgCode, styleMode, targetLayerIds = null) {
     // CARTOON: NOIR GRAPHIC NOVEL INKING
     // -------------------------------------------------------------
     else if (styleMode === 'cartoon_superhero_ink') {
-      elements.forEach(({ el, score }) => {
+      elementSizes.forEach(({ el, score }) => {
         const isMain = score >= maxScore * 0.4;
         el.setAttribute('fill', isMain ? '#09090b' : '#facc15');
         el.setAttribute('stroke', '#09090b');
@@ -2164,7 +2164,7 @@ export function transformSvgStyle(svgCode, styleMode, targetLayerIds = null) {
           <stop offset="100%" stop-color="#fbbf24"/>
         </linearGradient>
       `;
-      elements.forEach(({ el, score }) => {
+      elementSizes.forEach(({ el, score }) => {
         const isMain = score >= maxScore * 0.4;
         el.setAttribute('fill', isMain ? `url(#${uniqueId}_arcade)` : '#ffffff');
         el.setAttribute('stroke', '#1e1b4b');
@@ -2183,7 +2183,7 @@ export function transformSvgStyle(svgCode, styleMode, targetLayerIds = null) {
           <stop offset="100%" stop-color="#14532d"/>
         </linearGradient>
       `;
-      elements.forEach(({ el, score }) => {
+      elementSizes.forEach(({ el, score }) => {
         const isMain = score >= maxScore * 0.4;
         el.setAttribute('fill', isMain ? `url(#${uniqueId}_voxel)` : '#854d0e');
         el.setAttribute('stroke', '#14532d');
@@ -2203,7 +2203,7 @@ export function transformSvgStyle(svgCode, styleMode, targetLayerIds = null) {
           <stop offset="100%" stop-color="#713f12"/>
         </radialGradient>
       `;
-      elements.forEach(({ el }) => {
+      elementSizes.forEach(({ el }) => {
         el.setAttribute('fill', `url(#${uniqueId}_goldBalloon)`);
         el.setAttribute('stroke', '#fef08a');
         el.setAttribute('stroke-width', '2.5');
@@ -2224,7 +2224,7 @@ export function transformSvgStyle(svgCode, styleMode, targetLayerIds = null) {
           <stop offset="100%" stop-color="#1e293b"/>
         </linearGradient>
       `;
-      elements.forEach(({ el }) => {
+      elementSizes.forEach(({ el }) => {
         el.setAttribute('fill', `url(#${uniqueId}_liquidChrome)`);
         el.setAttribute('stroke', '#ffffff');
         el.setAttribute('stroke-width', '2');
@@ -2242,7 +2242,7 @@ export function transformSvgStyle(svgCode, styleMode, targetLayerIds = null) {
           <stop offset="100%" stop-color="#78350f"/>
         </linearGradient>
       `;
-      elements.forEach(({ el, score }) => {
+      elementSizes.forEach(({ el, score }) => {
         const isMain = score >= maxScore * 0.4;
         el.setAttribute('fill', isMain ? `url(#${uniqueId}_woodToy)` : '#fde68a');
         el.setAttribute('stroke', '#451a03');
@@ -2261,7 +2261,7 @@ export function transformSvgStyle(svgCode, styleMode, targetLayerIds = null) {
           <stop offset="100%" stop-color="#0284c7" stop-opacity="0.85"/>
         </linearGradient>
       `;
-      elements.forEach(({ el }) => {
+      elementSizes.forEach(({ el }) => {
         el.setAttribute('fill', `url(#${uniqueId}_holoMat)`);
         el.setAttribute('stroke', '#a5f3fc');
         el.setAttribute('stroke-width', '1.5');
@@ -2279,7 +2279,7 @@ export function transformSvgStyle(svgCode, styleMode, targetLayerIds = null) {
           <stop offset="100%" stop-color="#cbd5e1"/>
         </radialGradient>
       `;
-      elements.forEach(({ el, score }) => {
+      elementSizes.forEach(({ el, score }) => {
         const isMain = score >= maxScore * 0.4;
         el.setAttribute('fill', isMain ? `url(#${uniqueId}_porcelain)` : '#1d4ed8');
         el.setAttribute('stroke', '#1e40af');
@@ -2298,7 +2298,7 @@ export function transformSvgStyle(svgCode, styleMode, targetLayerIds = null) {
           <stop offset="100%" stop-color="#94a3b8"/>
         </linearGradient>
       `;
-      elements.forEach(({ el }) => {
+      elementSizes.forEach(({ el }) => {
         el.setAttribute('fill', `url(#${uniqueId}_paper3d)`);
         el.setAttribute('stroke', '#64748b');
         el.setAttribute('stroke-width', '1.8');
@@ -2316,7 +2316,7 @@ export function transformSvgStyle(svgCode, styleMode, targetLayerIds = null) {
           <stop offset="100%" stop-color="#052e16"/>
         </linearGradient>
       `;
-      elements.forEach(({ el }) => {
+      elementSizes.forEach(({ el }) => {
         el.setAttribute('fill', `url(#${uniqueId}_plasmaCap)`);
         el.setAttribute('stroke', '#86efac');
         el.setAttribute('stroke-width', '2.5');
@@ -2335,7 +2335,7 @@ export function transformSvgStyle(svgCode, styleMode, targetLayerIds = null) {
           <stop offset="100%" stop-color="#450a0a"/>
         </radialGradient>
       `;
-      elements.forEach(({ el }) => {
+      elementSizes.forEach(({ el }) => {
         el.setAttribute('fill', `url(#${uniqueId}_rubyGem)`);
         el.setAttribute('stroke', '#fecaca');
         el.setAttribute('stroke-width', '2');

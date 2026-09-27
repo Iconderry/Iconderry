@@ -330,7 +330,7 @@ export function applyLayerTransforms(
           el.style.setProperty('opacity', String(style.opacity), 'important');
         }
 
-        // Custom Filters & Effects (Glow, Blur, Brightness)
+        // Custom Filters & Effects (Glow, Blur, Brightness, 3D Extrusion)
         const filters = [];
         if (style.glow && style.glow.enabled) {
           const glowColor = style.glow.color || '#38bdf8';
@@ -342,6 +342,26 @@ export function applyLayerTransforms(
         }
         if (style.brightness !== undefined && Number(style.brightness) !== 100) {
           filters.push(`brightness(${style.brightness}%)`);
+        }
+        if (style.extrusion && Number(style.extrusion.depth) > 0) {
+          const extDepth = Math.min(40, Math.round(Number(style.extrusion.depth)));
+          const extColor = style.extrusion.color || 'rgba(0,0,0,0.65)';
+          const extAngle = style.extrusion.angle !== undefined ? style.extrusion.angle : 45;
+          const rad = (extAngle * Math.PI) / 180;
+          const normX = Math.cos(rad);
+          const normY = Math.sin(rad);
+          const steps = extDepth <= 4
+            ? Array.from({ length: extDepth }, (_, i) => i + 1)
+            : [1, Math.round(extDepth * 0.35), Math.round(extDepth * 0.7), extDepth];
+          steps.forEach(s => {
+            const sx = (normX * s).toFixed(1);
+            const sy = (normY * s).toFixed(1);
+            filters.push(`drop-shadow(${sx}px ${sy}px 0px ${extColor})`);
+          });
+          const endX = (normX * extDepth).toFixed(1);
+          const endY = (normY * extDepth + 2).toFixed(1);
+          const blur = Math.max(2, Math.round(extDepth * 0.35));
+          filters.push(`drop-shadow(${endX}px ${endY}px ${blur}px rgba(0,0,0,0.45))`);
         }
         if (style.customFilter) {
           filters.push(style.customFilter);
@@ -467,6 +487,11 @@ export function calculateArtworkBounds(
       if (dsSimpleMatch && dsSimpleMatch[1]) {
         glowRadius = Math.max(glowRadius, Number(dsSimpleMatch[1]));
       }
+    }
+    if (style.extrusion && Number(style.extrusion.depth) > 0) {
+      const extDepth = Number(style.extrusion.depth);
+      dsDx += extDepth;
+      dsDy += extDepth;
     }
 
     // Inspect SVG <filter> definition if element uses filter="url(#...)"

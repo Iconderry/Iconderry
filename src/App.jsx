@@ -40,6 +40,8 @@ const DEFAULT_ADJUSTMENTS = {
   skewY: 0,
   depth3D: 0,
   depth3DColor: '#000000',
+  extrusionDepth: 0,
+  extrusionColor: 'rgba(0,0,0,0.65)',
   is3DFloating: false,
   animPreset: 'float',
   animSpeed: 2.2,
@@ -67,6 +69,27 @@ export const MOTION_PRESETS = [
   { id: 'glitch', name: 'Glitch', icon: '👾', desc: 'Cyberpunk shift jumps' },
   { id: 'none', name: 'Static', icon: '⏸️', desc: 'Single frame still GIF' }
 ];
+
+export const getPresetAnimClass = (presetId) => {
+  switch (presetId) {
+    case 'float': return 'animate-floating-3d';
+    case 'bounce': return 'animate-bounce-3d';
+    case 'pulse': return 'animate-pulse-3d';
+    case 'heartbeat': return 'animate-heartbeat-3d';
+    case 'spin360': return 'animate-spin-3d';
+    case 'flip3d': return 'animate-flip-3d';
+    case 'wobble': return 'animate-wobble-3d';
+    case 'twist': return 'animate-twist-3d';
+    case 'wave': return 'animate-wave-3d';
+    case 'swing': return 'animate-swing-3d';
+    case 'orbit': return 'animate-orbit-3d';
+    case 'hover3d': return 'animate-hover-3d';
+    case 'jiggle': return 'animate-jiggle-3d';
+    case 'glitch': return 'animate-glitch-3d';
+    case 'none': return 'animate-none-3d';
+    default: return 'animate-floating-3d';
+  }
+};
 
 const EFFECT_PRESETS = [
   {
@@ -751,40 +774,55 @@ const NEW_EFFECT_IDS = new Set([
 ]);
 
 // Renders an authentic live visual preview thumbnail showing the look of each filter preset
-function FilterCardThumbnail({ preset }) {
+function FilterCardThumbnail({ preset, svgCode, activeGlowBlur = 0, activeGlowColor = '#38bdf8' }) {
   const { colorA, colorB, adjustments, badge } = preset;
-  const glowColor = adjustments?.shadowColor || colorA || '#38bdf8';
-  const hasGlow = (adjustments?.shadowBlur || 0) > 0;
+  const hasGlow = (activeGlowBlur || 0) > 0;
+  const glowColor = activeGlowColor || adjustments?.shadowColor || '#38bdf8';
+
+  const filterStyle = [
+    adjustments?.hue ? `hue-rotate(${adjustments.hue}deg)` : '',
+    adjustments?.brightness !== undefined && adjustments.brightness !== 100 ? `brightness(${adjustments.brightness}%)` : '',
+    adjustments?.saturation !== undefined && adjustments.saturation !== 100 ? `saturate(${adjustments.saturation}%)` : '',
+    adjustments?.contrast !== undefined && adjustments.contrast !== 100 ? `contrast(${adjustments.contrast}%)` : '',
+    adjustments?.sepia ? `sepia(${adjustments.sepia}%)` : '',
+    adjustments?.invert ? `invert(${adjustments.invert}%)` : '',
+    hasGlow ? `drop-shadow(0 0 ${Math.min(10, Math.round(activeGlowBlur * 0.4))}px ${glowColor})` : ''
+  ].filter(Boolean).join(' ');
 
   return (
     <div
-      className="w-full h-14 rounded-xl mb-2 overflow-hidden relative flex items-center justify-center border border-white/10 shadow-inner group-hover:scale-[1.02] transition-transform duration-200 select-none"
-      style={{
-        background: `linear-gradient(135deg, ${colorA}33, ${colorB}55, #0a0f1d 90%)`
-      }}
+      className="w-full h-14 rounded-xl mb-2 overflow-hidden relative flex items-center justify-center border border-white/10 shadow-inner group-hover:scale-[1.02] transition-transform duration-200 select-none bg-slate-950/80"
     >
-      {/* Ambient glowing backdrop */}
+      {/* Ambient glowing backdrop matching filter */}
       <div
-        className="absolute inset-0 opacity-50 blur-md pointer-events-none"
+        className="absolute inset-0 opacity-25 blur-md pointer-events-none"
         style={{
-          background: `radial-gradient(circle at center, ${colorA} 0%, ${colorB} 60%, transparent 100%)`
+          background: `radial-gradient(circle at center, ${colorA}44 0%, ${colorB}22 60%, transparent 100%)`
         }}
       />
 
-      {/* Styled Glyph demonstrating this filter's exact look */}
-      <div
-        className="relative z-10 w-7 h-7 rounded-lg flex items-center justify-center transition-transform group-hover:scale-110 shadow-md"
-        style={{
-          background: `linear-gradient(135deg, ${colorA}, ${colorB})`,
-          boxShadow: hasGlow ? `0 0 14px ${glowColor}, 0 0 4px ${glowColor}` : `0 2px 8px rgba(0,0,0,0.6)`,
-          filter: `hue-rotate(${adjustments?.hue || 0}deg) saturate(${adjustments?.saturation || 100}%) brightness(${adjustments?.brightness || 100}%) contrast(${adjustments?.contrast || 100}%)`
-        }}
-      >
-        <Sparkles className="w-3.5 h-3.5 text-white drop-shadow" />
-      </div>
+      {/* Actual Icon preview with this preset's exact filter style applied */}
+      {svgCode ? (
+        <div
+          className="relative z-10 w-8 h-8 flex items-center justify-center transition-transform group-hover:scale-110 pointer-events-none [&>svg]:w-full [&>svg]:h-full [&>svg]:max-h-full [&>svg]:block [shape-rendering:geometricPrecision]"
+          style={{ filter: filterStyle || undefined }}
+          dangerouslySetInnerHTML={{ __html: svgCode }}
+        />
+      ) : (
+        <div
+          className="relative z-10 w-7 h-7 rounded-lg flex items-center justify-center transition-transform group-hover:scale-110 shadow-md"
+          style={{
+            background: `linear-gradient(135deg, ${colorA}, ${colorB})`,
+            boxShadow: hasGlow ? `0 0 14px ${glowColor}, 0 0 4px ${glowColor}` : `0 2px 8px rgba(0,0,0,0.6)`,
+            filter: filterStyle || undefined
+          }}
+        >
+          <Sparkles className="w-3.5 h-3.5 text-white drop-shadow" />
+        </div>
+      )}
 
       {/* Filter Category / Tag Badge */}
-      <span className="absolute top-1 right-1 text-[8px] font-bold px-1.5 py-0.5 rounded bg-black/65 backdrop-blur-sm text-white/90 border border-white/10 z-10">
+      <span className="absolute top-1 right-1 text-[8px] font-bold px-1.5 py-0.5 rounded bg-black/75 backdrop-blur-sm text-white/90 border border-white/10 z-10">
         {badge || 'Filter'}
       </span>
     </div>
@@ -1287,6 +1325,8 @@ export default function App() {
   const [autoFitToElements, setAutoFitToElements] = useState(() => localStorage.getItem('iconderry_autofit_elements') !== 'false');
   const [autoFitFrameMode, setAutoFitFrameMode] = useState(() => localStorage.getItem('iconderry_autofit_mode') || 'square');
   const [downloading, setDownloading] = useState(false);
+  const [exportProgress, setExportProgress] = useState(null);
+  const cancelExportRef = useRef(false);
   const [previewBg, setPreviewBg] = useState(() => localStorage.getItem('iconderry_default_bg') || 'dark');
   const [zoomLevel, setZoomLevel] = useState(1);
   const zoomLevelRef = useRef(zoomLevel);
@@ -1767,9 +1807,17 @@ export default function App() {
         const vbHeight = (vb && vb.height > 0) ? vb.height : (svgRect?.height || 100);
         const scaleX = (svgRect && svgRect.width > 0) ? (vbWidth / svgRect.width) : 1;
         const scaleY = (svgRect && svgRect.height > 0) ? (vbHeight / svgRect.height) : 1;
-        const ctm = svgEl?.getScreenCTM ? svgEl.getScreenCTM() : null;
-        const dragScaleX = ctm && ctm.a ? (1 / ctm.a) : scaleX;
-        const dragScaleY = ctm && ctm.d ? (1 / ctm.d) : scaleY;
+        const invScreenCTM = svgEl?.getScreenCTM ? svgEl.getScreenCTM()?.inverse() : null;
+
+        const containerW = canvasSvgContainerRef.current?.offsetWidth || Math.round(iconWidth * zoomLevel);
+        const containerH = canvasSvgContainerRef.current?.offsetHeight || Math.round(iconHeight * zoomLevel);
+        const padLeft = parseFloat(getComputedStyle(canvasSvgContainerRef.current || document.body).paddingLeft) || 0;
+        const padRight = parseFloat(getComputedStyle(canvasSvgContainerRef.current || document.body).paddingRight) || 0;
+        const padTop = parseFloat(getComputedStyle(canvasSvgContainerRef.current || document.body).paddingTop) || 0;
+        const padBottom = parseFloat(getComputedStyle(canvasSvgContainerRef.current || document.body).paddingBottom) || 0;
+        const contentW = Math.max(10, containerW - padLeft - padRight);
+        const contentH = Math.max(10, containerH - padTop - padBottom);
+        const svgToContainerScale = (vbWidth > 0 && contentW > 0) ? Math.min(contentW / vbWidth, contentH / vbHeight) : 1;
 
         const wsEl = canvasWorkspaceRef.current;
         const wsRect = wsEl ? wsEl.getBoundingClientRect() : null;
@@ -1850,8 +1898,19 @@ export default function App() {
 
           latestDx = rawDx;
           latestDy = rawDy;
-          latestSvgDx = Math.round(rawDx * dragScaleX);
-          latestSvgDy = Math.round(rawDy * dragScaleY);
+          if (invScreenCTM && svgEl?.createSVGPoint) {
+            const pt0 = svgEl.createSVGPoint();
+            pt0.x = 0; pt0.y = 0;
+            const pt1 = svgEl.createSVGPoint();
+            pt1.x = rawDx; pt1.y = rawDy;
+            const p0 = pt0.matrixTransform(invScreenCTM);
+            const p1 = pt1.matrixTransform(invScreenCTM);
+            latestSvgDx = Math.round(p1.x - p0.x);
+            latestSvgDy = Math.round(p1.y - p0.y);
+          } else {
+            latestSvgDx = Math.round(rawDx * scaleX);
+            latestSvgDy = Math.round(rawDy * scaleY);
+          }
 
           if (dragRafId) return;
           dragRafId = requestAnimationFrame(() => {
@@ -1860,8 +1919,6 @@ export default function App() {
 
             const curSvgDx = latestSvgDx;
             const curSvgDy = latestSvgDy;
-            const curRawDx = latestDx;
-            const curRawDy = latestDy;
 
             // 1. Direct smooth DOM updates on active SVG nodes - zero DOM destruction, zero flickering!
             activeDomNodes.forEach(({ id, node, origAttr }) => {
@@ -1892,10 +1949,10 @@ export default function App() {
               node.setAttribute('transform', parts.join(' '));
             });
 
-            // 2. Direct transform on Transform Bounding Box for 60/120fps tracking
-            if (transformBoxRef.current && startTransformBox && zoomScaleX > 0 && zoomScaleY > 0) {
-              const boxDx = curRawDx / zoomScaleX;
-              const boxDy = curRawDy / zoomScaleY;
+            // 2. Direct transform on Transform Bounding Box for 60/120fps tracking in container space
+            if (transformBoxRef.current && startTransformBox) {
+              const boxDx = curSvgDx * svgToContainerScale;
+              const boxDy = curSvgDy * svgToContainerScale;
               transformBoxRef.current.style.transform = `translate3d(${boxDx}px, ${boxDy}px, 0px)`;
             }
           });
@@ -1926,8 +1983,18 @@ export default function App() {
                 const clientY = upEvt?.clientY ?? (layerDragStartPosRef.current.y + latestDy);
                 const rawDx = clientX - layerDragStartPosRef.current.x;
                 const rawDy = clientY - layerDragStartPosRef.current.y;
-                const finalSvgDx = Math.round(rawDx * dragScaleX);
-                const finalSvgDy = Math.round(rawDy * dragScaleY);
+                let finalSvgDx = latestSvgDx;
+                let finalSvgDy = latestSvgDy;
+                if (invScreenCTM && svgEl?.createSVGPoint) {
+                  const pt0 = svgEl.createSVGPoint();
+                  pt0.x = 0; pt0.y = 0;
+                  const pt1 = svgEl.createSVGPoint();
+                  pt1.x = rawDx; pt1.y = rawDy;
+                  const p0 = pt0.matrixTransform(invScreenCTM);
+                  const p1 = pt1.matrixTransform(invScreenCTM);
+                  finalSvgDx = Math.round(p1.x - p0.x);
+                  finalSvgDy = Math.round(p1.y - p0.y);
+                }
 
                 // 1. GUARANTEED: Synchronously apply the final transform to DOM nodes immediately.
                 // Even on ultra-fast flick releases, this ensures SVG DOM nodes are already at their exact target position!
@@ -1971,31 +2038,11 @@ export default function App() {
                 });
                 layerTransformsRef.current = updatedTransforms;
 
-                // 3. Immediately lock transformBox mathematically at the final position to eliminate any flick jump/lag
-                if (startTransformBox && zoomScaleX > 0 && zoomScaleY > 0) {
-                  const screenDx = rawDx / zoomScaleX;
-                  const screenDy = rawDy / zoomScaleY;
-                  const accurateBox = {
-                    ...startTransformBox,
-                    x: startTransformBox.x + screenDx,
-                    y: startTransformBox.y + screenDy,
-                    minLeft: startTransformBox.minLeft + screenDx,
-                    maxRight: startTransformBox.maxRight + screenDx,
-                    minTop: startTransformBox.minTop + screenDy,
-                    maxBottom: startTransformBox.maxBottom + screenDy
-                  };
-                  setTransformBox(accurateBox);
-                  if (transformBoxRef.current) {
-                    transformBoxRef.current.style.transform = '';
-                    transformBoxRef.current.style.left = `${accurateBox.x}px`;
-                    transformBoxRef.current.style.top = `${accurateBox.y}px`;
-                  }
-                } else {
-                  if (transformBoxRef.current) {
-                    transformBoxRef.current.style.transform = '';
-                  }
-                  updateTransformBox(activeIds);
+                // 3. Immediately lock transformBox mathematically at the final position
+                if (transformBoxRef.current) {
+                  transformBoxRef.current.style.transform = '';
                 }
+                updateTransformBox(activeIds);
 
                 // 4. Commit new transforms to React state
                 setLayerTransforms(updatedTransforms);
@@ -3136,6 +3183,8 @@ export default function App() {
     (adjustments.rotateX && adjustments.rotateX !== 0) ||
     (adjustments.rotateY && adjustments.rotateY !== 0) ||
     (adjustments.depth3D && adjustments.depth3D > 0) ||
+    (adjustments.extrusionDepth && adjustments.extrusionDepth > 0) ||
+    (adjustments.perspective && adjustments.perspective !== 800) ||
     adjustments.is3DFloating
   );
 
@@ -3427,9 +3476,8 @@ export default function App() {
 
   // Live calculation of the Transform Bounding Box around selected SVG element(s)
   const updateTransformBox = useCallback((overrideIds = null) => {
-    const wsEl = canvasWorkspaceRef.current;
     const svgContainer = canvasSvgContainerRef.current;
-    if (!wsEl || !svgContainer) {
+    if (!svgContainer) {
       setTransformBox(null);
       return null;
     }
@@ -3466,82 +3514,71 @@ export default function App() {
       return null;
     }
 
-    let minLeft = Infinity;
-    let minTop = Infinity;
-    let maxRight = -Infinity;
-    let maxBottom = -Infinity;
-
-    nodes.forEach(node => {
-      let rect = node.getBoundingClientRect();
-      if ((!rect || (rect.width === 0 && rect.height === 0)) && node.getBBox) {
-        try {
-          const svgEl = svgContainer.querySelector('svg');
-          const ctm = (node.getScreenCTM ? node.getScreenCTM() : null) || (svgEl?.getScreenCTM ? svgEl.getScreenCTM() : null);
-          const bbox = node.getBBox();
-          if (ctm && bbox && (bbox.width > 0 || bbox.height > 0) && svgEl?.createSVGPoint) {
-            const corners = [
-              { x: bbox.x, y: bbox.y },
-              { x: bbox.x + bbox.width, y: bbox.y },
-              { x: bbox.x + bbox.width, y: bbox.y + bbox.height },
-              { x: bbox.x, y: bbox.y + bbox.height }
-            ].map(p => {
-              const pt = svgEl.createSVGPoint();
-              pt.x = p.x;
-              pt.y = p.y;
-              return pt.matrixTransform(ctm);
-            });
-            const xs = corners.map(p => p.x);
-            const ys = corners.map(p => p.y);
-            rect = {
-              left: Math.min(...xs),
-              top: Math.min(...ys),
-              right: Math.max(...xs),
-              bottom: Math.max(...ys),
-              width: Math.max(...xs) - Math.min(...xs),
-              height: Math.max(...ys) - Math.min(...ys)
-            };
-          }
-        } catch (_) { }
-      }
-
-      if (rect && (rect.width > 0 || rect.height > 0)) {
-        if (rect.left < minLeft) minLeft = rect.left;
-        if (rect.top < minTop) minTop = rect.top;
-        if (rect.right > maxRight) maxRight = rect.right;
-        if (rect.bottom > maxBottom) maxBottom = rect.bottom;
-      }
-    });
-
-    if (!isFinite(minLeft) || !isFinite(minTop)) {
+    const svgEl = svgContainer.querySelector('svg');
+    if (!svgEl) {
       setTransformBox(null);
       return null;
     }
 
-    const wsRect = wsEl.getBoundingClientRect();
-    const zoomScaleX = wsEl.offsetWidth > 0 ? (wsRect.width / wsEl.offsetWidth) : 1;
-    const zoomScaleY = wsEl.offsetHeight > 0 ? (wsRect.height / wsEl.offsetHeight) : 1;
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
 
-    // Account for any scroll offset inside canvasWorkspaceRef
-    const scrollLeft = wsEl.scrollLeft || 0;
-    const scrollTop = wsEl.scrollTop || 0;
+    nodes.forEach(node => {
+      if (node.getBBox && svgEl.createSVGPoint) {
+        try {
+          const bbox = node.getBBox();
+          if (bbox && (bbox.width > 0 || bbox.height > 0)) {
+            const ctm = node.getCTM ? node.getCTM() : null;
+            if (ctm) {
+              const corners = [
+                { x: bbox.x, y: bbox.y },
+                { x: bbox.x + bbox.width, y: bbox.y },
+                { x: bbox.x + bbox.width, y: bbox.y + bbox.height },
+                { x: bbox.x, y: bbox.y + bbox.height }
+              ].map(p => {
+                const pt = svgEl.createSVGPoint();
+                pt.x = p.x;
+                pt.y = p.y;
+                return pt.matrixTransform(ctm);
+              });
+              corners.forEach(p => {
+                if (p.x < minX) minX = p.x;
+                if (p.x > maxX) maxX = p.x;
+                if (p.y < minY) minY = p.y;
+                if (p.y > maxY) maxY = p.y;
+              });
+            }
+          }
+        } catch (_) { }
+      }
+    });
 
-    const x = (minLeft - wsRect.left + scrollLeft) / zoomScaleX;
-    const y = (minTop - wsRect.top + scrollTop) / zoomScaleY;
-    const width = (maxRight - minLeft) / zoomScaleX;
-    const height = (maxBottom - minTop) / zoomScaleY;
+    if (!isFinite(minX) || !isFinite(minY)) {
+      setTransformBox(null);
+      return null;
+    }
+
+    const padLeft = parseFloat(getComputedStyle(svgContainer).paddingLeft) || 0;
+    const padTop = parseFloat(getComputedStyle(svgContainer).paddingTop) || 0;
+
+    const x = padLeft + minX;
+    const y = padTop + minY;
+    const width = Math.max(8, maxX - minX);
+    const height = Math.max(8, maxY - minY);
 
     const box = {
       x,
       y,
       width,
       height,
-      minLeft,
-      minTop,
-      maxRight,
-      maxBottom
+      minLeft: x,
+      minTop: y,
+      maxRight: x + width,
+      maxBottom: y + height
     };
 
-    // Immediately snap transform box in DOM for 60fps tracking during divider drags
     if (transformBoxRef.current) {
       transformBoxRef.current.style.left = `${box.x}px`;
       transformBoxRef.current.style.top = `${box.y}px`;
@@ -3552,7 +3589,7 @@ export default function App() {
 
     setTransformBox(box);
     return box;
-  }, [selectedLayerIds, selectedLayerId]);
+  }, [selectedLayerIds, selectedLayerId, zoomLevel, iconWidth, iconHeight]);
 
   useEffect(() => {
     if (isDraggingLayerRef.current || justFinishedLayerDragRef.current) return;
@@ -3594,6 +3631,100 @@ export default function App() {
     isResizingMobileCanvas
   ]);
 
+  const getSelectedLayerCenter = (id) => {
+    const orig = layerTransformsRef.current[id] || { x: 0, y: 0, rotate: 0, scaleX: 1, scaleY: 1 };
+    if (orig.cx && orig.cy) return { cx: orig.cx, cy: orig.cy };
+    const svgContainer = canvasSvgContainerRef.current;
+    if (svgContainer) {
+      const cleanId = String(id).replace(/^pf_studio_/i, '');
+      const numOnly = cleanId.replace(/\D/g, '');
+      const el = svgContainer.querySelector(`[data-layer-id="${id}"]`) ||
+        svgContainer.querySelector(`[data-layer-id="${cleanId}"]`) ||
+        (numOnly ? svgContainer.querySelector(`[data-layer-id="layer_${numOnly}"]`) : null);
+      if (el && el.getBBox) {
+        try {
+          const bbox = el.getBBox();
+          return { cx: bbox.x + bbox.width / 2, cy: bbox.y + bbox.height / 2 };
+        } catch (_) { }
+      }
+    }
+    return { cx: 256, cy: 256 };
+  };
+
+  const rotateSelectedOrCanvas = (newAngleOrUpdater) => {
+    recordUndo();
+    const activeIds = selectedLayerIds && selectedLayerIds.length > 0
+      ? selectedLayerIds
+      : (selectedLayerId ? [selectedLayerId] : []);
+
+    if (activeIds.length > 0) {
+      setLayerTransforms(prev => {
+        const next = { ...prev };
+        activeIds.forEach(id => {
+          const orig = next[id] || { x: 0, y: 0, rotate: 0, scaleX: 1, scaleY: 1 };
+          const { cx, cy } = getSelectedLayerCenter(id);
+          const currentRot = orig.rotate || 0;
+          const targetRot = typeof newAngleOrUpdater === 'function'
+            ? newAngleOrUpdater(currentRot)
+            : newAngleOrUpdater;
+          next[id] = {
+            ...orig,
+            rotate: Math.round(((targetRot % 360) + 360) % 360),
+            cx: orig.cx || cx,
+            cy: orig.cy || cy
+          };
+        });
+        layerTransformsRef.current = next;
+        return next;
+      });
+      requestAnimationFrame(() => updateTransformBox());
+    } else {
+      setAdjustments(prev => {
+        const currentRot = prev.rotation || 0;
+        const targetRot = typeof newAngleOrUpdater === 'function'
+          ? newAngleOrUpdater(currentRot)
+          : newAngleOrUpdater;
+        return {
+          ...prev,
+          rotation: Math.round(((targetRot % 360) + 360) % 360)
+        };
+      });
+    }
+  };
+
+  const flipSelectedOrCanvas = (axis) => {
+    recordUndo();
+    const activeIds = selectedLayerIds && selectedLayerIds.length > 0
+      ? selectedLayerIds
+      : (selectedLayerId ? [selectedLayerId] : []);
+
+    if (activeIds.length > 0) {
+      setLayerTransforms(prev => {
+        const next = { ...prev };
+        activeIds.forEach(id => {
+          const orig = next[id] || { x: 0, y: 0, rotate: 0, scaleX: 1, scaleY: 1 };
+          const { cx, cy } = getSelectedLayerCenter(id);
+          next[id] = {
+            ...orig,
+            scaleX: axis === 'h' ? (orig.scaleX !== undefined ? -orig.scaleX : -1) : (orig.scaleX ?? 1),
+            scaleY: axis === 'v' ? (orig.scaleY !== undefined ? -orig.scaleY : -1) : (orig.scaleY ?? 1),
+            cx: orig.cx || cx,
+            cy: orig.cy || cy
+          };
+        });
+        layerTransformsRef.current = next;
+        return next;
+      });
+      requestAnimationFrame(() => updateTransformBox());
+    } else {
+      setAdjustments(prev => ({
+        ...prev,
+        flipH: axis === 'h' ? !prev.flipH : prev.flipH,
+        flipV: axis === 'v' ? !prev.flipV : prev.flipV
+      }));
+    }
+  };
+
   // Transform handle pointer down: Handles corner proportional scaling, edge stretching, and rotation
   const handleTransformHandleDown = (e, handleType) => {
     e.preventDefault();
@@ -3616,8 +3747,10 @@ export default function App() {
     const zoomScaleX = wsEl?.offsetWidth > 0 ? (wsRect.width / wsEl.offsetWidth) : 1;
     const zoomScaleY = wsEl?.offsetHeight > 0 ? (wsRect.height / wsEl.offsetHeight) : 1;
 
-    const centerClientX = (startBox.minLeft + startBox.maxRight) / 2;
-    const centerClientY = (startBox.minTop + startBox.maxBottom) / 2;
+    const boxEl = transformBoxRef.current;
+    const bRect = boxEl ? boxEl.getBoundingClientRect() : null;
+    const centerClientX = bRect ? (bRect.left + bRect.right) / 2 : startClientX;
+    const centerClientY = bRect ? (bRect.top + bRect.bottom) / 2 : startClientY;
     const startAngle = Math.atan2(startClientY - centerClientY, startClientX - centerClientX) * (180 / Math.PI);
 
     const initialTransforms = {};
@@ -4917,9 +5050,21 @@ export default function App() {
     }
   };
 
+  const handleCancelExport = () => {
+    cancelExportRef.current = true;
+    setDownloading(false);
+    setExportProgress(null);
+  };
+
   const handleDownload = async () => {
     if (!selectedAsset) return;
+    cancelExportRef.current = false;
     setDownloading(true);
+    setExportProgress({
+      percent: 5,
+      stage: 'Preparing Export Canvas...',
+      details: `${exportFormat.toUpperCase()} · ${exportSize >= 1024 ? `${exportSize / 1024}K Ultra-HD` : `${exportSize}px`}`
+    });
     try {
       // Auto-fit bounds calculation:
       // If layers are moved, rotated, scaled, duplicated, or have effects (glow/blur), or autoFitToElements is ON,
@@ -4992,7 +5137,7 @@ export default function App() {
       }
 
       await downloadAsset({
-        svgCode: selectedAsset.svgCode,
+        svgCode: currentPreviewSvg || selectedAsset.svgCode,
         filename: exportCustomFilename.trim() || selectedAsset.title,
         customFilename: exportCustomFilename.trim(),
         autoTagDimensions: exportAutoTagDimensions,
@@ -5007,6 +5152,8 @@ export default function App() {
           solidColor: exportBgSolidColor,
           gradient: exportBgGradient
         },
+        onProgress: (p) => setExportProgress(p),
+        shouldCancel: () => cancelExportRef.current,
         adjustments: {
           ...adjustments,
           layerTransforms,
@@ -5032,15 +5179,26 @@ export default function App() {
         item.id === selectedAsset.id ? { ...item, downloads: (item.downloads || 0) + 1 } : item
       ));
     } catch (err) {
+      if (err.message === 'EXPORT_CANCELLED') return;
       alert('Download error: ' + err.message);
     } finally {
-      setDownloading(false);
+      setTimeout(() => {
+        setDownloading(false);
+        setExportProgress(null);
+      }, 700);
     }
   };
 
   const handleExportAnimatedGif = async () => {
     if (!selectedAsset || downloading) return;
+    cancelExportRef.current = false;
     setDownloading(true);
+    const targetSize = exportSize || 512;
+    setExportProgress({
+      percent: 5,
+      stage: 'Starting GIF Animation Engine...',
+      details: `GIF · ${targetSize >= 1024 ? `${targetSize / 1024}K` : `${targetSize}px`} · 3D Loop`
+    });
     try {
       let autoFitViewBox = null;
       const hasMovedLayers = Object.values(layerTransforms || {}).some(t => {
@@ -5085,7 +5243,6 @@ export default function App() {
         );
       }
 
-      const targetSize = exportSize || 512;
       let finalWidth = targetSize;
       let finalHeight = targetSize;
       if (autoFitViewBox && autoFitViewBox.width > 0 && autoFitViewBox.height > 0) {
@@ -5110,13 +5267,15 @@ export default function App() {
       }
 
       await downloadAsset({
-        svgCode: selectedAsset.svgCode,
+        svgCode: currentPreviewSvg || selectedAsset.svgCode,
         filename: selectedAsset.title,
         format: 'gif',
         size: targetSize,
         width: finalWidth,
         height: finalHeight,
         isTransparent,
+        onProgress: (p) => setExportProgress(p),
+        shouldCancel: () => cancelExportRef.current,
         adjustments: {
           ...adjustments,
           layerTransforms,
@@ -5142,9 +5301,13 @@ export default function App() {
         item.id === selectedAsset.id ? { ...item, downloads: (item.downloads || 0) + 1 } : item
       ));
     } catch (err) {
+      if (err.message === 'EXPORT_CANCELLED') return;
       alert('GIF export error: ' + err.message);
     } finally {
-      setDownloading(false);
+      setTimeout(() => {
+        setDownloading(false);
+        setExportProgress(null);
+      }, 700);
     }
   };
 
@@ -5153,13 +5316,12 @@ export default function App() {
     setActiveFilterPreset(preset.id || preset.name);
     if (preset.adjustments) {
       setAdjustments(prev => {
-        // Exclude shadowBlur and shadowColor so user's glow aura setting is preserved
         const { shadowBlur, shadowColor, ...cleanAdj } = preset.adjustments;
         return {
           ...prev,
           ...cleanAdj,
-          shadowBlur: prev.shadowBlur,
-          shadowColor: prev.shadowColor
+          shadowBlur: prev.shadowBlur || 0,
+          shadowColor: prev.shadowColor || '#38bdf8'
         };
       });
     } else {
@@ -5169,7 +5331,9 @@ export default function App() {
         saturation: preset.sat,
         contrast: preset.con,
         sepia: preset.sepia,
-        invert: preset.inv
+        invert: preset.inv,
+        shadowBlur: prev.shadowBlur || 0,
+        shadowColor: prev.shadowColor || '#38bdf8'
       }));
     }
   };
@@ -5195,11 +5359,7 @@ export default function App() {
             next[cleanId] = {
               ...(next[cleanId] || {}),
               styleMode: preset.id,
-              glow: preset.adjustments?.shadowBlur ? {
-                enabled: true,
-                color: preset.adjustments.shadowColor || '#38bdf8',
-                radius: preset.adjustments.shadowBlur
-              } : (next[cleanId]?.glow),
+              glow: next[cleanId]?.glow,
               brightness: preset.adjustments?.brightness !== undefined ? preset.adjustments.brightness : next[cleanId]?.brightness,
               opacity: preset.adjustments?.opacity !== undefined ? preset.adjustments.opacity : next[cleanId]?.opacity
             };
@@ -5216,8 +5376,8 @@ export default function App() {
           return {
             ...prev,
             ...cleanAdj,
-            shadowBlur: prev.shadowBlur,
-            shadowColor: prev.shadowColor,
+            shadowBlur: prev.shadowBlur || 0,
+            shadowColor: prev.shadowColor || '#38bdf8',
             colorReplacements: preset.id === 'original' ? {} : prev.colorReplacements
           };
         });
@@ -5248,6 +5408,32 @@ export default function App() {
       const offY = Math.round(Math.sin(radX) * d * 1.5 + (d * 0.8));
       const sColor = adjustments.depth3DColor || 'rgba(0,0,0,0.55)';
       rules.push(`drop-shadow(${offX}px ${offY}px ${Math.round(d * 0.6)}px ${sColor}) drop-shadow(${Math.round(offX * 0.5)}px ${Math.round(offY * 0.5)}px ${Math.round(d * 0.3)}px ${sColor})`);
+    }
+
+    if ((adjustments.extrusionDepth || 0) > 0) {
+      const extDepth = Math.min(40, Math.round(adjustments.extrusionDepth));
+      const extColor = adjustments.extrusionColor || 'rgba(0,0,0,0.65)';
+      const radX = ((adjustments.rotateX || 0) * Math.PI) / 180;
+      const radY = ((adjustments.rotateY || 0) * Math.PI) / 180;
+      let dirX = -Math.sin(radY) * 1.2 || 0.7;
+      let dirY = Math.sin(radX) * 1.2 || 0.7;
+      const len = Math.hypot(dirX, dirY) || 1;
+      const normX = dirX / len;
+      const normY = dirY / len;
+      
+      const steps = extDepth <= 4 
+        ? Array.from({ length: extDepth }, (_, i) => i + 1)
+        : [1, Math.round(extDepth * 0.35), Math.round(extDepth * 0.7), extDepth];
+      
+      steps.forEach(s => {
+        const sx = (normX * s).toFixed(1);
+        const sy = (normY * s).toFixed(1);
+        rules.push(`drop-shadow(${sx}px ${sy}px 0px ${extColor})`);
+      });
+      const endX = (normX * extDepth).toFixed(1);
+      const endY = (normY * extDepth + 2).toFixed(1);
+      const blur = Math.max(2, Math.round(extDepth * 0.35));
+      rules.push(`drop-shadow(${endX}px ${endY}px ${blur}px rgba(0,0,0,0.45))`);
     }
 
     return rules.filter(Boolean).join(' ');
@@ -6600,127 +6786,7 @@ export default function App() {
                 />
               )}
 
-              {/* Interactive Transform Bounding Box with 8 resize handles & rotation button - Unified Single Sky-Blue Frame */}
-              {transformBox && !isPanning && (
-                <div
-                  ref={transformBoxRef}
-                  style={{
-                    position: 'absolute',
-                    left: `${transformBox.x}px`,
-                    top: `${transformBox.y}px`,
-                    width: `${transformBox.width}px`,
-                    height: `${transformBox.height}px`,
-                  }}
-                  className="pointer-events-none z-30 border-2 border-[#38bdf8] shadow-[0_0_12px_rgba(56,189,248,0.45)] rounded-none"
-                >
-                  {/* 4 Corner Proportional Resize Dots */}
-                  <div
-                    onPointerDown={(e) => handleTransformHandleDown(e, 'nw')}
-                    className="pointer-events-auto absolute -top-2 -left-2 w-3.5 h-3.5 bg-white rounded-full border-2 border-[#38bdf8] shadow-md cursor-nwse-resize hover:scale-125 transition-transform"
-                    title="Drag to scale proportionally"
-                  />
-                  <div
-                    onPointerDown={(e) => handleTransformHandleDown(e, 'ne')}
-                    className="pointer-events-auto absolute -top-2 -right-2 w-3.5 h-3.5 bg-white rounded-full border-2 border-[#38bdf8] shadow-md cursor-nesw-resize hover:scale-125 transition-transform"
-                    title="Drag to scale proportionally"
-                  />
-                  <div
-                    onPointerDown={(e) => handleTransformHandleDown(e, 'se')}
-                    className="pointer-events-auto absolute -bottom-2 -right-2 w-3.5 h-3.5 bg-white rounded-full border-2 border-[#38bdf8] shadow-md cursor-nwse-resize hover:scale-125 transition-transform"
-                    title="Drag to scale proportionally"
-                  />
-                  <div
-                    onPointerDown={(e) => handleTransformHandleDown(e, 'sw')}
-                    className="pointer-events-auto absolute -bottom-2 -left-2 w-3.5 h-3.5 bg-white rounded-full border-2 border-[#38bdf8] shadow-md cursor-nesw-resize hover:scale-125 transition-transform"
-                    title="Drag to scale proportionally"
-                  />
 
-                  {/* 4 Mid-Edge Stretch Pills/Bars */}
-                  <div
-                    onPointerDown={(e) => handleTransformHandleDown(e, 'n')}
-                    className="pointer-events-auto absolute -top-1.5 left-1/2 -translate-x-1/2 w-4 h-2 bg-white rounded-full border border-[#38bdf8] shadow-sm cursor-ns-resize hover:scale-125 transition-transform"
-                    title="Drag to change height"
-                  />
-                  <div
-                    onPointerDown={(e) => handleTransformHandleDown(e, 's')}
-                    className="pointer-events-auto absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-4 h-2 bg-white rounded-full border border-[#38bdf8] shadow-sm cursor-ns-resize hover:scale-125 transition-transform"
-                    title="Drag to change height"
-                  />
-                  <div
-                    onPointerDown={(e) => handleTransformHandleDown(e, 'w')}
-                    className="pointer-events-auto absolute top-1/2 -left-1.5 -translate-y-1/2 w-2 h-4 bg-white rounded-full border border-[#38bdf8] shadow-sm cursor-ew-resize hover:scale-125 transition-transform"
-                    title="Drag to change width"
-                  />
-                  <div
-                    onPointerDown={(e) => handleTransformHandleDown(e, 'e')}
-                    className="pointer-events-auto absolute top-1/2 -right-1.5 -translate-y-1/2 w-2 h-4 bg-white rounded-full border border-[#38bdf8] shadow-sm cursor-ew-resize hover:scale-125 transition-transform"
-                    title="Drag to change width"
-                  />
-
-                  {/* Rotation & Group/Ungroup Controls Container right by the left selection line */}
-                  <div className="pointer-events-auto absolute top-1/2 -left-3 -translate-x-full -translate-y-1/2 flex items-center gap-1.5 z-40">
-                    {/* If single child inside a group is sub-selected: Provide "Select Group" button */}
-                    {isSubSelectedInGroup && activeGroupForSelection && (
-                      <button
-                        type="button"
-                        onPointerDown={(e) => e.stopPropagation()}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedLayerIds([...activeGroupForSelection]);
-                          setSelectedLayerId(activeGroupForSelection[0]);
-                        }}
-                        className="h-6 px-2.5 rounded-full border shadow-lg flex items-center gap-1 text-[10px] font-bold transition-all hover:scale-105 active:scale-95 whitespace-nowrap cursor-pointer select-none bg-cyan-500 hover:bg-cyan-400 text-slate-950 border-cyan-300 shadow-cyan-950/40"
-                        title="Click to select all parts in this group together"
-                      >
-                        <Layers className="w-3 h-3 flex-shrink-0" />
-                        <span>Select Group</span>
-                      </button>
-                    )}
-
-                    {/* Group / Ungroup Button */}
-                    {(isCurrentGroupSelected || isSubSelectedInGroup || (selectedLayerIds && selectedLayerIds.length > 1)) && (
-                      <button
-                        type="button"
-                        onPointerDown={(e) => e.stopPropagation()}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (isCurrentGroupSelected || isSubSelectedInGroup) {
-                            handleUngroupSelected();
-                          } else {
-                            handleGroupSelected();
-                          }
-                        }}
-                        className={`h-6 px-2.5 rounded-full border shadow-lg flex items-center gap-1 text-[10px] font-bold transition-all hover:scale-105 active:scale-95 whitespace-nowrap cursor-pointer select-none ${isCurrentGroupSelected || isSubSelectedInGroup
-                            ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 border-amber-300 shadow-amber-950/40'
-                            : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 border-cyan-300 shadow-cyan-950/40'
-                          }`}
-                        title={isCurrentGroupSelected || isSubSelectedInGroup ? "Click to ungroup parts so they become standalone" : "Click to group selected parts"}
-                      >
-                        {isCurrentGroupSelected || isSubSelectedInGroup ? (
-                          <>
-                            <Unlink2 className="w-3 h-3 flex-shrink-0" />
-                            <span>Ungroup</span>
-                          </>
-                        ) : (
-                          <>
-                            <Link2 className="w-3 h-3 flex-shrink-0" />
-                            <span>Group</span>
-                          </>
-                        )}
-                      </button>
-                    )}
-
-                    {/* Single Rotation Handle Button */}
-                    <div
-                      onPointerDown={(e) => handleTransformHandleDown(e, 'rotate')}
-                      className="w-6 h-6 bg-white rounded-full border-2 border-[#38bdf8] shadow-lg flex items-center justify-center cursor-grab active:cursor-grabbing hover:scale-115 hover:border-cyan-300 transition-all text-[#0284c7] hover:text-cyan-500 flex-shrink-0"
-                      title="Drag to rotate smoothly (or click to rotate)"
-                    >
-                      <RotateCw className="w-3.5 h-3.5" />
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {/* Floating Canvas Controls & Direct Selection Indicator (Hidden on mobile UI per user request for a completely clean, empty canvas) */}
               <div className="hidden sm:flex absolute top-2 inset-x-2 sm:top-4 sm:inset-x-6 items-center justify-between z-10 pointer-events-none gap-2">
@@ -6876,61 +6942,189 @@ export default function App() {
               {/* Floating SVG Icon or Background Badge Shape with Interactive Selection, Custom Dimensions & Smooth Zoom */}
               <div
                 className={
-                  adjustments.is3DFloating
-                    ? `animate-${
-                        adjustments.animPreset === 'float'
-                          ? 'floating'
-                          : adjustments.animPreset === 'spin360'
-                            ? 'spin'
-                            : adjustments.animPreset === 'flip3d'
-                              ? 'flip'
-                              : adjustments.animPreset === 'hover3d'
-                                ? 'hover'
-                                : (adjustments.animPreset || 'floating')
-                      }-3d`
+                  (!exportProgress && adjustments.is3DFloating && adjustments.animPreset !== 'none')
+                    ? getPresetAnimClass(adjustments.animPreset || 'float')
                     : ''
                 }
                 style={{
                   '--anim-speed': `${adjustments.animSpeed || 2.2}s`,
-                  '--anim-amp': `${adjustments.animHeight || 16}px`
+                  '--anim-amp': `${adjustments.animHeight || 16}px`,
+                  '--anim-amp-val': `${adjustments.animHeight || 16}`,
+                  display: 'inline-block',
+                  perspective: '1200px',
+                  transformStyle: 'preserve-3d',
+                  transformOrigin: adjustments.animPreset === 'swing' ? 'top center' : 'center center',
+                  animationPlayState: exportProgress ? 'paused' : 'running'
                 }}
               >
+                {/* 3D & Vector Transform Space: Holds both SVG and Interactive Selection Bounding Box */}
                 <div
-                  ref={canvasSvgContainerRef}
-                  onPointerDown={handleCanvasPointerDown}
-                  onClick={(e) => {
-                    if (justFinishedPanRef.current || isCtrlShiftDown || (e.ctrlKey && e.shiftKey)) {
-                      e.stopPropagation();
-                      return;
-                    }
-                    e.stopPropagation();
-                    handleCanvasElementClick(e);
-                  }}
                   style={{
-                    '--zoom-level': zoomLevel,
-                    '--sel-w': `${Math.max(0.02, Number((0.9 / zoomLevel).toFixed(4)))}px`,
-                    '--hover-w': `${Math.max(0.015, Number((0.75 / zoomLevel).toFixed(4)))}px`,
-                    '--sel-outline-w': `${Math.max(0.001, Number((2 * finalSvgScale).toFixed(5)))}px`,
-                    '--sel-outline-off': `${Math.max(0.001, Number((2 * finalSvgScale).toFixed(5)))}px`,
-                    '--hover-outline-w': `${Math.max(0.001, Number((1.5 * finalSvgScale).toFixed(5)))}px`,
-                    '--hover-outline-off': `${Math.max(0.001, Number((2 * finalSvgScale).toFixed(5)))}px`,
+                    position: 'relative',
                     width: `${Math.round(iconWidth * zoomLevel)}px`,
                     height: `${Math.round(iconHeight * zoomLevel)}px`,
                     transform: `translate(${canvasPan.x}px, ${canvasPan.y}px) ${has3D ? `perspective(${adjustments.perspective || 800}px) rotateX(${adjustments.rotateX || 0}deg) rotateY(${adjustments.rotateY || 0}deg) ` : ''}rotate(${adjustments.rotation || 0}deg) skew(${adjustments.skewX || 0}deg, ${adjustments.skewY || 0}deg) scale(${adjustments.flipH ? -1 : 1}, ${adjustments.flipV ? -1 : 1})`,
                     transformOrigin: 'center center',
                     transformStyle: has3D ? 'preserve-3d' : undefined,
-                    willChange: isPanning ? 'transform' : 'auto',
-                    filter: getComputedFilterStyle(),
-                    backgroundColor: bgShape !== 'none' ? bgShapeColor : 'transparent',
-                    padding: bgShape !== 'none' ? `${bgShapePadding * 0.7}%` : '0px',
-                    borderRadius: bgShape === 'circle' ? '9999px' : bgShape === 'squircle' ? '28%' : bgShape === 'rounded-square' ? '1.5rem' : '0px',
-                    clipPath: bgShape === 'hexagon' ? 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)' : 'none',
-                    border: bgShape !== 'none' && bgShapeBorder > 0 ? `${bgShapeBorder}px solid ${bgShapeBorderColor}` : 'none'
+                    willChange: isPanning ? 'transform' : 'auto'
                   }}
-                  className={`flex items-center justify-center interactive-svg-canvas cursor-pointer select-none [&>svg]:w-full [&>svg]:h-full [&>svg]:block [shape-rendering:geometricPrecision] [text-rendering:geometricPrecision] ${bgShape !== 'none' ? 'shadow-2xl' : ''
-                    }`}
-                  dangerouslySetInnerHTML={{ __html: currentPreviewSvg }}
-                />
+                >
+                  <div
+                    ref={canvasSvgContainerRef}
+                    onPointerDown={handleCanvasPointerDown}
+                    onClick={(e) => {
+                      if (justFinishedPanRef.current || isCtrlShiftDown || (e.ctrlKey && e.shiftKey)) {
+                        e.stopPropagation();
+                        return;
+                      }
+                      e.stopPropagation();
+                      handleCanvasElementClick(e);
+                    }}
+                    style={{
+                      '--zoom-level': zoomLevel,
+                      '--sel-w': `${Math.max(0.02, Number((0.9 / zoomLevel).toFixed(4)))}px`,
+                      '--hover-w': `${Math.max(0.015, Number((0.75 / zoomLevel).toFixed(4)))}px`,
+                      '--sel-outline-w': `${Math.max(0.001, Number((2 * finalSvgScale).toFixed(5)))}px`,
+                      '--sel-outline-off': `${Math.max(0.001, Number((2 * finalSvgScale).toFixed(5)))}px`,
+                      '--hover-outline-w': `${Math.max(0.001, Number((1.5 * finalSvgScale).toFixed(5)))}px`,
+                      '--hover-outline-off': `${Math.max(0.001, Number((2 * finalSvgScale).toFixed(5)))}px`,
+                      width: '100%',
+                      height: '100%',
+                      filter: getComputedFilterStyle(),
+                      backgroundColor: bgShape !== 'none' ? bgShapeColor : 'transparent',
+                      padding: bgShape !== 'none' ? `${bgShapePadding * 0.7}%` : '0px',
+                      borderRadius: bgShape === 'circle' ? '9999px' : bgShape === 'squircle' ? '28%' : bgShape === 'rounded-square' ? '1.5rem' : '0px',
+                      clipPath: bgShape === 'hexagon' ? 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)' : 'none',
+                      border: bgShape !== 'none' && bgShapeBorder > 0 ? `${bgShapeBorder}px solid ${bgShapeBorderColor}` : 'none'
+                    }}
+                    className={`flex items-center justify-center interactive-svg-canvas cursor-pointer select-none [&>svg]:w-full [&>svg]:h-full [&>svg]:block [shape-rendering:geometricPrecision] [text-rendering:geometricPrecision] ${bgShape !== 'none' ? 'shadow-2xl' : ''
+                      }`}
+                    dangerouslySetInnerHTML={{ __html: currentPreviewSvg }}
+                  />
+
+                  {/* Interactive Transform Bounding Box with 8 resize handles & rotation button - Unified Frame in 3D Space */}
+                  {transformBox && !isPanning && (
+                    <div
+                      ref={transformBoxRef}
+                      style={{
+                        position: 'absolute',
+                        left: `${transformBox.x}px`,
+                        top: `${transformBox.y}px`,
+                        width: `${transformBox.width}px`,
+                        height: `${transformBox.height}px`,
+                        pointerEvents: 'none'
+                      }}
+                      className="z-30 border-2 border-[#38bdf8] shadow-[0_0_12px_rgba(56,189,248,0.45)] rounded-none"
+                    >
+                      {/* 4 Corner Proportional Resize Dots */}
+                      <div
+                        onPointerDown={(e) => handleTransformHandleDown(e, 'nw')}
+                        className="pointer-events-auto absolute -top-2 -left-2 w-3.5 h-3.5 bg-white rounded-full border-2 border-[#38bdf8] shadow-md cursor-nwse-resize hover:scale-125 transition-transform"
+                        title="Drag to scale proportionally"
+                      />
+                      <div
+                        onPointerDown={(e) => handleTransformHandleDown(e, 'ne')}
+                        className="pointer-events-auto absolute -top-2 -right-2 w-3.5 h-3.5 bg-white rounded-full border-2 border-[#38bdf8] shadow-md cursor-nesw-resize hover:scale-125 transition-transform"
+                        title="Drag to scale proportionally"
+                      />
+                      <div
+                        onPointerDown={(e) => handleTransformHandleDown(e, 'se')}
+                        className="pointer-events-auto absolute -bottom-2 -right-2 w-3.5 h-3.5 bg-white rounded-full border-2 border-[#38bdf8] shadow-md cursor-nwse-resize hover:scale-125 transition-transform"
+                        title="Drag to scale proportionally"
+                      />
+                      <div
+                        onPointerDown={(e) => handleTransformHandleDown(e, 'sw')}
+                        className="pointer-events-auto absolute -bottom-2 -left-2 w-3.5 h-3.5 bg-white rounded-full border-2 border-[#38bdf8] shadow-md cursor-nesw-resize hover:scale-125 transition-transform"
+                        title="Drag to scale proportionally"
+                      />
+
+                      {/* 4 Mid-Edge Stretch Pills/Bars */}
+                      <div
+                        onPointerDown={(e) => handleTransformHandleDown(e, 'n')}
+                        className="pointer-events-auto absolute -top-1.5 left-1/2 -translate-x-1/2 w-4 h-2 bg-white rounded-full border border-[#38bdf8] shadow-sm cursor-ns-resize hover:scale-125 transition-transform"
+                        title="Drag to change height"
+                      />
+                      <div
+                        onPointerDown={(e) => handleTransformHandleDown(e, 's')}
+                        className="pointer-events-auto absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-4 h-2 bg-white rounded-full border border-[#38bdf8] shadow-sm cursor-ns-resize hover:scale-125 transition-transform"
+                        title="Drag to change height"
+                      />
+                      <div
+                        onPointerDown={(e) => handleTransformHandleDown(e, 'w')}
+                        className="pointer-events-auto absolute top-1/2 -left-1.5 -translate-y-1/2 w-2 h-4 bg-white rounded-full border border-[#38bdf8] shadow-sm cursor-ew-resize hover:scale-125 transition-transform"
+                        title="Drag to change width"
+                      />
+                      <div
+                        onPointerDown={(e) => handleTransformHandleDown(e, 'e')}
+                        className="pointer-events-auto absolute top-1/2 -right-1.5 -translate-y-1/2 w-2 h-4 bg-white rounded-full border border-[#38bdf8] shadow-sm cursor-ew-resize hover:scale-125 transition-transform"
+                        title="Drag to change width"
+                      />
+
+                      {/* Rotation & Group/Ungroup Controls Container right by the left selection line */}
+                      <div className="pointer-events-auto absolute top-1/2 -left-3 -translate-x-full -translate-y-1/2 flex items-center gap-1.5 z-40">
+                        {/* If single child inside a group is sub-selected: Provide "Select Group" button */}
+                        {isSubSelectedInGroup && activeGroupForSelection && (
+                          <button
+                            type="button"
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedLayerIds([...activeGroupForSelection]);
+                              setSelectedLayerId(activeGroupForSelection[0]);
+                            }}
+                            className="h-6 px-2.5 rounded-full border shadow-lg flex items-center gap-1 text-[10px] font-bold transition-all hover:scale-105 active:scale-95 whitespace-nowrap cursor-pointer select-none bg-cyan-500 hover:bg-cyan-400 text-slate-950 border-cyan-300 shadow-cyan-950/40"
+                            title="Click to select all parts in this group together"
+                          >
+                            <Layers className="w-3 h-3 flex-shrink-0" />
+                            <span>Select Group</span>
+                          </button>
+                        )}
+
+                        {/* Group / Ungroup Button */}
+                        {(isCurrentGroupSelected || isSubSelectedInGroup || (selectedLayerIds && selectedLayerIds.length > 1)) && (
+                          <button
+                            type="button"
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (isCurrentGroupSelected || isSubSelectedInGroup) {
+                                handleUngroupSelected();
+                              } else {
+                                handleGroupSelected();
+                              }
+                            }}
+                            className={`h-6 px-2.5 rounded-full border shadow-lg flex items-center gap-1 text-[10px] font-bold transition-all hover:scale-105 active:scale-95 whitespace-nowrap cursor-pointer select-none ${isCurrentGroupSelected || isSubSelectedInGroup
+                                ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 border-amber-300 shadow-amber-950/40'
+                                : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 border-cyan-300 shadow-cyan-950/40'
+                              }`}
+                            title={isCurrentGroupSelected || isSubSelectedInGroup ? "Click to ungroup parts so they become standalone" : "Click to group selected parts"}
+                          >
+                            {isCurrentGroupSelected || isSubSelectedInGroup ? (
+                              <>
+                                <Unlink2 className="w-3 h-3 flex-shrink-0" />
+                                <span>Ungroup</span>
+                              </>
+                            ) : (
+                              <>
+                                <Link2 className="w-3 h-3 flex-shrink-0" />
+                                <span>Group</span>
+                              </>
+                            )}
+                          </button>
+                        )}
+
+                        {/* Single Rotation Handle Button */}
+                        <div
+                          onPointerDown={(e) => handleTransformHandleDown(e, 'rotate')}
+                          className="w-6 h-6 bg-white rounded-full border-2 border-[#38bdf8] shadow-lg flex items-center justify-center cursor-grab active:cursor-grabbing hover:scale-115 hover:border-cyan-300 transition-all text-[#0284c7] hover:text-cyan-500 flex-shrink-0"
+                          title="Drag to rotate smoothly (or click to rotate)"
+                        >
+                          <RotateCw className="w-3.5 h-3.5" />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Bottom Floating Bar on Canvas (Hidden on mobile UI per user request, visible on tablet/desktop) */}
@@ -7342,35 +7536,69 @@ export default function App() {
                           </div>
                         </div>
 
-                        {/* Edge-Conforming Glow / Shadow */}
-                        <div className={`p-3.5 rounded-2xl border space-y-2 ${appTheme === 'dark' ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
+                        {/* Glow Aura Effect (Shifted from Color Studio) */}
+                        <div className={`p-3 rounded-2xl border space-y-2.5 ${adjustments.shadowBlur > 0
+                          ? appTheme === 'dark' ? 'bg-cyan-950/25 border-cyan-500/40 shadow-sm' : 'bg-cyan-50/70 border-cyan-300'
+                          : appTheme === 'dark' ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'
                           }`}>
-                          <div className="flex justify-between text-xs items-center">
-                            <span className={`font-semibold flex items-center gap-1.5 ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-800'}`}>
-                              <Sparkles className="w-3.5 h-3.5 text-cyan-500" /> Vector Edge Glow Aura
+                          <div className="flex items-center justify-between">
+                            <span className={`text-xs font-semibold flex items-center gap-1.5 ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-800'}`}>
+                              <span className={`w-2 h-2 rounded-full ${adjustments.shadowBlur > 0 ? 'bg-cyan-400 animate-ping' : 'bg-slate-600'}`} />
+                              <Sparkles className="w-3.5 h-3.5 text-cyan-500" />
+                              <span>Glow Aura Effect</span>
                             </span>
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="color"
-                                value={adjustments.shadowColor}
-                                onChange={(e) => setAdjustments({ ...adjustments, shadowColor: e.target.value })}
-                                className="w-5 h-5 rounded cursor-pointer bg-transparent border-0"
-                                title="Glow Color"
-                              />
-                              <span className="text-cyan-500 font-mono text-xs font-semibold">{adjustments.shadowBlur}px</span>
-                            </div>
+                            <button
+                              onClick={() => {
+                                recordUndo();
+                                if (adjustments.shadowBlur > 0) {
+                                  setAdjustments(prev => ({ ...prev, shadowBlur: 0 }));
+                                } else {
+                                  setAdjustments(prev => ({ ...prev, shadowBlur: 14, shadowColor: prev.shadowColor || '#38bdf8' }));
+                                }
+                              }}
+                              className={`px-2.5 py-0.5 rounded-md text-[10px] font-semibold transition ${adjustments.shadowBlur > 0
+                                ? 'bg-cyan-500 text-white shadow-md shadow-cyan-500/30'
+                                : appTheme === 'dark' ? 'bg-slate-800 text-slate-400 hover:text-white' : 'bg-slate-200 text-slate-600'
+                                }`}
+                            >
+                              {adjustments.shadowBlur > 0 ? 'Enabled' : 'Enable'}
+                            </button>
                           </div>
-                          <input
-                            type="range"
-                            min="0"
-                            max="60"
-                            value={adjustments.shadowBlur}
-                            onChange={(e) => setAdjustments({ ...adjustments, shadowColor: adjustments.shadowColor, shadowBlur: Number(e.target.value) })}
-                            className="theme-slider w-full"
-                          />
-                          <p className={`text-[10px] ${appTheme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
-                            Glow directly outlines and radiates around transparent vector contours.
-                          </p>
+
+                          {adjustments.shadowBlur > 0 && (
+                            <div className="space-y-2 pt-1 border-t border-cyan-500/20 animate-in fade-in duration-150">
+                              <div className="flex items-center justify-between text-[11px]">
+                                <span className={appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}>Glow Radius:</span>
+                                <span className="font-mono text-cyan-500 font-bold">{adjustments.shadowBlur}px</span>
+                              </div>
+                              <input
+                                type="range"
+                                min="1"
+                                max="60"
+                                value={adjustments.shadowBlur}
+                                onChange={(e) => setAdjustments(prev => ({ ...prev, shadowBlur: Number(e.target.value) }))}
+                                className="theme-slider w-full"
+                              />
+                              <div className="flex items-center gap-1.5 pt-1">
+                                <span className={`text-[10px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>Aura Color:</span>
+                                {['#38bdf8', '#a855f7', '#ec4899', '#10b981', '#ffffff', '#f59e0b'].map(c => (
+                                  <button
+                                    key={c}
+                                    onClick={() => setAdjustments(prev => ({ ...prev, shadowColor: c }))}
+                                    style={{ backgroundColor: c }}
+                                    className={`w-4 h-4 rounded-full border transition ${adjustments.shadowColor === c ? 'ring-2 ring-cyan-400 scale-110' : 'border-slate-700'}`}
+                                  />
+                                ))}
+                                <input
+                                  type="color"
+                                  value={adjustments.shadowColor || '#38bdf8'}
+                                  onChange={(e) => setAdjustments(prev => ({ ...prev, shadowColor: e.target.value }))}
+                                  className="w-5 h-5 rounded cursor-pointer bg-transparent border-0 p-0 ml-auto"
+                                  title="Custom Glow Color"
+                                />
+                              </div>
+                            </div>
+                          )}
                         </div>
 
                         {/* Soft Blur Slider */}
@@ -7765,62 +7993,6 @@ export default function App() {
                                   )}
                                 </div>
 
-                                {/* Glow Aura Toggle & Controls */}
-                                <div className={`p-2.5 rounded-xl border space-y-2 ${glowEnabled
-                                  ? appTheme === 'dark' ? 'bg-cyan-950/30 border-cyan-500/50' : 'bg-cyan-50 border-cyan-300'
-                                  : appTheme === 'dark' ? 'bg-slate-950/50 border-slate-800' : 'bg-slate-50 border-slate-200'
-                                  }`}>
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-[11px] font-medium flex items-center gap-1.5">
-                                      <span className={`w-2 h-2 rounded-full ${glowEnabled ? 'bg-cyan-400 animate-ping' : 'bg-slate-600'}`} />
-                                      <span>Glow Aura Effect</span>
-                                    </span>
-                                    <button
-                                      onClick={() => handleLayerEffectChange(activeIds, 'glow', { enabled: !glowEnabled, color: glowColor, radius: glowRadius })}
-                                      className={`px-2.5 py-0.5 rounded-md text-[10px] font-semibold transition ${glowEnabled
-                                        ? 'bg-cyan-500 text-white shadow-md shadow-cyan-500/30'
-                                        : appTheme === 'dark' ? 'bg-slate-800 text-slate-400 hover:text-white' : 'bg-slate-200 text-slate-600'
-                                        }`}
-                                    >
-                                      {glowEnabled ? 'Enabled' : 'Enable'}
-                                    </button>
-                                  </div>
-
-                                  {glowEnabled && (
-                                    <div className="space-y-2 pt-1 border-t border-cyan-500/20 animate-in fade-in duration-150">
-                                      <div className="flex items-center justify-between text-[10px]">
-                                        <span className="text-slate-400">Glow Radius:</span>
-                                        <span className="font-mono text-cyan-400 font-bold">{glowRadius}px</span>
-                                      </div>
-                                      <input
-                                        type="range"
-                                        min="2"
-                                        max="40"
-                                        value={glowRadius}
-                                        onChange={(e) => handleLayerEffectChange(activeIds, 'glow', { enabled: true, color: glowColor, radius: Number(e.target.value) })}
-                                        className="w-full accent-cyan-500 cursor-pointer h-1.5 bg-slate-700 rounded-lg"
-                                      />
-                                      <div className="flex items-center gap-1.5 pt-1">
-                                        <span className="text-[10px] text-slate-400">Aura Color:</span>
-                                        {['#38bdf8', '#a855f7', '#ec4899', '#10b981', '#ffffff'].map(c => (
-                                          <button
-                                            key={c}
-                                            onClick={() => handleLayerEffectChange(activeIds, 'glow', { enabled: true, color: c, radius: glowRadius })}
-                                            style={{ backgroundColor: c }}
-                                            className={`w-4 h-4 rounded-full border transition ${glowColor === c ? 'ring-2 ring-cyan-400 scale-110' : 'border-slate-700'}`}
-                                          />
-                                        ))}
-                                        <input
-                                          type="color"
-                                          value={glowColor}
-                                          onChange={(e) => handleLayerEffectChange(activeIds, 'glow', { enabled: true, color: e.target.value, radius: glowRadius })}
-                                          className="w-5 h-5 rounded cursor-pointer bg-transparent border-0 p-0 ml-auto"
-                                          title="Custom Glow Color"
-                                        />
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
 
                                 {/* Opacity Slider */}
                                 <div className={`p-2 rounded-xl border ${appTheme === 'dark' ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
@@ -8546,7 +8718,7 @@ export default function App() {
                               }`}
                           >
                             {/* Live Visual Filter Preview Box */}
-                            <FilterCardThumbnail preset={pst} />
+                            <FilterCardThumbnail preset={pst} svgCode={selectedAsset?.svgCode || currentPreviewSvg} activeGlowBlur={adjustments.shadowBlur || 0} activeGlowColor={adjustments.shadowColor || '#38bdf8'} />
 
                             <div className="w-full">
                               <div className="flex items-center justify-between gap-1 mb-1">
@@ -9486,10 +9658,112 @@ export default function App() {
                             max="2000"
                             step="50"
                             value={adjustments.perspective || 800}
-                            onChange={(e) => setAdjustments({ ...adjustments, perspective: Number(e.target.value) })}
+                            onChange={(e) => {
+                              const newPersp = Number(e.target.value);
+                              setAdjustments(prev => {
+                                const needsTilt = (!prev.rotateX || prev.rotateX === 0) && (!prev.rotateY || prev.rotateY === 0);
+                                return {
+                                  ...prev,
+                                  perspective: newPersp,
+                                  rotateX: needsTilt ? 18 : prev.rotateX,
+                                  rotateY: needsTilt ? -18 : prev.rotateY
+                                };
+                              });
+                            }}
                             className="theme-slider w-full"
                           />
                         </div>
+
+                        {/* 3D Solid Thickness / Motai (Extrusion) Slider */}
+                        {(() => {
+                          const activeTargetIds = (selectedLayerIds && selectedLayerIds.length > 0)
+                            ? selectedLayerIds
+                            : (selectedLayerId ? [selectedLayerId] : []);
+                          const isPartSelected = activeTargetIds.length > 0;
+                          const primaryCleanId = isPartSelected ? String(activeTargetIds[0]).replace(/^pf_studio_/i, '') : null;
+                          const currentPartExtrusion = primaryCleanId && layerStyles[primaryCleanId]?.extrusion;
+                          const currentDepth = isPartSelected
+                            ? (currentPartExtrusion?.depth !== undefined ? currentPartExtrusion.depth : (adjustments.extrusionDepth || 0))
+                            : (adjustments.extrusionDepth || 0);
+                          const currentColor = isPartSelected
+                            ? (currentPartExtrusion?.color || adjustments.extrusionColor || 'rgba(0,0,0,0.65)')
+                            : (adjustments.extrusionColor || 'rgba(0,0,0,0.65)');
+
+                          const handleExtrusionChange = (newDepth, newColor) => {
+                            const d = Math.max(0, Math.min(50, Number(newDepth)));
+                            const c = newColor || currentColor;
+                            if (isPartSelected) {
+                              setLayerStyles(prev => {
+                                const next = { ...prev };
+                                activeTargetIds.forEach(id => {
+                                  const cId = String(id).replace(/^pf_studio_/i, '');
+                                  next[cId] = {
+                                    ...(next[cId] || {}),
+                                    extrusion: { depth: d, color: c }
+                                  };
+                                });
+                                return next;
+                              });
+                            } else {
+                              setAdjustments(prev => ({
+                                ...prev,
+                                extrusionDepth: d,
+                                extrusionColor: c
+                              }));
+                            }
+                          };
+
+                          return (
+                            <div className={`p-3 rounded-2xl border transition space-y-2.5 ${currentDepth > 0
+                              ? appTheme === 'dark' ? 'bg-cyan-950/25 border-cyan-500/40 shadow-sm' : 'bg-cyan-50/70 border-cyan-300'
+                              : appTheme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'
+                              }`}>
+                              <div className="flex items-center justify-between">
+                                <span className={`text-xs font-semibold flex items-center gap-1.5 ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                                  <Layers className="w-3.5 h-3.5 text-cyan-400" />
+                                  <span>3D Thickness / Motai {isPartSelected ? '(Selected Part)' : '(Whole Artwork)'}</span>
+                                </span>
+                                <span className="text-xs text-cyan-500 font-mono font-bold">{currentDepth}px</span>
+                              </div>
+                              <input
+                                type="range"
+                                min="0"
+                                max="40"
+                                step="1"
+                                value={currentDepth}
+                                onChange={(e) => handleExtrusionChange(e.target.value)}
+                                className="theme-slider w-full"
+                              />
+
+                              <div className="flex items-center justify-between pt-1 border-t border-slate-800/40 text-[10px]">
+                                <span className={appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}>Thickness Color:</span>
+                                <div className="flex items-center gap-1.5">
+                                  {['rgba(0,0,0,0.7)', '#0f172a', '#7f1d1d', '#1e3a8a', '#14532d', '#713f12'].map(c => (
+                                    <button
+                                      key={c}
+                                      onClick={() => handleExtrusionChange(currentDepth, c)}
+                                      style={{ backgroundColor: c }}
+                                      className={`w-3.5 h-3.5 rounded-full border transition ${currentColor === c ? 'ring-2 ring-cyan-400 scale-110' : 'border-slate-700'}`}
+                                      title={c}
+                                    />
+                                  ))}
+                                  <input
+                                    type="color"
+                                    value={currentColor.startsWith('#') ? currentColor : '#000000'}
+                                    onChange={(e) => handleExtrusionChange(currentDepth, e.target.value)}
+                                    className="w-4 h-4 rounded cursor-pointer bg-transparent border-0 p-0 ml-1"
+                                    title="Custom Thickness Color"
+                                  />
+                                </div>
+                              </div>
+                              <p className={`text-[10px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                                {isPartSelected
+                                  ? 'Selected element ko solid 3D motai aur dimensional blocks deta hai'
+                                  : 'Poore icon ko solid 3D extrusion aur physical motai deta hai'}
+                              </p>
+                            </div>
+                          );
+                        })()}
 
                         {/* 3D Elevation / Depth Shadow */}
                         <div className={`p-3 rounded-2xl border ${appTheme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'
@@ -9554,24 +9828,37 @@ export default function App() {
                                 {adjustments.animPreset || 'float'}
                               </span>
                             </div>
-                            <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5 max-h-56 overflow-y-auto pr-1">
+                            <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 max-h-60 overflow-y-auto pr-1 py-1">
                               {MOTION_PRESETS.map((preset) => {
                                 const isSel = (adjustments.animPreset || 'float') === preset.id;
+                                const animClass = getPresetAnimClass(preset.id);
                                 return (
                                   <button
                                     key={preset.id}
                                     type="button"
-                                    title={preset.desc}
-                                    onClick={() => setAdjustments(prev => ({ ...prev, animPreset: preset.id, is3DFloating: true }))}
-                                    className={`p-1.5 rounded-xl text-center border transition flex flex-col items-center gap-0.5 ${isSel
-                                      ? 'bg-blue-600 text-white border-blue-400 shadow-md shadow-blue-600/20 font-bold'
+                                    title={`${preset.name}: ${preset.desc}`}
+                                    onClick={() => setAdjustments(prev => ({ ...prev, animPreset: preset.id, is3DFloating: preset.id !== 'none' }))}
+                                    className={`h-11 px-2 rounded-xl text-center border transition-all flex items-center justify-center overflow-hidden relative select-none ${isSel
+                                      ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white border-cyan-400 shadow-md shadow-blue-500/30 ring-1 ring-cyan-300 font-bold'
                                       : appTheme === 'dark'
-                                        ? 'bg-slate-800/80 border-slate-700/60 text-slate-300 hover:border-slate-600'
-                                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                                        ? 'bg-slate-800/90 border-slate-700/70 text-slate-200 hover:border-cyan-500/50 hover:text-white hover:bg-slate-750'
+                                        : 'bg-white border-slate-200 text-slate-700 hover:border-cyan-400 hover:text-cyan-900 hover:bg-cyan-50/40'
                                       }`}
+                                    style={{ perspective: '500px' }}
                                   >
-                                    <span className="text-base leading-none">{preset.icon}</span>
-                                    <span className="text-[9px] font-semibold truncate w-full">{preset.name}</span>
+                                    <span
+                                      className={`text-[11px] font-bold tracking-tight leading-none inline-block ${preset.id !== 'none' ? animClass : ''}`}
+                                      style={{
+                                        '--anim-speed': '2.2s',
+                                        '--anim-amp': '6px',
+                                        '--anim-amp-val': '6',
+                                        transformOrigin: preset.id === 'swing' ? 'top center' : 'center center',
+                                        transformStyle: 'preserve-3d',
+                                        backfaceVisibility: 'visible'
+                                      }}
+                                    >
+                                      {preset.name}
+                                    </span>
                                   </button>
                                 );
                               })}
@@ -9688,128 +9975,127 @@ export default function App() {
                     )}
 
                     {/* SUB-TAB 2: 2D ANGLE & FLIPS */}
-                    {transformSubTab === '2d' && (
-                      <div className="space-y-4">
-                        {/* 2D Angle Slider */}
-                        <div>
-                          <div className={`flex justify-between text-xs mb-1 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                            <span>Rotation Angle</span>
-                            <span className="text-cyan-500 font-mono font-semibold">{adjustments.rotation}&deg;</span>
+                    {transformSubTab === '2d' && (() => {
+                      const activeSelectedLayerId = (selectedLayerIds && selectedLayerIds.length > 0)
+                        ? selectedLayerIds[0]
+                        : selectedLayerId;
+                      const activeLayerTransform = activeSelectedLayerId ? layerTransforms[activeSelectedLayerId] : null;
+                      const isLayerTargeted = Boolean(activeSelectedLayerId);
+                      const currentAngle = isLayerTargeted
+                        ? (activeLayerTransform?.rotate || 0)
+                        : (adjustments.rotation || 0);
+                      const isFlippedH = isLayerTargeted
+                        ? (activeLayerTransform?.scaleX !== undefined ? activeLayerTransform.scaleX < 0 : false)
+                        : Boolean(adjustments.flipH);
+                      const isFlippedV = isLayerTargeted
+                        ? (activeLayerTransform?.scaleY !== undefined ? activeLayerTransform.scaleY < 0 : false)
+                        : Boolean(adjustments.flipV);
+
+                      return (
+                        <div className="space-y-4">
+                          {/* 2D Angle Slider */}
+                          <div>
+                            <div className={`flex justify-between text-xs mb-1 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                              <span>Rotation Angle {isLayerTargeted ? '(Selected Part)' : '(Whole Artwork)'}</span>
+                              <span className="text-cyan-500 font-mono font-semibold">{currentAngle}&deg;</span>
+                            </div>
+                            <input
+                              type="range"
+                              min="0"
+                              max="360"
+                              step="1"
+                              value={currentAngle}
+                              onChange={(e) => rotateSelectedOrCanvas(Number(e.target.value))}
+                              className="theme-slider w-full"
+                            />
                           </div>
-                          <input
-                            type="range"
-                            min="0"
-                            max="360"
-                            step="1"
-                            value={adjustments.rotation}
-                            onChange={(e) => setAdjustments({ ...adjustments, rotation: Number(e.target.value) })}
-                            className="theme-slider w-full"
-                          />
-                        </div>
 
-                        {/* Quick Angle Snap Pills */}
-                        <div>
-                          <span className={`text-[11px] font-medium block mb-1.5 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                            Quick Angle Snap
-                          </span>
-                          <div className="grid grid-cols-6 gap-1">
-                            {[0, 45, 90, 135, 180, 270].map(deg => (
-                              <button
-                                key={deg}
-                                onClick={() => {
-                                  recordUndo();
-                                  setAdjustments({ ...adjustments, rotation: deg });
-                                }}
-                                className={`py-1.5 rounded-lg border text-xs font-mono font-semibold transition ${adjustments.rotation === deg
-                                  ? 'bg-blue-600 text-white border-blue-400 shadow'
-                                  : appTheme === 'dark'
-                                    ? 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700'
-                                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-                                  }`}
-                              >
-                                {deg}&deg;
-                              </button>
-                            ))}
+                          {/* Quick Angle Snap Pills */}
+                          <div>
+                            <span className={`text-[11px] font-medium block mb-1.5 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                              Quick Angle Snap {isLayerTargeted ? '(Selected Part)' : ''}
+                            </span>
+                            <div className="grid grid-cols-6 gap-1">
+                              {[0, 45, 90, 135, 180, 270].map(deg => (
+                                <button
+                                  key={deg}
+                                  onClick={() => rotateSelectedOrCanvas(deg)}
+                                  className={`py-1.5 rounded-lg border text-xs font-mono font-semibold transition ${currentAngle === deg
+                                    ? 'bg-blue-600 text-white border-blue-400 shadow'
+                                    : appTheme === 'dark'
+                                      ? 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700'
+                                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                                    }`}
+                                >
+                                  {deg}&deg;
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Directional 90° and 180° Rotations */}
+                          <div className="grid grid-cols-3 gap-2 pt-1">
+                            <button
+                              onClick={() => rotateSelectedOrCanvas(prev => prev + 90)}
+                              className={`py-3 rounded-2xl border text-xs font-medium flex flex-col items-center justify-center gap-1.5 transition ${appTheme === 'dark'
+                                ? 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300'
+                                : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700 shadow-sm'
+                                }`}
+                            >
+                              <RotateCw className="w-4 h-4 text-cyan-500" />
+                              <span>Rotate 90&deg; CW</span>
+                            </button>
+
+                            <button
+                              onClick={() => rotateSelectedOrCanvas(prev => prev - 90)}
+                              className={`py-3 rounded-2xl border text-xs font-medium flex flex-col items-center justify-center gap-1.5 transition ${appTheme === 'dark'
+                                ? 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300'
+                                : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700 shadow-sm'
+                                }`}
+                            >
+                              <RotateCcw className="w-4 h-4 text-cyan-500" />
+                              <span>Rotate 90&deg; CCW</span>
+                            </button>
+
+                            <button
+                              onClick={() => rotateSelectedOrCanvas(prev => prev + 180)}
+                              className={`py-3 rounded-2xl border text-xs font-medium flex flex-col items-center justify-center gap-1.5 transition ${appTheme === 'dark'
+                                ? 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300'
+                                : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700 shadow-sm'
+                                }`}
+                            >
+                              <RefreshCw className="w-4 h-4 text-cyan-500" />
+                              <span>Invert 180&deg;</span>
+                            </button>
+                          </div>
+
+                          {/* Mirror Flips */}
+                          <div className="grid grid-cols-2 gap-2 pt-1">
+                            <button
+                              onClick={() => flipSelectedOrCanvas('h')}
+                              className={`py-3.5 rounded-2xl border text-xs font-medium flex items-center justify-center gap-2 transition ${isFlippedH
+                                ? 'bg-blue-600 text-white border-blue-500 shadow-md ring-1 ring-blue-400'
+                                : appTheme === 'dark' ? 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700' : 'bg-white border-slate-200 text-slate-700'
+                                }`}
+                            >
+                              <FlipHorizontal className="w-4 h-4 text-cyan-500" />
+                              <span>Flip Horizontal {isFlippedH ? '(On)' : ''}</span>
+                            </button>
+
+                            <button
+                              onClick={() => flipSelectedOrCanvas('v')}
+                              className={`py-3.5 rounded-2xl border text-xs font-medium flex items-center justify-center gap-2 transition ${isFlippedV
+                                ? 'bg-blue-600 text-white border-blue-500 shadow-md ring-1 ring-blue-400'
+                                : appTheme === 'dark' ? 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700' : 'bg-white border-slate-200 text-slate-700'
+                                }`}
+                            >
+                              <FlipVertical className="w-4 h-4 text-cyan-500" />
+                              <span>Flip Vertical {isFlippedV ? '(On)' : ''}</span>
+                            </button>
                           </div>
                         </div>
-
-                        {/* Directional 90° and 180° Rotations */}
-                        <div className="grid grid-cols-3 gap-2 pt-1">
-                          <button
-                            onClick={() => {
-                              recordUndo();
-                              setAdjustments(prev => ({ ...prev, rotation: (prev.rotation + 90) % 360 }));
-                            }}
-                            className={`py-3 rounded-2xl border text-xs font-medium flex flex-col items-center justify-center gap-1.5 transition ${appTheme === 'dark'
-                              ? 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300'
-                              : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700 shadow-sm'
-                              }`}
-                          >
-                            <RotateCw className="w-4 h-4 text-cyan-500" />
-                            <span>Rotate 90&deg; CW</span>
-                          </button>
-
-                          <button
-                            onClick={() => {
-                              recordUndo();
-                              setAdjustments(prev => ({ ...prev, rotation: (prev.rotation - 90 + 360) % 360 }));
-                            }}
-                            className={`py-3 rounded-2xl border text-xs font-medium flex flex-col items-center justify-center gap-1.5 transition ${appTheme === 'dark'
-                              ? 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300'
-                              : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700 shadow-sm'
-                              }`}
-                          >
-                            <RotateCcw className="w-4 h-4 text-cyan-500" />
-                            <span>Rotate 90&deg; CCW</span>
-                          </button>
-
-                          <button
-                            onClick={() => {
-                              recordUndo();
-                              setAdjustments(prev => ({ ...prev, rotation: (prev.rotation + 180) % 360 }));
-                            }}
-                            className={`py-3 rounded-2xl border text-xs font-medium flex flex-col items-center justify-center gap-1.5 transition ${appTheme === 'dark'
-                              ? 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300'
-                              : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700 shadow-sm'
-                              }`}
-                          >
-                            <RefreshCw className="w-4 h-4 text-cyan-500" />
-                            <span>Invert 180&deg;</span>
-                          </button>
-                        </div>
-
-                        {/* Mirror Flips */}
-                        <div className="grid grid-cols-2 gap-2 pt-1">
-                          <button
-                            onClick={() => {
-                              recordUndo();
-                              setAdjustments(prev => ({ ...prev, flipH: !prev.flipH }));
-                            }}
-                            className={`py-3.5 rounded-2xl border text-xs font-medium flex items-center justify-center gap-2 transition ${adjustments.flipH
-                              ? 'bg-blue-600 text-white border-blue-500 shadow-md ring-1 ring-blue-400'
-                              : appTheme === 'dark' ? 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700' : 'bg-white border-slate-200 text-slate-700'
-                              }`}
-                          >
-                            <FlipHorizontal className="w-4 h-4 text-cyan-500" />
-                            <span>Flip Horizontal {adjustments.flipH ? '(On)' : ''}</span>
-                          </button>
-
-                          <button
-                            onClick={() => {
-                              recordUndo();
-                              setAdjustments(prev => ({ ...prev, flipV: !prev.flipV }));
-                            }}
-                            className={`py-3.5 rounded-2xl border text-xs font-medium flex items-center justify-center gap-2 transition ${adjustments.flipV
-                              ? 'bg-blue-600 text-white border-blue-500 shadow-md ring-1 ring-blue-400'
-                              : appTheme === 'dark' ? 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700' : 'bg-white border-slate-200 text-slate-700'
-                              }`}
-                          >
-                            <FlipVertical className="w-4 h-4 text-cyan-500" />
-                            <span>Flip Vertical {adjustments.flipV ? '(On)' : ''}</span>
-                          </button>
-                        </div>
-                      </div>
-                    )}
+                      );
+                    })()}
 
                     {/* SUB-TAB 3: SKEW & SHEAR */}
                     {transformSubTab === 'skew' && (
@@ -9962,24 +10248,37 @@ export default function App() {
                                 {adjustments.animPreset || 'float'}
                               </span>
                             </div>
-                            <div className="grid grid-cols-5 gap-1 max-h-36 overflow-y-auto pr-0.5">
+                            <div className="grid grid-cols-3 gap-1.5 max-h-44 overflow-y-auto pr-1 py-1">
                               {MOTION_PRESETS.map((preset) => {
                                 const isSel = (adjustments.animPreset || 'float') === preset.id;
+                                const animClass = getPresetAnimClass(preset.id);
                                 return (
                                   <button
                                     key={preset.id}
                                     type="button"
-                                    title={preset.desc}
+                                    title={`${preset.name}: ${preset.desc}`}
                                     onClick={() => setAdjustments(prev => ({ ...prev, animPreset: preset.id, is3DFloating: preset.id !== 'none' }))}
-                                    className={`p-1 rounded-lg text-center border transition flex flex-col items-center gap-0.5 ${isSel
-                                      ? 'bg-blue-600 text-white border-blue-400 shadow-md font-bold'
+                                    className={`h-10 px-1.5 rounded-lg text-center border transition-all flex items-center justify-center overflow-hidden select-none ${isSel
+                                      ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white border-cyan-400 shadow-md font-bold ring-1 ring-cyan-300'
                                       : appTheme === 'dark'
-                                        ? 'bg-slate-900 border-slate-800 text-slate-300 hover:border-slate-700'
-                                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                                        ? 'bg-slate-900/90 border-slate-800 text-slate-300 hover:border-cyan-500/50 hover:text-white hover:bg-slate-800'
+                                        : 'bg-white border-slate-200 text-slate-700 hover:border-cyan-400 hover:bg-slate-100'
                                     }`}
+                                    style={{ perspective: '400px' }}
                                   >
-                                    <span className="text-sm leading-none">{preset.icon}</span>
-                                    <span className="text-[8px] font-semibold truncate w-full">{preset.name}</span>
+                                    <span
+                                      className={`text-[10px] font-bold tracking-tight leading-none inline-block ${preset.id !== 'none' ? animClass : ''}`}
+                                      style={{
+                                        '--anim-speed': '2.2s',
+                                        '--anim-amp': '5px',
+                                        '--anim-amp-val': '5',
+                                        transformOrigin: preset.id === 'swing' ? 'top center' : 'center center',
+                                        transformStyle: 'preserve-3d',
+                                        backfaceVisibility: 'visible'
+                                      }}
+                                    >
+                                      {preset.name}
+                                    </span>
                                   </button>
                                 );
                               })}
@@ -11219,6 +11518,82 @@ export default function App() {
           onColorChange={handleColorChange}
           appTheme={appTheme}
         />
+      )}
+
+      {/* Live Rendering & Export Progress Modal */}
+      {exportProgress && (
+        <div className="fixed inset-0 z-[99999] bg-slate-950/85 backdrop-blur-xl flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div
+            className="w-full max-w-sm rounded-3xl p-6 sm:p-7 border border-cyan-500/30 text-white shadow-2xl shadow-black/95 relative overflow-hidden bg-[#090d18]/96 ring-1 ring-cyan-500/20"
+          >
+            {/* Ambient Background Glow Flares */}
+            <div className="absolute -top-20 -right-20 w-44 h-44 bg-cyan-500/20 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-20 -left-20 w-44 h-44 bg-purple-500/20 rounded-full blur-3xl pointer-events-none" />
+
+            {/* Modal Header */}
+            <div className="flex items-center justify-between mb-4 relative z-10">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-blue-600/20 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shadow-inner">
+                  {exportFormat === 'gif' ? (
+                    <Film className="w-5 h-5 text-cyan-400 animate-pulse" />
+                  ) : (
+                    <Download className="w-5 h-5 text-cyan-400" />
+                  )}
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold tracking-tight text-white">Iconderry Render Engine</h4>
+                  <p className="text-[11px] text-cyan-400 font-medium truncate max-w-[190px]">
+                    {exportProgress.details || 'Processing high-res output'}
+                  </p>
+                </div>
+              </div>
+              <div className="px-2.5 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs font-mono font-bold tracking-wider">
+                .{exportFormat.toUpperCase()}
+              </div>
+            </div>
+
+            {/* Central Live Percentage Counter */}
+            <div className="my-5 text-center relative z-10">
+              <div className="text-5xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-sky-300 to-emerald-400 font-mono drop-shadow-md">
+                {Math.min(100, Math.max(0, exportProgress.percent))}%
+              </div>
+              <div className="mt-2 text-xs font-semibold text-slate-300 flex items-center justify-center gap-1.5">
+                <Activity className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
+                <span>{exportProgress.stage || 'Rendering in progress...'}</span>
+              </div>
+            </div>
+
+            {/* High-Tech Animated Progress Bar */}
+            <div className="w-full bg-slate-900/90 rounded-full h-3.5 p-0.5 border border-slate-700/60 overflow-hidden relative shadow-inner mb-3 z-10">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-cyan-500 via-sky-400 to-emerald-400 transition-all duration-150 ease-out shadow-lg shadow-cyan-500/50 relative overflow-hidden"
+                style={{ width: `${Math.min(100, Math.max(3, exportProgress.percent))}%` }}
+              >
+                <div className="absolute inset-0 bg-white/25 animate-pulse" />
+              </div>
+            </div>
+
+            {/* GPU Dedicated & Background Paused Indicator */}
+            <div className="flex items-center justify-between text-[10px] text-slate-400 px-1 pt-1.5 border-t border-slate-800/60 relative z-10">
+              <span className="flex items-center gap-1 text-cyan-400/90 font-medium">
+                <Zap className="w-3 h-3 text-cyan-400" /> 100% Dedicated GPU
+              </span>
+              <span className="text-emerald-400/90 font-medium">Canvas Animation Paused</span>
+            </div>
+
+            {/* Cancel Button */}
+            <div className="mt-4 pt-1 relative z-10">
+              <button
+                type="button"
+                onClick={handleCancelExport}
+                className="w-full py-2.5 px-4 rounded-xl border border-red-500/30 hover:border-red-500/60 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer shadow-sm active:scale-95"
+              >
+                <X className="w-3.5 h-3.5" />
+                <span>Cancel Export</span>
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
