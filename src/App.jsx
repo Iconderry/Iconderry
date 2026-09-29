@@ -54,6 +54,9 @@ const DEFAULT_ADJUSTMENTS = {
   flipV: false,
   rotateX: 0,
   rotateY: 0,
+  translateX: 0,
+  translateY: 0,
+  translateZ: 0,
   perspective: 800,
   skewX: 0,
   skewY: 0,
@@ -804,7 +807,18 @@ const NEW_EFFECT_IDS = new Set([
   '3d_glossy_ceramic',
   '3d_origami_tessellation',
   '3d_neon_glass_capsule',
-  '3d_crystal_gemstone'
+  '3d_crystal_gemstone',
+  // 10 Trending & Viral Effects
+  'y2k_acid_chrome',
+  'risograph_indie_print',
+  'frosted_spatial_glass',
+  'prism_optical_dispersion',
+  'vintage_synth_vhs',
+  'cyber_matrix_glitch',
+  'obsidian_gold_kintsugi',
+  'cosmic_stardust_nebula',
+  'bioluminescent_abyss',
+  'acid_mesh_gradient_grain'
 ]);
 
 // Renders an authentic live visual preview thumbnail showing the look of each filter preset
@@ -1038,6 +1052,17 @@ const QUICK_SWATCHES = [
   { name: 'Teal Mint', hex: '#14b8a6' },
   { name: 'Pure White', hex: '#ffffff' },
   { name: 'Dark Slate', hex: '#0f172a' }
+];
+
+const PRESETS_XYZ = [
+  { id: 'center', name: 'Center Origin', icon: '🎯', x: 0, y: 0, z: 0, desc: 'Reset translation to (0, 0, 0)' },
+  { id: 'popout_lg', name: 'Pop-Out Max', icon: '🚀', x: 0, y: 0, z: 140, desc: 'Pops out toward camera in 3D' },
+  { id: 'popout_sm', name: 'Gentle Pop', icon: '✨', x: 0, y: 0, z: 60, desc: 'Subtle 3D elevation forward' },
+  { id: 'recess_deep', name: 'Deep Recess', icon: '🕳️', x: 0, y: 0, z: -140, desc: 'Pushes deep into screen perspective' },
+  { id: 'stage_left', name: 'Left Stage', icon: '◀️', x: -80, y: 0, z: 40, desc: 'Shift left with forward lift' },
+  { id: 'stage_right', name: 'Right Stage', icon: '▶️', x: 80, y: 0, z: 40, desc: 'Shift right with forward lift' },
+  { id: 'float_high', name: 'Float Up', icon: '🔼', x: 0, y: -70, z: 70, desc: 'Elevate top-center toward user' },
+  { id: 'ground_front', name: 'Ground Base', icon: '🔽', x: 0, y: 60, z: 80, desc: 'Drop down-forward grounding' }
 ];
 
 const PRESETS_3D = [
@@ -2397,6 +2422,40 @@ export default function App() {
     });
   };
 
+  const handleLayer3DRotationChange = (targetIds, rx, ry) => {
+    const ids = Array.isArray(targetIds) ? targetIds : [targetIds];
+    if (ids.length === 0) return;
+    recordUndoRef.current?.();
+    setLayerTransforms(prev => {
+      const updated = { ...prev };
+      ids.forEach(id => {
+        const cleanId = String(id).replace(/^pf_studio_/i, '');
+        const cur = updated[cleanId] || { x: 0, y: 0, z: 0, rotate: 0, rotateX: 0, rotateY: 0 };
+        updated[cleanId] = {
+          ...cur,
+          ...(rx !== undefined ? { rotateX: Number(rx) } : {}),
+          ...(ry !== undefined ? { rotateY: Number(ry) } : {})
+        };
+      });
+      return updated;
+    });
+  };
+
+  const handleLayerTransformBatch = (targetIds, partialObj) => {
+    const ids = Array.isArray(targetIds) ? targetIds : [targetIds];
+    if (ids.length === 0) return;
+    recordUndoRef.current?.();
+    setLayerTransforms(prev => {
+      const updated = { ...prev };
+      ids.forEach(id => {
+        const cleanId = String(id).replace(/^pf_studio_/i, '');
+        const cur = updated[cleanId] || { x: 0, y: 0, z: 0, rotate: 0, rotateX: 0, rotateY: 0 };
+        updated[cleanId] = { ...cur, ...partialObj };
+      });
+      return updated;
+    });
+  };
+
   // Layer per-element color & effect styling helpers
   const handleLayerColorChange = (targetIds, color) => {
     const ids = Array.isArray(targetIds) ? targetIds : [targetIds];
@@ -3444,7 +3503,9 @@ export default function App() {
     }
   }, [selectedLayerId]);
   const [adjustmentSubTab, setAdjustmentSubTab] = useState('gradient'); // 'gradient' | 'colors'
-  const [transformSubTab, setTransformSubTab] = useState('3d'); // '3d' | '2d' | 'skew'
+  const [transformSubTab, setTransformSubTab] = useState('xyz'); // 'xyz' | '3d' | '2d' | 'skew'
+  const [transformTarget, setTransformTarget] = useState('selected'); // 'selected' | 'all'
+  const [xyzStep, setXyzStep] = useState(20); // 5 | 20 | 50
   const [effectSubTab, setEffectSubTab] = useState('effects'); // 'effects'
   const [filterSubView, setFilterSubView] = useState('presets'); // 'presets' | 'materials' | 'sliders'
   const [filterCategory, setFilterCategory] = useState('All');
@@ -3488,8 +3549,14 @@ export default function App() {
       if (effectVersionFilter === 'new' && !isNew) return false;
       if (effectVersionFilter === 'old' && isNew) return false;
 
-      // Filter by category: only match if 'All' or matches mode category
-      if (effectCategory !== 'All' && mode.category !== effectCategory) return false;
+      // Filter by category: only match if 'All' or matches mode category or matches Trending & Viral
+      if (effectCategory !== 'All') {
+        if (effectCategory === 'Trending & Viral') {
+          if (!isNew) return false;
+        } else if (mode.category !== effectCategory) {
+          return false;
+        }
+      }
 
       const q = effectSearchTerm.trim().toLowerCase();
       const matchesSearch = !q ||
@@ -3594,6 +3661,7 @@ export default function App() {
   const has3D = Boolean(
     (adjustments.rotateX && adjustments.rotateX !== 0) ||
     (adjustments.rotateY && adjustments.rotateY !== 0) ||
+    (adjustments.translateZ && adjustments.translateZ !== 0) ||
     (adjustments.depth3D && adjustments.depth3D > 0) ||
     (adjustments.extrusionDepth && adjustments.extrusionDepth > 0) ||
     (adjustments.perspective && adjustments.perspective !== 800) ||
@@ -4092,18 +4160,22 @@ export default function App() {
       setLayerTransforms(prev => {
         const next = { ...prev };
         activeIds.forEach(id => {
-          const orig = next[id] || { x: 0, y: 0, rotate: 0, scaleX: 1, scaleY: 1 };
+          const cleanId = String(id).replace(/^pf_studio_/i, '');
+          const orig = next[cleanId] || next[id] || { x: 0, y: 0, z: 0, rotate: 0, rotateX: 0, rotateY: 0, scaleX: 1, scaleY: 1 };
           const { cx, cy } = getSelectedLayerCenter(id);
           const currentRot = orig.rotate || 0;
           const targetRot = typeof newAngleOrUpdater === 'function'
             ? newAngleOrUpdater(currentRot)
             : newAngleOrUpdater;
-          next[id] = {
+          const updatedRot = Math.round(((targetRot % 360) + 360) % 360);
+          const updated = {
             ...orig,
-            rotate: Math.round(((targetRot % 360) + 360) % 360),
+            rotate: updatedRot,
             cx: orig.cx || cx,
             cy: orig.cy || cy
           };
+          next[cleanId] = updated;
+          next[id] = updated;
         });
         layerTransformsRef.current = next;
         return next;
@@ -4705,6 +4777,9 @@ export default function App() {
     recordUndo();
     setAdjustments(prev => ({
       ...prev,
+      translateX: 0,
+      translateY: 0,
+      translateZ: 0,
       rotation: 0,
       flipH: false,
       flipV: false,
@@ -8114,7 +8189,7 @@ export default function App() {
                     position: 'relative',
                     width: `${Math.round(iconWidth * zoomLevel)}px`,
                     height: `${Math.round(iconHeight * zoomLevel)}px`,
-                    transform: `translate(${canvasPan.x}px, ${canvasPan.y}px) ${has3D ? `perspective(${adjustments.perspective || 800}px) rotateX(${adjustments.rotateX || 0}deg) rotateY(${adjustments.rotateY || 0}deg) ` : ''}rotate(${adjustments.rotation || 0}deg) skew(${adjustments.skewX || 0}deg, ${adjustments.skewY || 0}deg) scale(${adjustments.flipH ? -1 : 1}, ${adjustments.flipV ? -1 : 1})`,
+                    transform: `translate(${canvasPan.x + (adjustments.translateX || 0)}px, ${canvasPan.y + (adjustments.translateY || 0)}px) ${has3D ? `perspective(${adjustments.perspective || 800}px) translateZ(${adjustments.translateZ || 0}px) rotateX(${adjustments.rotateX || 0}deg) rotateY(${adjustments.rotateY || 0}deg) ` : ''}rotate(${adjustments.rotation || 0}deg) skew(${adjustments.skewX || 0}deg, ${adjustments.skewY || 0}deg) scale(${adjustments.flipH ? -1 : 1}, ${adjustments.flipV ? -1 : 1})`,
                     transformOrigin: 'center center',
                     transformStyle: has3D ? 'preserve-3d' : undefined,
                     willChange: isPanning ? 'transform' : 'auto'
@@ -9013,25 +9088,26 @@ export default function App() {
                                 </div>
                               </div>
 
-                              {/* 3. POSITION (X / Y) CONTROLS */}
+                              {/* 3. POSITION (X / Y / Z) CONTROLS */}
                               <div className="space-y-2.5 pt-1 border-t border-slate-800/60">
                                 <div className="flex items-center justify-between text-[11px] font-semibold">
                                   <span className={appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'}>
-                                    {isMulti ? 'Move Selected Parts (Offset X / Y)' : 'Part Position (X / Y)'}
+                                    {isMulti ? 'Move Selected Parts (Offset X / Y / Depth Z)' : 'Part Position (X / Y / Depth Z)'}
                                   </span>
                                   <button
                                     onClick={() => {
                                       handleLayerPositionChange(activeIds, 'x', 0);
                                       handleLayerPositionChange(activeIds, 'y', 0);
+                                      handleLayerPositionChange(activeIds, 'z', 0);
                                     }}
                                     className={`text-[9px] px-1.5 py-0.5 rounded border transition ${appTheme === 'dark' ? 'border-slate-800 text-slate-400 hover:text-white' : 'border-slate-200 text-slate-600 hover:text-slate-900'
                                       }`}
                                   >
-                                    Center (0, 0)
+                                    Center (0, 0, 0)
                                   </button>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-2">
+                                <div className="grid grid-cols-3 gap-1.5">
                                   {/* X Axis */}
                                   <div className={`p-2 rounded-xl border ${appTheme === 'dark' ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
                                     <div className="flex items-center justify-between text-[10px] mb-1">
@@ -9053,7 +9129,7 @@ export default function App() {
                                   <div className={`p-2 rounded-xl border ${appTheme === 'dark' ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
                                     <div className="flex items-center justify-between text-[10px] mb-1">
                                       <span className="text-slate-400 font-medium">Offset Y:</span>
-                                      <span className="font-mono text-cyan-400 font-bold">{firstTransform.y || 0}px</span>
+                                      <span className="font-mono text-emerald-400 font-bold">{firstTransform.y || 0}px</span>
                                     </div>
                                     <input
                                       type="range"
@@ -9062,7 +9138,24 @@ export default function App() {
                                       step={offsetStep}
                                       value={firstTransform.y || 0}
                                       onChange={(e) => handleLayerPositionChange(activeIds, 'y', e.target.value)}
-                                      className="w-full accent-cyan-500 cursor-pointer h-1.5 bg-slate-700 rounded-lg"
+                                      className="w-full accent-emerald-500 cursor-pointer h-1.5 bg-slate-700 rounded-lg"
+                                    />
+                                  </div>
+
+                                  {/* Z Axis Depth */}
+                                  <div className={`p-2 rounded-xl border ${appTheme === 'dark' ? 'bg-slate-950/60 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                                    <div className="flex items-center justify-between text-[10px] mb-1">
+                                      <span className="text-slate-400 font-medium">Depth Z:</span>
+                                      <span className="font-mono text-purple-400 font-bold">{firstTransform.z || 0}px</span>
+                                    </div>
+                                    <input
+                                      type="range"
+                                      min="-200"
+                                      max="200"
+                                      step="2"
+                                      value={firstTransform.z || 0}
+                                      onChange={(e) => handleLayerPositionChange(activeIds, 'z', e.target.value)}
+                                      className="w-full accent-purple-500 cursor-pointer h-1.5 bg-slate-700 rounded-lg"
                                     />
                                   </div>
                                 </div>
@@ -11043,7 +11136,7 @@ export default function App() {
 
                     {/* Style Category Filter Chips */}
                     <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
-                      {['All', 'Anime & Manga', 'Cartoon & Comic', '3D & Inflatable', 'Glass & Water', 'Fire & Metal', 'Craft & Texture', 'Cyber & Neon', 'Silhouette & Vector'].map((cat) => {
+                      {['All', 'Trending & Viral', 'Cyber & Neon', 'Glass & Water', 'Fire & Metal', 'Craft & Texture', '3D & Inflatable', 'Anime & Manga', 'Cartoon & Comic', 'Retro & Vintage', 'Silhouette & Vector'].map((cat) => {
                         const isCatActive = effectCategory === cat;
                         return (
                           <button
@@ -11584,217 +11677,733 @@ export default function App() {
                 )}
 
                 {/* TAB 4: TRANSFORM & 3D ROTATION */}
-                {studioTab === 'transform' && (
-                  <div className="space-y-4">
-                    {/* Header */}
-                    <div className="flex items-center justify-between gap-2">
-                      <div>
-                        <h4 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
-                          }`}>
-                          <Move3d className="w-3.5 h-3.5 text-cyan-500" /> 3D Perspective &amp; Transforms
-                        </h4>
-                        <p className={`text-[11px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                          3D Pitch, Yaw, Orbit Pad, 2D Angle, Mirror &amp; Skew
-                        </p>
+                {studioTab === 'transform' && (() => {
+                  const activeSelectedIds = (selectedLayerIds && selectedLayerIds.length > 0)
+                    ? selectedLayerIds
+                    : (selectedLayerId ? [selectedLayerId] : []);
+                  const isPartSelected = activeSelectedIds.length > 0;
+                  const primarySelectedId = isPartSelected ? activeSelectedIds[0] : null;
+                  const cleanPrimaryId = primarySelectedId ? String(primarySelectedId).replace(/^pf_studio_/i, '') : null;
+                  const isTransformingSelected = transformTarget === 'selected' && isPartSelected;
+
+                  const curTransform = cleanPrimaryId ? (layerTransforms[cleanPrimaryId] || layerTransforms[primarySelectedId] || {}) : {};
+                  const curX = isTransformingSelected ? (curTransform.x || 0) : (adjustments.translateX || 0);
+                  const curY = isTransformingSelected ? (curTransform.y || 0) : (adjustments.translateY || 0);
+                  const curZ = isTransformingSelected ? (curTransform.z || 0) : (adjustments.translateZ || 0);
+                  const curRx = isTransformingSelected ? (curTransform.rotateX || 0) : (adjustments.rotateX || 0);
+                  const curRy = isTransformingSelected ? (curTransform.rotateY || 0) : (adjustments.rotateY || 0);
+                  const curRot = isTransformingSelected ? (curTransform.rotate || 0) : (adjustments.rotation || 0);
+
+                  const updateX = (val) => {
+                    if (isTransformingSelected) {
+                      handleLayerPositionChange(activeSelectedIds, 'x', val);
+                    } else {
+                      setAdjustments(prev => ({ ...prev, translateX: val }));
+                    }
+                  };
+
+                  const updateY = (val) => {
+                    if (isTransformingSelected) {
+                      handleLayerPositionChange(activeSelectedIds, 'y', val);
+                    } else {
+                      setAdjustments(prev => ({ ...prev, translateY: val }));
+                    }
+                  };
+
+                  const updateZ = (val) => {
+                    if (isTransformingSelected) {
+                      handleLayerPositionChange(activeSelectedIds, 'z', val);
+                    } else {
+                      setAdjustments(prev => ({ ...prev, translateZ: val }));
+                    }
+                  };
+
+                  const update3DRotation = (rx, ry) => {
+                    if (isTransformingSelected) {
+                      handleLayer3DRotationChange(activeSelectedIds, rx, ry);
+                    } else {
+                      setAdjustments(prev => ({
+                        ...prev,
+                        ...(rx !== undefined ? { rotateX: rx } : {}),
+                        ...(ry !== undefined ? { rotateY: ry } : {})
+                      }));
+                    }
+                  };
+
+                  const updateRotation = (val) => {
+                    if (isTransformingSelected) {
+                      rotateSelectedOrCanvas(val);
+                    } else {
+                      setAdjustments(prev => ({ ...prev, rotation: val }));
+                    }
+                  };
+
+                  const apply3DPreset = (p) => {
+                    recordUndo();
+                    if (isTransformingSelected) {
+                      handleLayerTransformBatch(activeSelectedIds, {
+                        rotateX: p.rx,
+                        rotateY: p.ry,
+                        ...(p.rz !== undefined ? { rotate: p.rz } : {})
+                      });
+                    } else {
+                      setAdjustments(prev => ({
+                        ...prev,
+                        rotateX: p.rx,
+                        rotateY: p.ry,
+                        rotation: p.rz !== undefined ? p.rz : prev.rotation
+                      }));
+                    }
+                  };
+
+                  const applyXyzPreset = (p) => {
+                    recordUndo();
+                    if (isTransformingSelected) {
+                      handleLayerTransformBatch(activeSelectedIds, {
+                        x: p.x,
+                        y: p.y,
+                        z: p.z
+                      });
+                    } else {
+                      setAdjustments(prev => ({
+                        ...prev,
+                        translateX: p.x,
+                        translateY: p.y,
+                        translateZ: p.z
+                      }));
+                    }
+                  };
+
+                  const resetOrigin = () => {
+                    recordUndo();
+                    if (isTransformingSelected) {
+                      handleLayerTransformBatch(activeSelectedIds, { x: 0, y: 0, z: 0 });
+                    } else {
+                      setAdjustments(prev => ({ ...prev, translateX: 0, translateY: 0, translateZ: 0 }));
+                    }
+                  };
+
+                  return (
+                    <div className="space-y-4">
+                      {/* Header */}
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <h4 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
+                            }`}>
+                            <Move3d className="w-3.5 h-3.5 text-cyan-500" /> 3D Perspective, XYZ Move &amp; Transforms
+                          </h4>
+                          <p className={`text-[11px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                            XYZ Coordinates, 3D Orbit, Pitch/Yaw, 360&deg; Spin &amp; Skew
+                          </p>
+                        </div>
+
+                        <button
+                          onClick={handleResetTransformPanel}
+                          className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition flex items-center gap-1.5 flex-shrink-0 ${appTheme === 'dark'
+                            ? 'text-slate-300 hover:text-white bg-slate-900 border-slate-800 hover:border-slate-700'
+                            : 'text-slate-700 hover:text-slate-900 bg-white border-slate-200 hover:bg-slate-50'
+                            }`}
+                          title="Reset all 3D and 2D transforms"
+                        >
+                          <Undo2 className="w-3 h-3 text-cyan-500" />
+                          <span>Reset All</span>
+                        </button>
                       </div>
 
-                      <button
-                        onClick={handleResetTransformPanel}
-                        className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border transition flex items-center gap-1.5 flex-shrink-0 ${appTheme === 'dark'
-                          ? 'text-slate-300 hover:text-white bg-slate-900 border-slate-800 hover:border-slate-700'
-                          : 'text-slate-700 hover:text-slate-900 bg-white border-slate-200 hover:bg-slate-50'
-                          }`}
-                        title="Reset all 3D and 2D transforms"
-                      >
-                        <Undo2 className="w-3 h-3 text-cyan-500" />
-                        <span>Reset All</span>
-                      </button>
-                    </div>
+                      {/* Transform Target Switcher Banner: [🌐 Whole Icon] vs [🎯 Selected Item] */}
+                      <div className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 ${appTheme === 'dark' ? 'bg-slate-900/90 border-slate-800' : 'bg-slate-100 border-slate-300'}`}>
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Transforming:</span>
+                          <span className="text-xs font-semibold text-cyan-400 truncate">
+                            {isTransformingSelected
+                              ? `🎯 Selected Part (${activeSelectedIds.length > 1 ? `${activeSelectedIds.length} parts` : (cleanPrimaryId || 'Layer')})`
+                              : '🌐 Entire Icon Model'}
+                          </span>
+                        </div>
 
-                    {/* Sub-Navigation: 3D Perspective | 2D Angle & Flips | Skew & Shear */}
-                    <div className={`grid grid-cols-3 gap-1 p-1 rounded-xl border ${appTheme === 'dark' ? 'bg-slate-900 border-slate-800' : 'bg-slate-200/80 border-slate-300'
-                      }`}>
-                      <button
-                        onClick={() => setTransformSubTab('3d')}
-                        className={`py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition ${transformSubTab === '3d'
-                          ? 'bg-blue-600 text-white shadow'
-                          : appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
-                          }`}
-                      >
-                        <Box className="w-3.5 h-3.5" />
-                        <span>3D Rotate</span>
-                      </button>
+                        <div className="flex items-center gap-1 bg-slate-950/70 p-0.5 rounded-lg border border-slate-800 flex-shrink-0">
+                          <button
+                            onClick={() => setTransformTarget('all')}
+                            className={`px-2.5 py-1 rounded-md text-[10px] font-semibold transition flex items-center gap-1 ${!isTransformingSelected
+                              ? 'bg-blue-600 text-white shadow-sm'
+                              : 'text-slate-400 hover:text-white'
+                            }`}
+                          >
+                            <span>Whole Icon</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (!isPartSelected) {
+                                if (svgLayers.length > 0) {
+                                  setSelectedLayerId(svgLayers[0].id);
+                                }
+                              }
+                              setTransformTarget('selected');
+                            }}
+                            className={`px-2.5 py-1 rounded-md text-[10px] font-semibold transition flex items-center gap-1 ${isTransformingSelected
+                              ? 'bg-cyan-600 text-white shadow-sm'
+                              : 'text-slate-400 hover:text-white'
+                            }`}
+                            title={isPartSelected ? 'Transform selected part' : 'Click to select first part or click in preview'}
+                          >
+                            <span>🎯 Selected Item</span>
+                          </button>
+                        </div>
+                      </div>
 
-                      <button
-                        onClick={() => setTransformSubTab('2d')}
-                        className={`py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition ${transformSubTab === '2d'
-                          ? 'bg-blue-600 text-white shadow'
-                          : appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
-                          }`}
-                      >
-                        <RotateCw className="w-3.5 h-3.5" />
-                        <span>2D Angle</span>
-                      </button>
+                      {/* Sub-Navigation: XYZ Move | 3D Perspective | 2D Angle & Flips | Skew & Shear */}
+                      <div className={`grid grid-cols-4 gap-1 p-1 rounded-xl border ${appTheme === 'dark' ? 'bg-slate-900 border-slate-800' : 'bg-slate-200/80 border-slate-300'
+                        }`}>
+                        <button
+                          onClick={() => setTransformSubTab('xyz')}
+                          className={`py-1.5 px-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition ${transformSubTab === 'xyz'
+                            ? 'bg-blue-600 text-white shadow'
+                            : appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                        >
+                          <Move className="w-3.5 h-3.5" />
+                          <span>XYZ Move</span>
+                        </button>
 
-                      <button
-                        onClick={() => setTransformSubTab('skew')}
-                        className={`py-1.5 px-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition ${transformSubTab === 'skew'
-                          ? 'bg-blue-600 text-white shadow'
-                          : appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
-                          }`}
-                      >
-                        <SlidersHorizontal className="w-3.5 h-3.5" />
-                        <span>Skew &amp; Shear</span>
-                      </button>
-                    </div>
+                        <button
+                          onClick={() => setTransformSubTab('3d')}
+                          className={`py-1.5 px-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition ${transformSubTab === '3d'
+                            ? 'bg-blue-600 text-white shadow'
+                            : appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                        >
+                          <Box className="w-3.5 h-3.5" />
+                          <span>3D Rotate</span>
+                        </button>
 
-                    {/* SUB-TAB 1: 3D PERSPECTIVE */}
-                    {transformSubTab === '3d' && (
-                      <div className="space-y-4">
-                        {/* Interactive 3D Orbit Trackball Pad */}
-                        <Trackball3DPad
-                          rotateX={adjustments.rotateX || 0}
-                          rotateY={adjustments.rotateY || 0}
-                          onChange={(newRx, newRy) => {
-                            setAdjustments(prev => ({
-                              ...prev,
-                              rotateX: newRx,
-                              rotateY: newRy
-                            }));
-                          }}
-                          onReset={() => {
-                            recordUndo();
-                            setAdjustments(prev => ({ ...prev, rotateX: 0, rotateY: 0 }));
-                          }}
-                          appTheme={appTheme}
-                        />
+                        <button
+                          onClick={() => setTransformSubTab('2d')}
+                          className={`py-1.5 px-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition ${transformSubTab === '2d'
+                            ? 'bg-blue-600 text-white shadow'
+                            : appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                        >
+                          <RotateCw className="w-3.5 h-3.5" />
+                          <span>2D Angle</span>
+                        </button>
 
-                        {/* 1-Click 3D Angle Presets */}
-                        <div>
-                          <div className={`text-xs font-semibold mb-2 flex items-center justify-between ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
-                            }`}>
-                            <span>1-Click 3D Angle Presets</span>
-                            <span className="text-[10px] text-cyan-500 font-normal">8 Angles</span>
+                        <button
+                          onClick={() => setTransformSubTab('skew')}
+                          className={`py-1.5 px-1.5 rounded-lg text-xs font-semibold flex items-center justify-center gap-1 transition ${transformSubTab === 'skew'
+                            ? 'bg-blue-600 text-white shadow'
+                            : appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                        >
+                          <SlidersHorizontal className="w-3.5 h-3.5" />
+                          <span>Skew</span>
+                        </button>
+                      </div>
+
+                      {/* SUB-TAB 0: XYZ AXIS TRANSLATION & 3D DEPTH */}
+                      {transformSubTab === 'xyz' && (
+                        <div className="space-y-4">
+                          {/* 1. Coordinate Readout Bar & Quick Center */}
+                          <div className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 ${appTheme === 'dark' ? 'bg-slate-900/90 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Position:</span>
+                              <span className="px-2 py-0.5 rounded-md text-[11px] font-mono font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                                X: {curX}px
+                              </span>
+                              <span className="px-2 py-0.5 rounded-md text-[11px] font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                Y: {curY}px
+                              </span>
+                              <span className="px-2 py-0.5 rounded-md text-[11px] font-mono font-bold bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                                Z: {curZ}px
+                              </span>
+                            </div>
+
+                            <button
+                              onClick={resetOrigin}
+                              className={`text-[10px] font-semibold px-2 py-1 rounded-lg border transition flex items-center gap-1 ${appTheme === 'dark'
+                                ? 'bg-slate-800 border-slate-700 hover:bg-slate-700 text-slate-300'
+                                : 'bg-white border-slate-300 hover:bg-slate-100 text-slate-700'
+                              }`}
+                              title={isTransformingSelected ? 'Reset selected part to (0,0,0)' : 'Reset whole icon to (0,0,0)'}
+                            >
+                              <RotateCcw className="w-2.5 h-2.5 text-cyan-400" />
+                              <span>Origin</span>
+                            </button>
                           </div>
 
-                          <div className="grid grid-cols-4 gap-1.5">
-                            {PRESETS_3D.map(p => {
-                              const isActive = (adjustments.rotateX || 0) === p.rx && (adjustments.rotateY || 0) === p.ry;
-                              return (
-                                <button
-                                  key={p.id}
-                                  onClick={() => {
-                                    recordUndo();
-                                    setAdjustments(prev => ({
-                                      ...prev,
-                                      rotateX: p.rx,
-                                      rotateY: p.ry,
-                                      rotation: p.rz !== undefined ? p.rz : prev.rotation
-                                    }));
-                                  }}
-                                  title={`${p.name}: ${p.desc} (X: ${p.rx}°, Y: ${p.ry}°)`}
-                                  className={`p-2 rounded-xl border text-center transition flex flex-col items-center justify-center gap-1 ${isActive
-                                    ? 'bg-blue-600 text-white border-blue-400 shadow-md ring-1 ring-blue-400'
-                                    : appTheme === 'dark'
-                                      ? 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300'
-                                      : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700 shadow-sm'
+                          {/* 2. Interactive Tactile D-Pad & 3D Depth Stepper */}
+                          <div className={`p-3 rounded-2xl border ${appTheme === 'dark' ? 'bg-slate-950/70 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
+                            <div className="flex items-center justify-between mb-2.5">
+                              <span className={`text-xs font-semibold flex items-center gap-1.5 ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                                <Move className="w-3.5 h-3.5 text-cyan-400" />
+                                <span>XYZ D-Pad {isTransformingSelected ? '(Selected Part)' : '(Whole Icon)'}</span>
+                              </span>
+                              <div className="flex items-center gap-1 bg-slate-900/80 p-0.5 rounded-lg border border-slate-800 text-[10px]">
+                                <span className="text-slate-400 px-1 font-medium">Step:</span>
+                                {[5, 20, 50].map(s => (
+                                  <button
+                                    key={s}
+                                    onClick={() => setXyzStep(s)}
+                                    className={`px-1.5 py-0.5 rounded font-mono font-bold transition ${xyzStep === s
+                                      ? 'bg-blue-600 text-white shadow-sm'
+                                      : 'text-slate-400 hover:text-white'
                                     }`}
-                                >
-                                  <span className="text-base leading-none">{p.icon}</span>
-                                  <span className="text-[10px] font-medium truncate w-full">{p.name}</span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
+                                  >
+                                    {s}px
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
 
-                        {/* 3D Pitch (X-Axis Tilt) Slider */}
-                        <div>
-                          <div className={`flex justify-between text-xs mb-1 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                            <span className="flex items-center gap-1">
-                              <strong>3D Tilt X (Pitch)</strong>
-                              <span className="text-[10px] text-slate-500 font-normal">(Forward / Backward)</span>
-                            </span>
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-cyan-500 font-mono font-semibold">{adjustments.rotateX || 0}&deg;</span>
-                              {(adjustments.rotateX || 0) !== 0 && (
+                            <div className="grid grid-cols-3 gap-3 items-center">
+                              {/* D-Pad (X / Y Axis) */}
+                              <div className="col-span-2 flex flex-col items-center justify-center p-2 rounded-xl bg-slate-900/50 border border-slate-800/80">
+                                {/* Up */}
                                 <button
-                                  onClick={() => setAdjustments(prev => ({ ...prev, rotateX: 0 }))}
-                                  className="text-[9px] px-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-400"
+                                  onClick={() => updateY(curY - xyzStep)}
+                                  className="w-9 h-9 rounded-lg bg-slate-800 hover:bg-cyan-600/30 active:scale-95 border border-slate-700 hover:border-cyan-500/50 text-slate-200 flex items-center justify-center transition shadow-sm mb-1"
+                                  title={`Move Up (-${xyzStep}px Y)`}
                                 >
-                                  0&deg;
+                                  <ArrowUp className="w-4 h-4 text-cyan-400" />
                                 </button>
-                              )}
+
+                                {/* Left / Center / Right */}
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    onClick={() => updateX(curX - xyzStep)}
+                                    className="w-9 h-9 rounded-lg bg-slate-800 hover:bg-cyan-600/30 active:scale-95 border border-slate-700 hover:border-cyan-500/50 text-slate-200 flex items-center justify-center transition shadow-sm"
+                                    title={`Move Left (-${xyzStep}px X)`}
+                                  >
+                                    <ArrowLeft className="w-4 h-4 text-cyan-400" />
+                                  </button>
+                                  <button
+                                    onClick={() => { updateX(0); updateY(0); }}
+                                    className="w-9 h-9 rounded-lg bg-slate-900 hover:bg-slate-800 active:scale-95 border border-slate-700/80 text-[10px] font-mono font-bold text-slate-300 flex items-center justify-center transition shadow-inner"
+                                    title="Reset X and Y to (0,0)"
+                                  >
+                                    (0,0)
+                                  </button>
+                                  <button
+                                    onClick={() => updateX(curX + xyzStep)}
+                                    className="w-9 h-9 rounded-lg bg-slate-800 hover:bg-cyan-600/30 active:scale-95 border border-slate-700 hover:border-cyan-500/50 text-slate-200 flex items-center justify-center transition shadow-sm"
+                                    title={`Move Right (+${xyzStep}px X)`}
+                                  >
+                                    <ArrowLeft className="w-4 h-4 text-cyan-400 rotate-180" />
+                                  </button>
+                                </div>
+
+                                {/* Down */}
+                                <button
+                                  onClick={() => updateY(curY + xyzStep)}
+                                  className="w-9 h-9 rounded-lg bg-slate-800 hover:bg-cyan-600/30 active:scale-95 border border-slate-700 hover:border-cyan-500/50 text-slate-200 flex items-center justify-center transition shadow-sm mt-1"
+                                  title={`Move Down (+${xyzStep}px Y)`}
+                                >
+                                  <ArrowDown className="w-4 h-4 text-cyan-400" />
+                                </button>
+                              </div>
+
+                              {/* 3D Depth Stepper (Z Axis) */}
+                              <div className="flex flex-col items-center justify-between h-full p-2 rounded-xl bg-purple-950/20 border border-purple-900/40">
+                                <span className="text-[10px] font-bold text-purple-400 uppercase tracking-wider">3D Depth (Z)</span>
+
+                                {/* Z+ (Pop Out Forward) */}
+                                <button
+                                  onClick={() => updateZ(curZ + xyzStep)}
+                                  className="w-full py-2 px-1 rounded-lg bg-purple-900/40 hover:bg-purple-800/60 active:scale-95 border border-purple-500/40 text-purple-200 flex flex-col items-center justify-center gap-0.5 transition shadow-sm"
+                                  title={`Pop Out Forward toward camera (+${xyzStep}px Z)`}
+                                >
+                                  <ChevronsUp className="w-4 h-4 text-purple-300" />
+                                  <span className="text-[10px] font-bold">Pop Out (Z+)</span>
+                                </button>
+
+                                {/* Reset Z */}
+                                <button
+                                  onClick={() => updateZ(0)}
+                                  className="text-[9px] font-mono text-purple-400 hover:text-white px-2 py-0.5 rounded bg-purple-900/30"
+                                  title="Reset Z Depth to 0"
+                                >
+                                  Z: {curZ}px
+                                </button>
+
+                                {/* Z- (Recess Backward) */}
+                                <button
+                                  onClick={() => updateZ(curZ - xyzStep)}
+                                  className="w-full py-2 px-1 rounded-lg bg-purple-900/40 hover:bg-purple-800/60 active:scale-95 border border-purple-500/40 text-purple-200 flex flex-col items-center justify-center gap-0.5 transition shadow-sm"
+                                  title={`Recess Backward away from camera (-${xyzStep}px Z)`}
+                                >
+                                  <ChevronsDown className="w-4 h-4 text-purple-300" />
+                                  <span className="text-[10px] font-bold">Recess (Z-)</span>
+                                </button>
+                              </div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => setAdjustments(prev => ({ ...prev, rotateX: Math.max(-85, (prev.rotateX || 0) - 5) }))}
-                              className="px-2 py-1 rounded-lg border border-slate-700 bg-slate-800 text-[10px] text-slate-300 font-mono hover:text-white"
-                            >
-                              -5&deg;
-                            </button>
-                            <input
-                              type="range"
-                              min="-85"
-                              max="85"
-                              step="1"
-                              value={adjustments.rotateX || 0}
-                              onChange={(e) => setAdjustments({ ...adjustments, rotateX: Number(e.target.value) })}
-                              className="theme-slider w-full flex-1"
-                            />
-                            <button
-                              onClick={() => setAdjustments(prev => ({ ...prev, rotateX: Math.min(85, (prev.rotateX || 0) + 5) }))}
-                              className="px-2 py-1 rounded-lg border border-slate-700 bg-slate-800 text-[10px] text-slate-300 font-mono hover:text-white"
-                            >
-                              +5&deg;
-                            </button>
-                          </div>
-                        </div>
 
-                        {/* 3D Yaw (Y-Axis Tilt) Slider */}
-                        <div>
-                          <div className={`flex justify-between text-xs mb-1 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                            <span className="flex items-center gap-1">
-                              <strong>3D Tilt Y (Yaw)</strong>
-                              <span className="text-[10px] text-slate-500 font-normal">(Left / Right Angle)</span>
-                            </span>
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-cyan-500 font-mono font-semibold">{adjustments.rotateY || 0}&deg;</span>
-                              {(adjustments.rotateY || 0) !== 0 && (
-                                <button
-                                  onClick={() => setAdjustments(prev => ({ ...prev, rotateY: 0 }))}
-                                  className="text-[9px] px-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-400"
-                                >
-                                  0&deg;
-                                </button>
-                              )}
+                          {/* 3. Detailed Axis Sliders with Stepper Buttons */}
+                          <div className="space-y-3">
+                            {/* X Axis Slider */}
+                            <div className={`p-2.5 rounded-xl border ${appTheme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                              <div className="flex items-center justify-between text-xs mb-1.5">
+                                <span className="font-semibold flex items-center gap-1.5 text-cyan-400">
+                                  <span>X-Axis</span>
+                                  <span className={`text-[10px] font-normal ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                                    (Left ↔ Right)
+                                  </span>
+                                </span>
+                                <div className="flex items-center gap-1">
+                                  <span className="font-mono text-cyan-400 font-bold">{curX}px</span>
+                                  <button
+                                    onClick={() => updateX(curX - 10)}
+                                    className="text-[9px] px-1 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
+                                    title="-10px"
+                                  >
+                                    -10
+                                  </button>
+                                  <button
+                                    onClick={() => updateX(curX + 10)}
+                                    className="text-[9px] px-1 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
+                                    title="+10px"
+                                  >
+                                    +10
+                                  </button>
+                                  {curX !== 0 && (
+                                    <button
+                                      onClick={() => updateX(0)}
+                                      className="text-[9px] px-1 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-400"
+                                    >
+                                      0
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                              <input
+                                type="range"
+                                min="-350"
+                                max="350"
+                                step="1"
+                                value={curX}
+                                onChange={(e) => updateX(Number(e.target.value))}
+                                className="theme-slider w-full accent-cyan-500"
+                              />
+                            </div>
+
+                            {/* Y Axis Slider */}
+                            <div className={`p-2.5 rounded-xl border ${appTheme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                              <div className="flex items-center justify-between text-xs mb-1.5">
+                                <span className="font-semibold flex items-center gap-1.5 text-emerald-400">
+                                  <span>Y-Axis</span>
+                                  <span className={`text-[10px] font-normal ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                                    (Up ↕ Down)
+                                  </span>
+                                </span>
+                                <div className="flex items-center gap-1">
+                                  <span className="font-mono text-emerald-400 font-bold">{curY}px</span>
+                                  <button
+                                    onClick={() => updateY(curY - 10)}
+                                    className="text-[9px] px-1 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
+                                    title="-10px"
+                                  >
+                                    -10
+                                  </button>
+                                  <button
+                                    onClick={() => updateY(curY + 10)}
+                                    className="text-[9px] px-1 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
+                                    title="+10px"
+                                  >
+                                    +10
+                                  </button>
+                                  {curY !== 0 && (
+                                    <button
+                                      onClick={() => updateY(0)}
+                                      className="text-[9px] px-1 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-400"
+                                    >
+                                      0
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                              <input
+                                type="range"
+                                min="-350"
+                                max="350"
+                                step="1"
+                                value={curY}
+                                onChange={(e) => updateY(Number(e.target.value))}
+                                className="theme-slider w-full accent-emerald-500"
+                              />
+                            </div>
+
+                            {/* Z Axis Slider */}
+                            <div className={`p-2.5 rounded-xl border ${appTheme === 'dark' ? 'bg-purple-950/30 border-purple-900/50' : 'bg-purple-50 border-purple-200'}`}>
+                              <div className="flex items-center justify-between text-xs mb-1.5">
+                                <span className="font-semibold flex items-center gap-1.5 text-purple-400">
+                                  <span>Z-Axis 3D Depth</span>
+                                  <span className={`text-[10px] font-normal ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                                    (Forward ↔ Backward)
+                                  </span>
+                                </span>
+                                <div className="flex items-center gap-1">
+                                  <span className="font-mono text-purple-400 font-bold">{curZ}px</span>
+                                  <button
+                                    onClick={() => updateZ(curZ - 25)}
+                                    className="text-[9px] px-1 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
+                                    title="-25px"
+                                  >
+                                    -25
+                                  </button>
+                                  <button
+                                    onClick={() => updateZ(curZ + 25)}
+                                    className="text-[9px] px-1 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
+                                    title="+25px"
+                                  >
+                                    +25
+                                  </button>
+                                  {curZ !== 0 && (
+                                    <button
+                                      onClick={() => updateZ(0)}
+                                      className="text-[9px] px-1 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-400"
+                                    >
+                                      0
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                              <input
+                                type="range"
+                                min="-400"
+                                max="400"
+                                step="2"
+                                value={curZ}
+                                onChange={(e) => updateZ(Number(e.target.value))}
+                                className="theme-slider w-full accent-purple-500"
+                              />
+                              <p className="text-[10px] text-slate-400 mt-1">
+                                Positive Z pushes the target forward toward the screen with true 3D perspective; negative Z pushes it deeper into the scene.
+                              </p>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => setAdjustments(prev => ({ ...prev, rotateY: Math.max(-85, (prev.rotateY || 0) - 5) }))}
-                              className="px-2 py-1 rounded-lg border border-slate-700 bg-slate-800 text-[10px] text-slate-300 font-mono hover:text-white"
-                            >
-                              -5&deg;
-                            </button>
-                            <input
-                              type="range"
-                              min="-85"
-                              max="85"
-                              step="1"
-                              value={adjustments.rotateY || 0}
-                              onChange={(e) => setAdjustments({ ...adjustments, rotateY: Number(e.target.value) })}
-                              className="theme-slider w-full flex-1"
-                            />
-                            <button
-                              onClick={() => setAdjustments(prev => ({ ...prev, rotateY: Math.min(85, (prev.rotateY || 0) + 5) }))}
-                              className="px-2 py-1 rounded-lg border border-slate-700 bg-slate-800 text-[10px] text-slate-300 font-mono hover:text-white"
-                            >
-                              +5&deg;
-                            </button>
+
+                          {/* 4. 1-Click 3D Positioning Presets */}
+                          <div>
+                            <div className={`text-xs font-semibold mb-2 flex items-center justify-between ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'}`}>
+                              <span>1-Click 3D XYZ Presets</span>
+                              <span className="text-[10px] text-cyan-500 font-normal">8 Presets</span>
+                            </div>
+
+                            <div className="grid grid-cols-4 gap-1.5">
+                              {PRESETS_XYZ.map(p => {
+                                const isActive = curX === p.x && curY === p.y && curZ === p.z;
+                                return (
+                                  <button
+                                    key={p.id}
+                                    onClick={() => applyXyzPreset(p)}
+                                    title={`${p.name}: ${p.desc} (X: ${p.x}px, Y: ${p.y}px, Z: ${p.z}px)`}
+                                    className={`p-2 rounded-xl border text-center transition flex flex-col items-center justify-center gap-1 ${isActive
+                                      ? 'bg-blue-600 text-white border-blue-400 shadow-md ring-1 ring-blue-400'
+                                      : appTheme === 'dark'
+                                        ? 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300'
+                                        : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700 shadow-sm'
+                                      }`}
+                                  >
+                                    <span className="text-base leading-none">{p.icon}</span>
+                                    <span className="text-[10px] font-medium truncate w-full">{p.name}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
                           </div>
                         </div>
+                      )}
+
+                      {/* SUB-TAB 1: 3D PERSPECTIVE */}
+                      {transformSubTab === '3d' && (
+                        <div className="space-y-4">
+                          {/* Interactive 3D Orbit Trackball Pad */}
+                          <Trackball3DPad
+                            rotateX={curRx}
+                            rotateY={curRy}
+                            onChange={(newRx, newRy) => update3DRotation(newRx, newRy)}
+                            onReset={() => update3DRotation(0, 0)}
+                            appTheme={appTheme}
+                          />
+
+                          {/* 1-Click 3D Angle Presets */}
+                          <div>
+                            <div className={`text-xs font-semibold mb-2 flex items-center justify-between ${appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
+                              }`}>
+                              <span>1-Click 3D Angle Presets</span>
+                              <span className="text-[10px] text-cyan-500 font-normal">8 Angles</span>
+                            </div>
+
+                            <div className="grid grid-cols-4 gap-1.5">
+                              {PRESETS_3D.map(p => {
+                                const isActive = curRx === p.rx && curRy === p.ry;
+                                return (
+                                  <button
+                                    key={p.id}
+                                    onClick={() => apply3DPreset(p)}
+                                    title={`${p.name}: ${p.desc} (X: ${p.rx}°, Y: ${p.ry}°)`}
+                                    className={`p-2 rounded-xl border text-center transition flex flex-col items-center justify-center gap-1 ${isActive
+                                      ? 'bg-blue-600 text-white border-blue-400 shadow-md ring-1 ring-blue-400'
+                                      : appTheme === 'dark'
+                                        ? 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300'
+                                        : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700 shadow-sm'
+                                      }`}
+                                  >
+                                    <span className="text-base leading-none">{p.icon}</span>
+                                    <span className="text-[10px] font-medium truncate w-full">{p.name}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          {/* 3D Pitch (X-Axis Tilt) Slider */}
+                          <div>
+                            <div className={`flex justify-between text-xs mb-1 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                              <span className="flex items-center gap-1">
+                                <strong>3D Tilt X (Pitch)</strong>
+                                <span className="text-[10px] text-slate-500 font-normal">(Forward / Backward)</span>
+                              </span>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-cyan-500 font-mono font-semibold">{curRx}&deg;</span>
+                                {curRx !== 0 && (
+                                  <button
+                                    onClick={() => update3DRotation(0, curRy)}
+                                    className="text-[9px] px-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-400"
+                                  >
+                                    0&deg;
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => update3DRotation(Math.max(-85, curRx - 5), curRy)}
+                                className="px-2 py-1 rounded-lg border border-slate-700 bg-slate-800 text-[10px] text-slate-300 font-mono hover:text-white"
+                              >
+                                -5&deg;
+                              </button>
+                              <input
+                                type="range"
+                                min="-85"
+                                max="85"
+                                step="1"
+                                value={curRx}
+                                onChange={(e) => update3DRotation(Number(e.target.value), curRy)}
+                                className="theme-slider w-full flex-1"
+                              />
+                              <button
+                                onClick={() => update3DRotation(Math.min(85, curRx + 5), curRy)}
+                                className="px-2 py-1 rounded-lg border border-slate-700 bg-slate-800 text-[10px] text-slate-300 font-mono hover:text-white"
+                              >
+                                +5&deg;
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* 3D Yaw (Y-Axis Tilt) Slider */}
+                          <div>
+                            <div className={`flex justify-between text-xs mb-1 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                              <span className="flex items-center gap-1">
+                                <strong>3D Tilt Y (Yaw)</strong>
+                                <span className="text-[10px] text-slate-500 font-normal">(Left / Right Angle)</span>
+                              </span>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-cyan-500 font-mono font-semibold">{curRy}&deg;</span>
+                                {curRy !== 0 && (
+                                  <button
+                                    onClick={() => update3DRotation(curRx, 0)}
+                                    className="text-[9px] px-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-400"
+                                  >
+                                    0&deg;
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => update3DRotation(curRx, Math.max(-85, curRy - 5))}
+                                className="px-2 py-1 rounded-lg border border-slate-700 bg-slate-800 text-[10px] text-slate-300 font-mono hover:text-white"
+                              >
+                                -5&deg;
+                              </button>
+                              <input
+                                type="range"
+                                min="-85"
+                                max="85"
+                                step="1"
+                                value={curRy}
+                                onChange={(e) => update3DRotation(curRx, Number(e.target.value))}
+                                className="theme-slider w-full flex-1"
+                              />
+                              <button
+                                onClick={() => update3DRotation(curRx, Math.min(85, curRy + 5))}
+                                className="px-2 py-1 rounded-lg border border-slate-700 bg-slate-800 text-[10px] text-slate-300 font-mono hover:text-white"
+                              >
+                                +5&deg;
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* 360° Rotation / Roll Angle Slider & Quick Angle Dial */}
+                          <div className={`p-3 rounded-2xl border space-y-2.5 ${appTheme === 'dark' ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-50 border-slate-200'}`}>
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="flex items-center gap-1.5 font-semibold text-cyan-400">
+                                <RotateCw className="w-3.5 h-3.5" />
+                                <span>360&deg; Spin &amp; Angle {isTransformingSelected ? '(Selected Part)' : '(Whole Icon)'}</span>
+                              </span>
+                              <div className="flex items-center gap-1">
+                                <span className="text-cyan-400 font-mono font-bold">{curRot}&deg;</span>
+                                <button
+                                  onClick={() => updateRotation(curRot - 15)}
+                                  className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono"
+                                  title="-15°"
+                                >
+                                  -15&deg;
+                                </button>
+                                <button
+                                  onClick={() => updateRotation(curRot + 15)}
+                                  className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono"
+                                  title="+15°"
+                                >
+                                  +15&deg;
+                                </button>
+                                {curRot !== 0 && (
+                                  <button
+                                    onClick={() => updateRotation(0)}
+                                    className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-400"
+                                  >
+                                    0&deg;
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+
+                            <input
+                              type="range"
+                              min="-180"
+                              max="180"
+                              step="1"
+                              value={curRot}
+                              onChange={(e) => updateRotation(Number(e.target.value))}
+                              className="theme-slider w-full accent-cyan-500"
+                            />
+
+                            {/* Quick 360 Degree Presets */}
+                            <div className="flex items-center justify-between gap-1 pt-1 border-t border-slate-800/40">
+                              {[0, 45, 90, 135, 180, -90, -45].map(deg => (
+                                <button
+                                  key={deg}
+                                  onClick={() => updateRotation(deg)}
+                                  className={`flex-1 py-1 rounded text-[10px] font-mono font-semibold transition ${curRot === deg
+                                    ? 'bg-blue-600 text-white shadow-sm'
+                                    : appTheme === 'dark' ? 'bg-slate-800/80 text-slate-400 hover:text-white' : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+                                  }`}
+                                >
+                                  {deg}&deg;
+                                </button>
+                              ))}
+                            </div>
+                          </div>
 
                         {/* Camera Perspective Distance Slider */}
                         <div>
@@ -12159,7 +12768,7 @@ export default function App() {
                       </div>
                     )}
                   </div>
-                )}
+                ); })()}
 
                                 {/* DEDICATED TAB: ANIMATED GIF STUDIO (Directly under 3D Transform) */}
                 {studioTab === 'gif' && (

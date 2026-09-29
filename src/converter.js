@@ -232,13 +232,16 @@ export async function downloadAsset({
         return;
       }
 
-      // 4. Transformations (Rotation, Scale, 3D Perspective & Skew)
+      // 4. Transformations (Rotation, Scale, 3D Perspective & Skew, XYZ Translation)
       const rotX = adjustments.rotateX || 0;
       const rotY = adjustments.rotateY || 0;
       const rotZ = adjustments.rotation || 0;
       const skX = adjustments.skewX || 0;
       const skY = adjustments.skewY || 0;
-      const has3D = rotX !== 0 || rotY !== 0 || skX !== 0 || skY !== 0;
+      const trX = adjustments.translateX || 0;
+      const trY = adjustments.translateY || 0;
+      const trZ = adjustments.translateZ || 0;
+      const has3D = rotX !== 0 || rotY !== 0 || skX !== 0 || skY !== 0 || trZ !== 0;
 
       // Icon Padding / Inset:
       // Default to 1.0 (edge-to-edge, zero artificial white padding/shrinkage).
@@ -265,9 +268,10 @@ export async function downloadAsset({
 
       if (!has3D) {
         // Fast 2D Vector Path: zero 3D matrix needed
+        const scaleFactor = targetWidth / 384;
         ctx.save();
         ctx.filter = filterRules || 'none';
-        ctx.translate(targetWidth / 2, targetHeight / 2);
+        ctx.translate((targetWidth / 2) + (trX * scaleFactor), (targetHeight / 2) + (trY * scaleFactor));
         ctx.rotate((rotZ * Math.PI) / 180);
         ctx.scale(adjustments.flipH ? -1 : 1, adjustments.flipV ? -1 : 1);
         ctx.drawImage(img, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
@@ -664,6 +668,9 @@ function prepareSvgWithAdjustments(svgCode, adjustments = {}, targetWidth, targe
     const rotZ = adjustments.rotation || 0;
     const skX = adjustments.skewX || 0;
     const skY = adjustments.skewY || 0;
+    const trX = adjustments.translateX || 0;
+    const trY = adjustments.translateY || 0;
+    const trZ = adjustments.translateZ || 0;
     const persp = adjustments.perspective || 800;
     const flipH = adjustments.flipH ? -1 : 1;
     const flipV = adjustments.flipV ? -1 : 1;
@@ -705,7 +712,7 @@ function prepareSvgWithAdjustments(svgCode, adjustments = {}, targetWidth, targe
     }
     const svgFilterStr = svgFilterParts.filter(Boolean).join(' ');
 
-    const hasAnyTransform = rotX !== 0 || rotY !== 0 || rotZ !== 0 || skX !== 0 || skY !== 0 || flipH !== 1 || flipV !== 1;
+    const hasAnyTransform = trX !== 0 || trY !== 0 || trZ !== 0 || rotX !== 0 || rotY !== 0 || rotZ !== 0 || skX !== 0 || skY !== 0 || flipH !== 1 || flipV !== 1;
     if (hasAnyTransform || svgFilterStr) {
       const firstClose = res.indexOf('>');
       const lastOpen = res.lastIndexOf('</svg>');
@@ -713,7 +720,7 @@ function prepareSvgWithAdjustments(svgCode, adjustments = {}, targetWidth, targe
         const svgOpen = res.substring(0, firstClose + 1);
         const inner = res.substring(firstClose + 1, lastOpen);
         const transformCss = hasAnyTransform
-          ? `transform-box: fill-box; transform-origin: center; transform: perspective(${persp}px) rotateX(${rotX}deg) rotateY(${rotY}deg) rotate(${rotZ}deg) skew(${skX}deg, ${skY}deg) scale(${flipH}, ${flipV});`
+          ? `transform-box: fill-box; transform-origin: center; transform: translate(${trX}px, ${trY}px) perspective(${persp}px) translateZ(${trZ}px) rotateX(${rotX}deg) rotateY(${rotY}deg) rotate(${rotZ}deg) skew(${skX}deg, ${skY}deg) scale(${flipH}, ${flipV});`
           : '';
         const filterCss = svgFilterStr ? `filter: ${svgFilterStr};` : '';
         res = `${svgOpen}
@@ -937,6 +944,17 @@ function render3DWithWebGL(imageSource, targetWidth, targetHeight, adjustments, 
     0, 0, 0, 1
   ]);
 
+  // Translation XYZ (normalized to canvas resolution)
+  const trX = (adjustments.translateX || 0) * (targetWidth / 384);
+  const trY = (adjustments.translateY || 0) * (targetHeight / 384);
+  const trZ = (adjustments.translateZ || 0) * (targetWidth / 384);
+  const Txyz = new Float32Array([
+    1, 0, 0, 0,
+    0, 1, 0, 0,
+    0, 0, 1, 0,
+    trX, trY, trZ, 1
+  ]);
+
   // Perspective & NDC projection (maps to [-1, 1] device coordinates without clipping Z)
   const P = new Float32Array([
     2 / targetWidth, 0, 0, 0,
@@ -957,8 +975,11 @@ function render3DWithWebGL(imageSource, targetWidth, targetHeight, adjustments, 
   const m4 = new Float32Array(16);
   mat4Multiply(m4, Rx, m3);
 
+  const m5 = new Float32Array(16);
+  mat4Multiply(m5, Txyz, m4);
+
   const M = new Float32Array(16);
-  mat4Multiply(M, P, m4);
+  mat4Multiply(M, P, m5);
 
   gl.uniformMatrix4fv(_uMatrixLoc, false, M);
   gl.drawArrays(gl.TRIANGLES, 0, 6);

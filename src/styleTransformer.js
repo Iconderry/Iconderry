@@ -19,6 +19,137 @@ export const STYLE_RENDER_MODES = [
     texture: 'none',
     adjustments: { customColor: '', opacity: 100, blur: 0, shadowBlur: 0, shadowColor: '#38bdf8', brightness: 100, contrast: 100, saturation: 100, hue: 0, sepia: 0, invert: 0 }
   },
+  // --- 10 NEW TRENDING & VIRAL EFFECTS ---
+  {
+    id: 'y2k_acid_chrome',
+    name: 'Y2K Liquid Acid Chrome',
+    category: 'Fire & Metal',
+    desc: 'Melting liquid chrome mirror with iridescent electric lime, violet & hot pink reflections',
+    icon: '🛸',
+    badge: 'Acid Chrome',
+    previewBg: 'linear-gradient(135deg, #a3e635, #c084fc, #ec4899, #38bdf8)',
+    borderAccent: '#a3e635',
+    texture: 'chrome',
+    isNew: true,
+    adjustments: { customColor: '', opacity: 100, blur: 0, shadowBlur: 24, shadowColor: '#a3e635', brightness: 125, contrast: 145, saturation: 170 }
+  },
+  {
+    id: 'risograph_indie_print',
+    name: 'Retro Risograph Halftone',
+    category: 'Craft & Texture',
+    desc: 'Analog riso soy-ink print with tactile dot-raster screens, vibrant fluo pink & cyan offset',
+    icon: '🖨️',
+    badge: 'Risograph',
+    previewBg: 'linear-gradient(135deg, #f43f5e, #06b6d4, #fef08a)',
+    borderAccent: '#f43f5e',
+    texture: 'riso',
+    isNew: true,
+    adjustments: { customColor: '', opacity: 98, blur: 0, shadowBlur: 14, shadowColor: '#06b6d4', brightness: 110, contrast: 130, saturation: 160 }
+  },
+  {
+    id: 'frosted_spatial_glass',
+    name: 'VisionOS Spatial Frosted Glass',
+    category: 'Glass & Water',
+    desc: 'Spatial compute glass with deep frosted refraction, illuminated rim edges & specular glint',
+    icon: '🥽',
+    badge: 'Spatial Glass',
+    previewBg: 'linear-gradient(135deg, rgba(255,255,255,0.4), rgba(56,189,248,0.3), rgba(15,23,42,0.8))',
+    borderAccent: '#38bdf8',
+    texture: 'glass',
+    isNew: true,
+    adjustments: { customColor: '', opacity: 88, blur: 0, shadowBlur: 26, shadowColor: '#38bdf8', brightness: 125, contrast: 120, saturation: 130 }
+  },
+  {
+    id: 'prism_optical_dispersion',
+    name: 'Spectral Prism Dispersion',
+    category: 'Glass & Water',
+    desc: 'Optical crystal glass splitting white light into rainbow caustics & chromatic spectral dispersion',
+    icon: '💎',
+    badge: 'Prism Flare',
+    previewBg: 'linear-gradient(135deg, #ef4444, #f59e0b, #10b981, #06b6d4, #8b5cf6)',
+    borderAccent: '#8b5cf6',
+    texture: 'prism',
+    isNew: true,
+    adjustments: { customColor: '', opacity: 100, blur: 0, shadowBlur: 24, shadowColor: '#8b5cf6', brightness: 120, contrast: 135, saturation: 165 }
+  },
+  {
+    id: 'vintage_synth_vhs',
+    name: 'Japanese City Pop VHS 80s',
+    category: 'Retro & Vintage',
+    desc: 'Tokyo 1984 aesthetic with scanline CRT phosphor glow, pastel peach-lavender hues & tape warmth',
+    icon: '📼',
+    badge: 'City Pop 84',
+    previewBg: 'linear-gradient(135deg, #ff6b8b, #ff8e53, #70e1ff)',
+    borderAccent: '#ff6b8b',
+    texture: 'vhs',
+    isNew: true,
+    adjustments: { customColor: '', opacity: 100, blur: 0, shadowBlur: 22, shadowColor: '#ff6b8b', brightness: 115, contrast: 125, saturation: 145 }
+  },
+  {
+    id: 'cyber_matrix_glitch',
+    name: 'Cyberpunk Data Glitch',
+    category: 'Cyber & Neon',
+    desc: 'Terminal cyber-hack with RGB chromatic subpixel split, digital noise burst & toxic matrix green',
+    icon: '⚡',
+    badge: 'Cyber Glitch',
+    previewBg: 'linear-gradient(135deg, #052e16, #22c55e, #06b6d4, #020617)',
+    borderAccent: '#22c55e',
+    texture: 'glitch',
+    isNew: true,
+    adjustments: { customColor: '', opacity: 100, blur: 0, shadowBlur: 25, shadowColor: '#22c55e', brightness: 120, contrast: 155, saturation: 175 }
+  },
+  {
+    id: 'obsidian_gold_kintsugi',
+    name: 'Japanese Gold Kintsugi',
+    category: 'Craft & Texture',
+    desc: 'Ceramic fractured obsidian with repaired luminous 24K molten gold cracks & metallic vein welds',
+    icon: '🏺',
+    badge: 'Kintsugi',
+    previewBg: 'linear-gradient(135deg, #09090b, #27272a, #fbbf24, #d97706)',
+    borderAccent: '#fbbf24',
+    texture: 'kintsugi',
+    isNew: true,
+    adjustments: { customColor: '', opacity: 100, blur: 0, shadowBlur: 20, shadowColor: '#fbbf24', brightness: 110, contrast: 140, saturation: 150 }
+  },
+  {
+    id: 'cosmic_stardust_nebula',
+    name: 'Cosmic Stardust Nebula',
+    category: 'Cyber & Neon',
+    desc: 'Deep interstellar cosmos with swirling violet-cyan galactic gas clouds & gleaming diamond stars',
+    icon: '🌌',
+    badge: 'Cosmic Nebula',
+    previewBg: 'linear-gradient(135deg, #030712, #581c87, #0284c7, #e879f9)',
+    borderAccent: '#c084fc',
+    texture: 'nebula',
+    isNew: true,
+    adjustments: { customColor: '', opacity: 100, blur: 0, shadowBlur: 26, shadowColor: '#c084fc', brightness: 120, contrast: 135, saturation: 160 }
+  },
+  {
+    id: 'bioluminescent_abyss',
+    name: 'Bioluminescent Abyssal Marine',
+    category: 'Cyber & Neon',
+    desc: 'Deep ocean trench organism glowing with ethereal electric aqua, seafoam green & oceanic luminescence',
+    icon: '🪼',
+    badge: 'Bioluminescent',
+    previewBg: 'linear-gradient(135deg, #022c22, #0d9488, #2dd4bf, #020617)',
+    borderAccent: '#2dd4bf',
+    texture: 'bioluminescence',
+    isNew: true,
+    adjustments: { customColor: '', opacity: 95, blur: 0, shadowBlur: 28, shadowColor: '#2dd4bf', brightness: 125, contrast: 135, saturation: 165 }
+  },
+  {
+    id: 'acid_mesh_gradient_grain',
+    name: 'Acid Mesh Aura & Film Grain',
+    category: '3D & Inflatable',
+    desc: 'Hypnotic viral color mesh blending electric lime, supersonic coral & indigo with tactile micro-grain noise',
+    icon: '🔮',
+    badge: 'Acid Mesh',
+    previewBg: 'linear-gradient(135deg, #d946ef, #8b5cf6, #3b82f6, #10b981)',
+    borderAccent: '#d946ef',
+    texture: 'grain',
+    isNew: true,
+    adjustments: { customColor: '', opacity: 100, blur: 0, shadowBlur: 30, shadowColor: '#d946ef', brightness: 120, contrast: 130, saturation: 160 }
+  },
   // 1. New Material Styles from reference
   {
     id: 'splash_water',
@@ -2339,6 +2470,319 @@ export function transformSvgStyle(svgCode, styleMode, targetLayerIds = null) {
         el.setAttribute('fill', `url(#${uniqueId}_rubyGem)`);
         el.setAttribute('stroke', '#fecaca');
         el.setAttribute('stroke-width', '2');
+      });
+    }
+
+    // -------------------------------------------------------------
+    // STYLE: Y2K LIQUID ACID CHROME
+    // -------------------------------------------------------------
+    else if (styleMode === 'y2k_acid_chrome') {
+      defs.innerHTML += `
+        <linearGradient id="${uniqueId}_acidChrome" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#ccff00"/>
+          <stop offset="25%" stop-color="#ffffff"/>
+          <stop offset="45%" stop-color="#ec4899"/>
+          <stop offset="65%" stop-color="#8b5cf6"/>
+          <stop offset="85%" stop-color="#06b6d4"/>
+          <stop offset="100%" stop-color="#ccff00"/>
+        </linearGradient>
+        <filter id="${uniqueId}_acidGlow" x="-30%" y="-30%" width="160%" height="160%">
+          <feDropShadow dx="0" dy="0" stdDeviation="4" flood-color="#ccff00" flood-opacity="0.8"/>
+          <feDropShadow dx="2" dy="2" stdDeviation="8" flood-color="#ec4899" flood-opacity="0.6"/>
+        </filter>
+      `;
+      elementSizes.forEach(({ el, score }) => {
+        const isMain = score >= maxScore * 0.35;
+        if (isMain) {
+          el.setAttribute('fill', `url(#${uniqueId}_acidChrome)`);
+          el.setAttribute('stroke', '#ffffff');
+          el.setAttribute('stroke-width', '2');
+          el.setAttribute('filter', `url(#${uniqueId}_acidGlow)`);
+        } else {
+          el.setAttribute('fill', '#ccff00');
+          el.setAttribute('stroke', '#ec4899');
+          el.setAttribute('stroke-width', '1.5');
+        }
+      });
+    }
+
+    // -------------------------------------------------------------
+    // STYLE: RETRO RISOGRAPH HALFTONE
+    // -------------------------------------------------------------
+    else if (styleMode === 'risograph_indie_print') {
+      defs.innerHTML += `
+        <pattern id="${uniqueId}_risoDots" width="8" height="8" patternUnits="userSpaceOnUse">
+          <circle cx="4" cy="4" r="1.8" fill="#f43f5e" opacity="0.4"/>
+          <circle cx="2" cy="2" r="0.9" fill="#06b6d4" opacity="0.35"/>
+        </pattern>
+        <linearGradient id="${uniqueId}_risoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#ff2a85"/>
+          <stop offset="50%" stop-color="#f43f5e"/>
+          <stop offset="100%" stop-color="#00b4d8"/>
+        </linearGradient>
+        <filter id="${uniqueId}_risoMisreg" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="2.5" dy="2.5" stdDeviation="0" flood-color="#06b6d4" flood-opacity="0.85"/>
+        </filter>
+      `;
+      elementSizes.forEach(({ el, score }) => {
+        const isMain = score >= maxScore * 0.4;
+        if (isMain) {
+          el.setAttribute('fill', `url(#${uniqueId}_risoGrad)`);
+          el.setAttribute('stroke', '#06b6d4');
+          el.setAttribute('stroke-width', '2');
+          el.setAttribute('filter', `url(#${uniqueId}_risoMisreg)`);
+        } else {
+          el.setAttribute('fill', '#fef08a');
+          el.setAttribute('stroke', '#ff2a85');
+          el.setAttribute('stroke-width', '1.8');
+        }
+      });
+    }
+
+    // -------------------------------------------------------------
+    // STYLE: VISIONOS SPATIAL FROSTED GLASS
+    // -------------------------------------------------------------
+    else if (styleMode === 'frosted_spatial_glass') {
+      defs.innerHTML += `
+        <linearGradient id="${uniqueId}_spatialGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#ffffff" stop-opacity="0.5"/>
+          <stop offset="30%" stop-color="#bae6fd" stop-opacity="0.3"/>
+          <stop offset="70%" stop-color="#0284c7" stop-opacity="0.25"/>
+          <stop offset="100%" stop-color="#ffffff" stop-opacity="0.45"/>
+        </linearGradient>
+        <filter id="${uniqueId}_spatialGlow" x="-30%" y="-30%" width="160%" height="160%">
+          <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#38bdf8" flood-opacity="0.35"/>
+          <feDropShadow dx="0" dy="0" stdDeviation="3" flood-color="#ffffff" flood-opacity="0.6"/>
+        </filter>
+      `;
+      elementSizes.forEach(({ el }) => {
+        el.setAttribute('fill', `url(#${uniqueId}_spatialGrad)`);
+        el.setAttribute('stroke', '#ffffff');
+        el.setAttribute('stroke-width', '2.2');
+        el.setAttribute('stroke-opacity', '0.85');
+        el.setAttribute('filter', `url(#${uniqueId}_spatialGlow)`);
+      });
+    }
+
+    // -------------------------------------------------------------
+    // STYLE: SPECTRAL PRISM DISPERSION
+    // -------------------------------------------------------------
+    else if (styleMode === 'prism_optical_dispersion') {
+      defs.innerHTML += `
+        <linearGradient id="${uniqueId}_prismGrad" x1="0%" y1="15%" x2="100%" y2="85%">
+          <stop offset="0%" stop-color="#ff0055"/>
+          <stop offset="20%" stop-color="#ff8800"/>
+          <stop offset="40%" stop-color="#ffee00"/>
+          <stop offset="60%" stop-color="#00ffcc"/>
+          <stop offset="80%" stop-color="#00aaff"/>
+          <stop offset="100%" stop-color="#bf00ff"/>
+        </linearGradient>
+        <filter id="${uniqueId}_prismFilter" x="-40%" y="-40%" width="180%" height="180%">
+          <feDropShadow dx="-3" dy="0" stdDeviation="4" flood-color="#ff0055" flood-opacity="0.8"/>
+          <feDropShadow dx="3" dy="0" stdDeviation="4" flood-color="#00ffcc" flood-opacity="0.8"/>
+          <feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="#00aaff" flood-opacity="0.5"/>
+        </filter>
+      `;
+      elementSizes.forEach(({ el }) => {
+        el.setAttribute('fill', `url(#${uniqueId}_prismGrad)`);
+        el.setAttribute('stroke', '#ffffff');
+        el.setAttribute('stroke-width', '1.8');
+        el.setAttribute('filter', `url(#${uniqueId}_prismFilter)`);
+      });
+    }
+
+    // -------------------------------------------------------------
+    // STYLE: JAPANESE CITY POP VHS 80s
+    // -------------------------------------------------------------
+    else if (styleMode === 'vintage_synth_vhs') {
+      defs.innerHTML += `
+        <linearGradient id="${uniqueId}_cityPop" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="#ff6b8b"/>
+          <stop offset="40%" stop-color="#ff8e53"/>
+          <stop offset="70%" stop-color="#fec5bb"/>
+          <stop offset="100%" stop-color="#70e1ff"/>
+        </linearGradient>
+        <filter id="${uniqueId}_vhsGlow" x="-30%" y="-30%" width="160%" height="160%">
+          <feDropShadow dx="-2" dy="0" stdDeviation="0" flood-color="#ff0055" flood-opacity="0.75"/>
+          <feDropShadow dx="2" dy="0" stdDeviation="0" flood-color="#00ffff" flood-opacity="0.75"/>
+          <feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="#ff6b8b" flood-opacity="0.6"/>
+        </filter>
+      `;
+      elementSizes.forEach(({ el, score }) => {
+        const isMain = score >= maxScore * 0.35;
+        if (isMain) {
+          el.setAttribute('fill', `url(#${uniqueId}_cityPop)`);
+          el.setAttribute('stroke', '#ffffff');
+          el.setAttribute('stroke-width', '2');
+          el.setAttribute('filter', `url(#${uniqueId}_vhsGlow)`);
+        } else {
+          el.setAttribute('fill', '#70e1ff');
+          el.setAttribute('stroke', '#ff6b8b');
+          el.setAttribute('stroke-width', '1.5');
+        }
+      });
+    }
+
+    // -------------------------------------------------------------
+    // STYLE: CYBERPUNK DATA GLITCH
+    // -------------------------------------------------------------
+    else if (styleMode === 'cyber_matrix_glitch') {
+      defs.innerHTML += `
+        <linearGradient id="${uniqueId}_glitchGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#00ff66"/>
+          <stop offset="35%" stop-color="#052e16"/>
+          <stop offset="65%" stop-color="#00f0ff"/>
+          <stop offset="100%" stop-color="#00ff66"/>
+        </linearGradient>
+        <filter id="${uniqueId}_rgbGlitch" x="-40%" y="-40%" width="180%" height="180%">
+          <feDropShadow dx="-4" dy="-1" stdDeviation="0" flood-color="#ff003c" flood-opacity="0.9"/>
+          <feDropShadow dx="4" dy="1" stdDeviation="0" flood-color="#00f0ff" flood-opacity="0.9"/>
+          <feDropShadow dx="0" dy="0" stdDeviation="7" flood-color="#00ff66" flood-opacity="0.75"/>
+        </filter>
+      `;
+      elementSizes.forEach(({ el, score }) => {
+        const isMain = score >= maxScore * 0.35;
+        if (isMain) {
+          el.setAttribute('fill', `url(#${uniqueId}_glitchGrad)`);
+          el.setAttribute('stroke', '#00ff66');
+          el.setAttribute('stroke-width', '2');
+          el.setAttribute('filter', `url(#${uniqueId}_rgbGlitch)`);
+        } else {
+          el.setAttribute('fill', '#00f0ff');
+          el.setAttribute('stroke', '#00ff66');
+          el.setAttribute('stroke-width', '1.5');
+        }
+      });
+    }
+
+    // -------------------------------------------------------------
+    // STYLE: JAPANESE GOLD KINTSUGI
+    // -------------------------------------------------------------
+    else if (styleMode === 'obsidian_gold_kintsugi') {
+      defs.innerHTML += `
+        <radialGradient id="${uniqueId}_kintsugiObsidian" cx="30%" cy="30%" r="75%">
+          <stop offset="0%" stop-color="#27272a"/>
+          <stop offset="45%" stop-color="#18181b"/>
+          <stop offset="100%" stop-color="#09090b"/>
+        </radialGradient>
+        <linearGradient id="${uniqueId}_kintsugiGold" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#fef08a"/>
+          <stop offset="35%" stop-color="#fbbf24"/>
+          <stop offset="70%" stop-color="#d97706"/>
+          <stop offset="100%" stop-color="#fef08a"/>
+        </linearGradient>
+        <filter id="${uniqueId}_goldGleam" x="-30%" y="-30%" width="160%" height="160%">
+          <feDropShadow dx="0" dy="0" stdDeviation="5" flood-color="#fbbf24" flood-opacity="0.85"/>
+          <feDropShadow dx="0" dy="0" stdDeviation="12" flood-color="#d97706" flood-opacity="0.5"/>
+        </filter>
+      `;
+      elementSizes.forEach(({ el, score }) => {
+        const isMain = score >= maxScore * 0.35;
+        if (isMain) {
+          el.setAttribute('fill', `url(#${uniqueId}_kintsugiObsidian)`);
+          el.setAttribute('stroke', `url(#${uniqueId}_kintsugiGold)`);
+          el.setAttribute('stroke-width', '3');
+          el.setAttribute('filter', `url(#${uniqueId}_goldGleam)`);
+        } else {
+          el.setAttribute('fill', `url(#${uniqueId}_kintsugiGold)`);
+          el.setAttribute('stroke', '#fef08a');
+          el.setAttribute('stroke-width', '1.5');
+        }
+      });
+    }
+
+    // -------------------------------------------------------------
+    // STYLE: COSMIC STARDUST NEBULA
+    // -------------------------------------------------------------
+    else if (styleMode === 'cosmic_stardust_nebula') {
+      defs.innerHTML += `
+        <radialGradient id="${uniqueId}_nebulaCore" cx="45%" cy="35%" r="75%">
+          <stop offset="0%" stop-color="#f472b6"/>
+          <stop offset="25%" stop-color="#c084fc"/>
+          <stop offset="55%" stop-color="#3b82f6"/>
+          <stop offset="85%" stop-color="#1e1b4b"/>
+          <stop offset="100%" stop-color="#020617"/>
+        </radialGradient>
+        <filter id="${uniqueId}_cosmicGlow" x="-40%" y="-40%" width="180%" height="180%">
+          <feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="#c084fc" flood-opacity="0.75"/>
+          <feDropShadow dx="0" dy="0" stdDeviation="14" flood-color="#38bdf8" flood-opacity="0.5"/>
+        </filter>
+      `;
+      elementSizes.forEach(({ el, score }) => {
+        const isMain = score >= maxScore * 0.35;
+        if (isMain) {
+          el.setAttribute('fill', `url(#${uniqueId}_nebulaCore)`);
+          el.setAttribute('stroke', '#e0e7ff');
+          el.setAttribute('stroke-width', '2');
+          el.setAttribute('filter', `url(#${uniqueId}_cosmicGlow)`);
+        } else {
+          el.setAttribute('fill', '#f472b6');
+          el.setAttribute('stroke', '#ffffff');
+          el.setAttribute('stroke-width', '1.5');
+        }
+      });
+    }
+
+    // -------------------------------------------------------------
+    // STYLE: BIOLUMINESCENT ABYSSAL MARINE
+    // -------------------------------------------------------------
+    else if (styleMode === 'bioluminescent_abyss') {
+      defs.innerHTML += `
+        <linearGradient id="${uniqueId}_bioAbyss" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="#5eead4" stop-opacity="0.95"/>
+          <stop offset="35%" stop-color="#14b8a6" stop-opacity="0.85"/>
+          <stop offset="70%" stop-color="#0f766e" stop-opacity="0.9"/>
+          <stop offset="100%" stop-color="#042f2e" stop-opacity="0.98"/>
+        </linearGradient>
+        <filter id="${uniqueId}_bioAura" x="-40%" y="-40%" width="180%" height="180%">
+          <feDropShadow dx="0" dy="0" stdDeviation="5" flood-color="#2dd4bf" flood-opacity="0.95"/>
+          <feDropShadow dx="0" dy="0" stdDeviation="16" flood-color="#0d9488" flood-opacity="0.65"/>
+        </filter>
+      `;
+      elementSizes.forEach(({ el, score }) => {
+        const isMain = score >= maxScore * 0.35;
+        if (isMain) {
+          el.setAttribute('fill', `url(#${uniqueId}_bioAbyss)`);
+          el.setAttribute('stroke', '#a7f3d0');
+          el.setAttribute('stroke-width', '2');
+          el.setAttribute('filter', `url(#${uniqueId}_bioAura)`);
+        } else {
+          el.setAttribute('fill', '#2dd4bf');
+          el.setAttribute('stroke', '#5eead4');
+          el.setAttribute('stroke-width', '1.5');
+        }
+      });
+    }
+
+    // -------------------------------------------------------------
+    // STYLE: ACID MESH AURA & FILM GRAIN
+    // -------------------------------------------------------------
+    else if (styleMode === 'acid_mesh_gradient_grain') {
+      defs.innerHTML += `
+        <linearGradient id="${uniqueId}_acidMesh" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#ec4899"/>
+          <stop offset="30%" stop-color="#8b5cf6"/>
+          <stop offset="70%" stop-color="#06b6d4"/>
+          <stop offset="100%" stop-color="#10b981"/>
+        </linearGradient>
+        <filter id="${uniqueId}_acidMeshAura" x="-40%" y="-40%" width="180%" height="180%">
+          <feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="#ec4899" flood-opacity="0.7"/>
+          <feDropShadow dx="0" dy="0" stdDeviation="18" flood-color="#8b5cf6" flood-opacity="0.5"/>
+          <feDropShadow dx="0" dy="0" stdDeviation="28" flood-color="#06b6d4" flood-opacity="0.4"/>
+        </filter>
+      `;
+      elementSizes.forEach(({ el, score }) => {
+        const isMain = score >= maxScore * 0.35;
+        if (isMain) {
+          el.setAttribute('fill', `url(#${uniqueId}_acidMesh)`);
+          el.setAttribute('stroke', '#ffffff');
+          el.setAttribute('stroke-width', '2.2');
+          el.setAttribute('filter', `url(#${uniqueId}_acidMeshAura)`);
+        } else {
+          el.setAttribute('fill', '#10b981');
+          el.setAttribute('stroke', '#ec4899');
+          el.setAttribute('stroke-width', '1.8');
+        }
       });
     }
 

@@ -237,20 +237,33 @@ export function applyLayerTransforms(
     }
 
     // 3. Apply transforms to targeted layer nodes (translate, rotate, scale around center)
+    // Ensure SVG root preserves 3D context if any layer has 3D rotation or depth
+    const hasAny3DLayer = hasTransforms && Object.values(layerTransforms).some(t => t && ((t.rotateX && t.rotateX !== 0) || (t.rotateY && t.rotateY !== 0) || (t.z && t.z !== 0)));
+    if (hasAny3DLayer) {
+      const origSvgStyle = svgEl.getAttribute('style') || '';
+      if (!origSvgStyle.includes('transform-style')) {
+        svgEl.setAttribute('style', `${origSvgStyle ? origSvgStyle + '; ' : ''}transform-style: preserve-3d; perspective: 800px;`);
+      }
+    }
+
+    // 2. Apply layer transforms (X/Y/Z translation, 3D pitch/yaw, 360 rotation, and scale)
     if (hasTransforms) {
       Object.entries(layerTransforms).forEach(([rawId, transform]) => {
         if (!transform) return;
         const {
           x = 0,
           y = 0,
+          z = 0,
           rotate = 0,
+          rotateX = 0,
+          rotateY = 0,
           scaleX = 1,
           scaleY = 1,
           cx = 0,
           cy = 0
         } = transform;
 
-        if (x === 0 && y === 0 && rotate === 0 && scaleX === 1 && scaleY === 1) return;
+        if (x === 0 && y === 0 && z === 0 && rotate === 0 && rotateX === 0 && rotateY === 0 && scaleX === 1 && scaleY === 1) return;
 
         const cleanId = String(rawId).replace(/^pf_studio_/i, '');
         const numOnly = cleanId.replace(/\D/g, '');
@@ -266,14 +279,39 @@ export function applyLayerTransforms(
           el.setAttribute('data-orig-transform', existingTransform.replace(/translate\([^)]*\)/gi, '').trim());
         }
 
-        // Clean out any inline style transform that can override the SVG transform attribute
+        // Clean out any existing transform CSS
         const origStyle = el.getAttribute('style') || '';
-        if (origStyle) {
-          const cleanStyle = origStyle
-            .replace(/transform-box\s*:\s*[^;]+;?/gi, '')
-            .replace(/transform-origin\s*:\s*[^;]+;?/gi, '')
-            .replace(/transform\s*:\s*[^;]+;?/gi, '')
-            .trim();
+        let cleanStyle = origStyle
+          .replace(/transform-box\s*:\s*[^;]+;?/gi, '')
+          .replace(/transform-origin\s*:\s*[^;]+;?/gi, '')
+          .replace(/transform\s*:\s*[^;]+;?/gi, '')
+          .trim();
+
+        // If part has Z-depth (elevation / recess), apply realistic drop shadow elevation
+        if (z !== 0) {
+          const shadowY = Math.round(z * 0.22);
+          const shadowBlur = Math.max(2, Math.round(Math.abs(z) * 0.35));
+          const shadowAlpha = Math.min(0.7, 0.2 + (Math.abs(z) / 300)).toFixed(2);
+          const depthDropShadow = `drop-shadow(0px ${shadowY}px ${shadowBlur}px rgba(0,0,0,${shadowAlpha}))`;
+          if (cleanStyle.includes('filter:')) {
+            cleanStyle = cleanStyle.replace(/filter\s*:\s*([^;]+);?/gi, (match, p1) => `filter: ${p1} ${depthDropShadow};`);
+          } else {
+            cleanStyle = `${cleanStyle ? cleanStyle + '; ' : ''}filter: ${depthDropShadow};`;
+          }
+        }
+
+        // Apply hardware-accelerated 3D and 360-degree rotation CSS on the element
+        const has3DLayer = rotateX !== 0 || rotateY !== 0 || z !== 0;
+        const cssTransform = has3DLayer
+          ? `transform-box: fill-box; transform-origin: center; transform: perspective(800px) translate3d(${x}px, ${y}px, ${z}px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) rotate(${rotate}deg);`
+          : (x !== 0 || y !== 0 || rotate !== 0)
+            ? `transform-box: fill-box; transform-origin: center; transform: translate(${x}px, ${y}px) rotate(${rotate}deg);`
+            : '';
+
+        if (cssTransform) {
+          cleanStyle = `${cleanStyle ? cleanStyle + '; ' : ''}${cssTransform}`;
+        }
+        if (cleanStyle) {
           el.setAttribute('style', cleanStyle);
         }
 
@@ -281,7 +319,9 @@ export function applyLayerTransforms(
         const transformParts = [];
 
         // Center origin calculation: if cx, cy are provided, translate to origin, rotate & scale, then translate back
-        const hasScale = scaleX !== 1 || scaleY !== 1;
+        const effectiveScaleX = scaleX * (z !== 0 ? Math.max(0.2, 1 + (z / 600)) : 1);
+        const effectiveScaleY = scaleY * (z !== 0 ? Math.max(0.2, 1 + (z / 600)) : 1);
+        const hasScale = effectiveScaleX !== 1 || effectiveScaleY !== 1;
         const hasRotate = rotate !== 0;
 
         if (x !== 0 || y !== 0) {
@@ -291,11 +331,11 @@ export function applyLayerTransforms(
           if (cx !== 0 || cy !== 0) {
             transformParts.push(`translate(${cx} ${cy})`);
             if (hasRotate) transformParts.push(`rotate(${rotate})`);
-            if (hasScale) transformParts.push(`scale(${scaleX} ${scaleY})`);
+            if (hasScale) transformParts.push(`scale(${effectiveScaleX.toFixed(3)} ${effectiveScaleY.toFixed(3)})`);
             transformParts.push(`translate(${-cx} ${-cy})`);
           } else {
             if (hasRotate) transformParts.push(`rotate(${rotate})`);
-            if (hasScale) transformParts.push(`scale(${scaleX} ${scaleY})`);
+            if (hasScale) transformParts.push(`scale(${effectiveScaleX.toFixed(3)} ${effectiveScaleY.toFixed(3)})`);
           }
         }
         if (origAttr) {
