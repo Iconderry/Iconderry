@@ -10,6 +10,10 @@
   --sal: env(safe-area-inset-left, 0px);
 }
 
+html {
+  scrollbar-gutter: stable;
+}
+
 body {
   margin: 0;
   background-color: #060a12;

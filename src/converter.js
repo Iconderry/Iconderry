@@ -92,10 +92,7 @@ export async function downloadAsset({
       preparedSvg = preparedSvg.replace(/<svg([^>]*)>/, `<svg$1>${bgRect}`);
     }
 
-    // If background badge shape is active, embed container shape into SVG
-    if (adjustments.bgShape && adjustments.bgShape !== 'none') {
-      preparedSvg = embedSvgBgShape(preparedSvg, adjustments, targetWidth, targetHeight);
-    }
+    // Note: Background badge shape is now embedded directly in prepareSvgWithAdjustments
 
     if (onProgress) onProgress({ percent: 85, stage: 'Generating SVG File...', details: `${baseFilename}.svg` });
     await new Promise(r => setTimeout(r, 0));
@@ -144,7 +141,7 @@ export async function downloadAsset({
       ctx.imageSmoothingQuality = 'high';
 
       // 1. Solid or gradient canvas background (if not transparent or jpeg)
-      if (format === 'jpeg' || (!isTransparent && (!adjustments.bgShape || adjustments.bgShape === 'none'))) {
+      if (format === 'jpeg' || !isTransparent) {
         if (customBg && customBg.type === 'gradient' && customBg.gradient) {
           const angleRad = ((customBg.gradient.angle || 135) * Math.PI) / 180;
           const cx = targetWidth / 2;
@@ -163,11 +160,7 @@ export async function downloadAsset({
         }
         ctx.fillRect(0, 0, targetWidth, targetHeight);
       }
-
-      // 2. Background Badge Shape (Circle, Squircle, Rounded Square, Hexagon)
-      if (adjustments.bgShape && adjustments.bgShape !== 'none') {
-        drawCanvasBgShape(ctx, targetWidth, targetHeight, adjustments);
-      }
+      // Note: Background Badge Shape is embedded directly into the SVG artwork composite
 
       // 3. Scale blur and glow relative to preview baseline (384px) with safe hardware kernel caps
       // Massive unconstrained blur kernels at 8K crash Chromium/Safari's Skia 2D rasterizer due to OOM
@@ -254,17 +247,17 @@ export async function downloadAsset({
       const hasAnyBlurOrGlow = Boolean(
         adjustments.shadowBlur > 0 ||
         adjustments.blur > 0 ||
+        (adjustments.extrusionDepth && adjustments.extrusionDepth > 0) ||
         (adjustments.layerStyles && Object.values(adjustments.layerStyles).some(s => (s?.glow?.enabled && (s.glow.radius || 12) > 0) || (s?.blur && Number(s.blur) > 0)))
       );
       if (hasAnyBlurOrGlow) {
-        paddingRatio = 0.90;
-      }
-      if (adjustments.bgShape && adjustments.bgShape !== 'none') {
-        const shapePad = Number(adjustments.bgShapePadding || 20) / 100;
-        paddingRatio = Math.max(0.2, (1 - shapePad * 1.5));
+        paddingRatio = 0.92;
       }
       if (has3D) {
-        paddingRatio = Math.min(paddingRatio, 0.82); // Margin so 3D perspective tilted corners and glow don't get clipped by canvas bounds
+        // Tilted 3D corners expand along Z-perspective; 0.76 ensures zero edge clipping
+        paddingRatio = Math.min(paddingRatio, (adjustments.extrusionDepth > 0 ? 0.72 : 0.76));
+      } else if (adjustments.bgShape && adjustments.bgShape !== 'none') {
+        paddingRatio = hasAnyBlurOrGlow ? 0.92 : 0.96;
       }
 
       const drawWidth = targetWidth * paddingRatio;
@@ -442,30 +435,60 @@ function drawCanvasBgShape(ctx, w, h, adjustments) {
   ctx.restore();
 }
 
-function embedSvgBgShape(svgCode, adjustments, width, height) {
+function embedBadgeShapeIntoSvg(svgCode, adjustments, width, height) {
   const shape = adjustments.bgShape;
+  if (!shape || shape === 'none') return svgCode;
+
   const color = adjustments.bgShapeColor || '#1e293b';
   const borderWidth = Number(adjustments.bgShapeBorder || 0);
   const borderColor = adjustments.bgShapeBorderColor || '#38bdf8';
-  const padPercent = Number(adjustments.bgShapePadding || 20);
+  // Matches App.jsx padding formula: bgShapePadding * 0.7 %
+  const padPercent = Math.max(0, Math.min(45, Number(adjustments.bgShapePadding ?? 20) * 0.7));
+  const baseDim = 1000;
+  const strokeW = borderWidth > 0 ? Math.max(1, (borderWidth * baseDim) / (width || 384)) : 0;
+  const halfStroke = strokeW / 2;
 
   let shapeElement = '';
+  let clipDef = '';
+  let clipAttr = '';
+
   if (shape === 'circle') {
-    shapeElement = `<circle cx="50%" cy="50%" r="48%" fill="${color}" stroke="${borderColor}" stroke-width="${borderWidth}"/>`;
+    const r = baseDim / 2 - halfStroke;
+    shapeElement = `<circle cx="500" cy="500" r="${r}" fill="${color}" ${strokeW > 0 ? `stroke="${borderColor}" stroke-width="${strokeW}"` : ''}/>`;
   } else if (shape === 'squircle') {
-    shapeElement = `<rect x="2%" y="2%" width="96%" height="96%" rx="28%" ry="28%" fill="${color}" stroke="${borderColor}" stroke-width="${borderWidth}"/>`;
+    // 28% radius squircle accurately mirrors the screen's iOS squircle
+    const r = baseDim * 0.28;
+    shapeElement = `<rect x="${halfStroke}" y="${halfStroke}" width="${baseDim - strokeW}" height="${baseDim - strokeW}" rx="${r}" ry="${r}" fill="${color}" ${strokeW > 0 ? `stroke="${borderColor}" stroke-width="${strokeW}"` : ''}/>`;
   } else if (shape === 'rounded-square') {
-    shapeElement = `<rect x="2%" y="2%" width="96%" height="96%" rx="16%" ry="16%" fill="${color}" stroke="${borderColor}" stroke-width="${borderWidth}"/>`;
+    // 16% radius rounded square
+    const r = baseDim * 0.16;
+    shapeElement = `<rect x="${halfStroke}" y="${halfStroke}" width="${baseDim - strokeW}" height="${baseDim - strokeW}" rx="${r}" ry="${r}" fill="${color}" ${strokeW > 0 ? `stroke="${borderColor}" stroke-width="${strokeW}"` : ''}/>`;
   } else if (shape === 'hexagon') {
-    shapeElement = `<polygon points="50,2 96,25 96,75 50,98 4,75 4,25" fill="${color}" stroke="${borderColor}" stroke-width="${borderWidth}"/>`;
+    const pts = `500,${halfStroke} ${baseDim - halfStroke},250 ${baseDim - halfStroke},750 500,${baseDim - halfStroke} ${halfStroke},750 ${halfStroke},250`;
+    clipDef = `<clipPath id="iconderry-hex-clip"><polygon points="${pts}"/></clipPath>`;
+    clipAttr = `clip-path="url(#iconderry-hex-clip)"`;
+    shapeElement = `<polygon points="${pts}" fill="${color}" ${strokeW > 0 ? `stroke="${borderColor}" stroke-width="${strokeW}"` : ''}/>`;
+  } else {
+    // Standard rectangle
+    shapeElement = `<rect x="${halfStroke}" y="${halfStroke}" width="${baseDim - strokeW}" height="${baseDim - strokeW}" fill="${color}" ${strokeW > 0 ? `stroke="${borderColor}" stroke-width="${strokeW}"` : ''}/>`;
   }
 
-  // Wrap inside outer SVG with background shape
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="${width}" height="${height}">
+  // Calculate inner SVG padding offset and dimension
+  const padOffset = Math.round((baseDim * padPercent) / 100);
+  const innerDim = Math.max(10, baseDim - padOffset * 2);
+
+  // Nest the inner SVG without stripping child elements, preserving inner viewBox and coordinate systems
+  let innerSvg = svgCode.replace(/<svg\b([^>]*)>/i, (m, attrs) => {
+    let cleanAttrs = attrs
+      .replace(/\b(x|y|width|height)="[^"]*"/gi, '')
+      .replace(/\b(x|y|width|height)=[^\s>]+/gi, '');
+    return `<svg x="${padOffset}" y="${padOffset}" width="${innerDim}" height="${innerDim}" overflow="visible"${cleanAttrs}>`;
+  });
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${baseDim} ${baseDim}" width="${width || 512}" height="${height || 512}" overflow="visible" ${clipAttr}>
+  <defs>${clipDef}</defs>
   ${shapeElement}
-  <g transform="translate(${padPercent/2}, ${padPercent/2}) scale(${(100 - padPercent)/100})">
-    ${svgCode.replace(/<svg[^>]*>|<\/svg>/gi, '')}
-  </g>
+  ${innerSvg}
 </svg>`;
 }
 
@@ -473,6 +496,12 @@ function prepareSvgWithAdjustments(svgCode, adjustments = {}, targetWidth, targe
   let res = svgCode;
   if (!res.includes('xmlns=')) {
     res = res.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+  }
+
+  // Embed Google Fonts stylesheet into SVG when text elements are present
+  if (res.includes('<text') && !res.includes('fonts.googleapis.com')) {
+    const fontImport = `<defs><style>@import url('https://fonts.googleapis.com/css2?family=Bangers&amp;family=Bebas+Neue&amp;family=Cinzel:wght@600;800&amp;family=Fredoka:wght@600;700&amp;family=Inter:wght@600;800&amp;family=Montserrat:wght@600;800&amp;family=Orbitron:wght@600;800&amp;family=Outfit:wght@600;800&amp;family=Pacifico&amp;family=Permanent+Marker&amp;family=Playfair+Display:wght@700&amp;family=Righteous&amp;family=Russo+One&amp;family=Space+Grotesk:wght@600;700&amp;display=swap');</style></defs>`;
+    res = res.replace(/<svg\b([^>]*)>/i, `<svg$1>${fontImport}`);
   }
 
   // Apply individual multi-color replacements
@@ -623,6 +652,11 @@ function prepareSvgWithAdjustments(svgCode, adjustments = {}, targetWidth, targe
     res = res.replace(/stroke="((?!none|url)[^"]+)"/gi, `stroke="${adjustments.customColor}"`);
   }
 
+  // Embed Background Badge Shape directly into the SVG composite before 3D transformations
+  if (adjustments.bgShape && adjustments.bgShape !== 'none') {
+    res = embedBadgeShapeIntoSvg(res, adjustments, targetWidth, targetHeight);
+  }
+
   // 3D & 2D Vector Transform & Filter Embedding for Direct SVG Export
   if (forVectorSvgExport) {
     const rotX = adjustments.rotateX || 0;
@@ -673,18 +707,21 @@ function prepareSvgWithAdjustments(svgCode, adjustments = {}, targetWidth, targe
 
     const hasAnyTransform = rotX !== 0 || rotY !== 0 || rotZ !== 0 || skX !== 0 || skY !== 0 || flipH !== 1 || flipV !== 1;
     if (hasAnyTransform || svgFilterStr) {
-      const inner = res.replace(/<svg[^>]*>|<\/svg>/gi, '');
-      const svgOpenMatch = res.match(/<svg[^>]*>/i);
-      const svgOpen = svgOpenMatch ? svgOpenMatch[0] : '<svg>';
-      const transformCss = hasAnyTransform
-        ? `transform-box: fill-box; transform-origin: center; transform: perspective(${persp}px) rotateX(${rotX}deg) rotateY(${rotY}deg) rotate(${rotZ}deg) skew(${skX}deg, ${skY}deg) scale(${flipH}, ${flipV});`
-        : '';
-      const filterCss = svgFilterStr ? `filter: ${svgFilterStr};` : '';
-      res = `${svgOpen}
+      const firstClose = res.indexOf('>');
+      const lastOpen = res.lastIndexOf('</svg>');
+      if (firstClose !== -1 && lastOpen !== -1) {
+        const svgOpen = res.substring(0, firstClose + 1);
+        const inner = res.substring(firstClose + 1, lastOpen);
+        const transformCss = hasAnyTransform
+          ? `transform-box: fill-box; transform-origin: center; transform: perspective(${persp}px) rotateX(${rotX}deg) rotateY(${rotY}deg) rotate(${rotZ}deg) skew(${skX}deg, ${skY}deg) scale(${flipH}, ${flipV});`
+          : '';
+        const filterCss = svgFilterStr ? `filter: ${svgFilterStr};` : '';
+        res = `${svgOpen}
   <g style="${transformCss} ${filterCss}">
     ${inner}
   </g>
 </svg>`;
+      }
     }
   }
 
@@ -752,7 +789,9 @@ function render3DWithWebGL(imageSource, targetWidth, targetHeight, adjustments, 
         uniform mat4 u_matrix;
         varying vec2 v_texCoord;
         void main() {
-          gl_Position = u_matrix * vec4(a_position, 0.0, 1.0);
+          vec4 p = u_matrix * vec4(a_position, 0.0, 1.0);
+          float safeW = max(p.w, 0.001);
+          gl_Position = vec4(p.xy, 0.0, safeW);
           v_texCoord = a_texCoord;
         }
       `;
@@ -898,11 +937,11 @@ function render3DWithWebGL(imageSource, targetWidth, targetHeight, adjustments, 
     0, 0, 0, 1
   ]);
 
-  // Perspective & NDC projection (maps to [-1, 1] device coordinates)
+  // Perspective & NDC projection (maps to [-1, 1] device coordinates without clipping Z)
   const P = new Float32Array([
     2 / targetWidth, 0, 0, 0,
     0, -2 / targetHeight, 0, 0,
-    0, 0, 1 / persp, -1 / persp,
+    0, 0, 0, -1 / persp,
     0, 0, 0, 1
   ]);
 
@@ -913,10 +952,10 @@ function render3DWithWebGL(imageSource, targetWidth, targetHeight, adjustments, 
   mat4Multiply(m2, Rz, m1);
 
   const m3 = new Float32Array(16);
-  mat4Multiply(m3, Rx, m2);
+  mat4Multiply(m3, Ry, m2);
 
   const m4 = new Float32Array(16);
-  mat4Multiply(m4, Ry, m3);
+  mat4Multiply(m4, Rx, m3);
 
   const M = new Float32Array(16);
   mat4Multiply(M, P, m4);
@@ -1188,20 +1227,37 @@ async function exportAnimatedGif({
 
   const gifFilterRules = gifFilterRulesArr.filter(Boolean).join(' ');
 
+  // Intermediate texture canvas holding the complete rasterized graphic with filters (glow, extrusion wall shadow)
+  const is3DActive = (adjustments.rotateX || 0) !== 0 || (adjustments.rotateY || 0) !== 0 || (adjustments.skewX || 0) !== 0 || (adjustments.skewY || 0) !== 0;
+  const paddingRatio = is3DActive ? (adjustments.extrusionDepth > 0 ? 0.72 : 0.76) : 0.90;
+  const drawW = gifW * paddingRatio;
+  const drawH = gifH * paddingRatio;
+  const glowPad = Math.round(Math.max(drawW, drawH) * 0.18);
+  const rawTexW = Math.round(drawW + glowPad * 2);
+  const rawTexH = Math.round(drawH + glowPad * 2);
+
+  const gifOffCanvas = document.createElement('canvas');
+  gifOffCanvas.width = rawTexW;
+  gifOffCanvas.height = rawTexH;
+  const gifOffCtx = gifOffCanvas.getContext('2d');
+  if (gifOffCtx) {
+    gifOffCtx.imageSmoothingEnabled = true;
+    gifOffCtx.imageSmoothingQuality = 'high';
+    gifOffCtx.filter = gifFilterRules || 'none';
+    gifOffCtx.drawImage(img, glowPad, glowPad, drawW, drawH);
+  }
+
   // Helper to render a specific animation frame state (t: 0..1)
   function renderFrameAtProgress(t) {
     fCtx.clearRect(0, 0, gifW, gifH);
 
     // 1. Background
-    if (!isTransparent && adjustments.bgShape === 'none') {
+    if (!isTransparent) {
       fCtx.fillStyle = '#FFFFFF';
       fCtx.fillRect(0, 0, gifW, gifH);
     }
-    if (adjustments.bgShape && adjustments.bgShape !== 'none') {
-      drawCanvasBgShape(fCtx, gifW, gifH, adjustments);
-    }
 
-    // 2. Compute motion state for this frame across all 14 presets
+    // 2. Compute motion state for this frame across all presets
     let frameAdj = { ...adjustments };
     let offsetY = 0;
     let offsetX = 0;
@@ -1239,13 +1295,9 @@ async function exportAnimatedGif({
         scalePulseX = 1 + hb;
         scalePulseY = 1 + hb;
       } else if (animPreset === 'spin360') {
-        const spinAngle = t * 2 * Math.PI;
-        scalePulseX = Math.cos(spinAngle);
-        offsetY = -Math.sin(spinAngle) * (animHeight * 0.2) * (gifH / 384);
+        offsetY = -Math.sin(t * 2 * Math.PI) * (animHeight * 0.2) * (gifH / 384);
       } else if (animPreset === 'flip3d') {
-        const flipAngle = t * 2 * Math.PI;
-        scalePulseY = Math.cos(flipAngle);
-        offsetY = -Math.sin(flipAngle) * (animHeight * 0.2) * (gifH / 384);
+        offsetY = -Math.sin(t * 2 * Math.PI) * (animHeight * 0.2) * (gifH / 384);
       } else if (animPreset === 'wobble') {
         const sinVal = Math.sin(t * 2 * Math.PI);
         const cosVal = Math.cos(t * 2 * Math.PI);
@@ -1273,14 +1325,12 @@ async function exportAnimatedGif({
         const cosVal = Math.cos(t * 2 * Math.PI);
         offsetX = cosVal * (animHeight * 1.0) * (gifW / 384);
         offsetY = -sinVal * (animHeight * 1.0) * (gifH / 384);
-        rotZ = (frameAdj.rotation || 0) + sinVal * (ampScale * 5);
+        curRotZ = (frameAdj.rotation || 0) + sinVal * (ampScale * 5);
       } else if (animPreset === 'hover3d') {
         const sinVal = Math.sin(t * 2 * Math.PI);
         const cosVal = Math.cos(t * 2 * Math.PI);
         offsetY = -sinVal * (animHeight * 0.8) * (gifH / 384);
         rotZ = (frameAdj.rotation || 0) - sinVal * (ampScale * 4);
-        scalePulseX = 1 + cosVal * (ampScale * 0.08);
-        scalePulseY = 1 - cosVal * (ampScale * 0.05);
       } else if (animPreset === 'jiggle') {
         const sinVal = Math.sin(t * 6 * Math.PI);
         rotZ = (frameAdj.rotation || 0) + sinVal * (ampScale * 8);
@@ -1297,72 +1347,84 @@ async function exportAnimatedGif({
       }
     }
 
-    // Apply manual 3D perspective tilts if user adjusted rotateX or rotateY
-    if (frameAdj.rotateX) {
-      scalePulseY *= Math.cos((frameAdj.rotateX * Math.PI) / 180);
-    }
-    if (frameAdj.rotateY) {
-      scalePulseX *= Math.cos((frameAdj.rotateY * Math.PI) / 180);
+    // 3. Current 3D Orientation
+    let curRotX = adjustments.rotateX || 0;
+    let curRotY = adjustments.rotateY || 0;
+    let curRotZ = rotZ;
+    let totalSkewX = skewX + (adjustments.skewX || 0);
+    let totalSkewY = adjustments.skewY || 0;
+
+    if (animPreset === 'spin360') {
+      curRotY += t * 360;
+    } else if (animPreset === 'flip3d') {
+      curRotX += t * 360;
+    } else if (animPreset === 'hover3d') {
+      curRotX += Math.sin(t * 2 * Math.PI) * 12;
+      curRotY += Math.cos(t * 2 * Math.PI) * 12;
     }
 
-    // 3. Render icon for this frame with padding & transformations
-    let paddingRatio = frameAdj.shadowBlur > 0 ? 0.82 : 0.9;
-    if (frameAdj.bgShape && frameAdj.bgShape !== 'none') {
-      const shapePad = Number(frameAdj.bgShapePadding || 20) / 100;
-      paddingRatio = Math.max(0.2, (1 - shapePad * 1.5));
-    }
+    const hasFrame3D = curRotX !== 0 || curRotY !== 0 || totalSkewX !== 0 || totalSkewY !== 0;
 
-    const drawW = gifW * paddingRatio;
-    const drawH = gifH * paddingRatio;
+    if (hasFrame3D) {
+      const frameAdj3D = {
+        ...adjustments,
+        rotateX: curRotX,
+        rotateY: curRotY,
+        rotation: curRotZ,
+        skewX: totalSkewX,
+        skewY: totalSkewY,
+        flipH: adjustments.flipH,
+        flipV: adjustments.flipV
+      };
 
-    // Optional 3D depth shadow (for solid background or badge container)
-    if ((frameAdj.depth3D || 0) > 0 && (!isTransparent || adjustments.bgShape !== 'none')) {
-      const depth = (frameAdj.depth3D || 0) * (gifW / 384);
-      const radX = ((frameAdj.rotateX || 0) * Math.PI) / 180;
-      const radY = ((frameAdj.rotateY || 0) * Math.PI) / 180;
-      const shadowOffX = -Math.sin(radY) * depth * 1.5 + offsetX;
-      const shadowOffY = Math.sin(radX) * depth * 1.5 + (depth * 0.8) + offsetY;
-      const sColor = frameAdj.depth3DColor || 'rgba(0,0,0,0.55)';
+      const webglCanvas = render3DWithWebGL(gifOffCtx ? gifOffCanvas : img, gifW, gifH, frameAdj3D, rawTexW, rawTexH);
+      if (webglCanvas) {
+        if ((frameAdj.depth3D || 0) > 0) {
+          const depth = (frameAdj.depth3D || 0) * (gifW / 384);
+          const radX = (curRotX * Math.PI) / 180;
+          const radY = (curRotY * Math.PI) / 180;
+          const shadowOffX = -Math.sin(radY) * depth * 1.5 + offsetX;
+          const shadowOffY = Math.sin(radX) * depth * 1.5 + (depth * 0.8) + offsetY;
+          const sColor = frameAdj.depth3DColor || 'rgba(0,0,0,0.55)';
+
+          fCtx.save();
+          fCtx.filter = `blur(${Math.max(2, Math.round(depth * 0.4))}px) drop-shadow(0 0 ${Math.round(depth * 0.3)}px ${sColor})`;
+          fCtx.globalAlpha = 0.55;
+          fCtx.drawImage(webglCanvas, shadowOffX, shadowOffY, gifW, gifH);
+          fCtx.restore();
+        }
+
+        fCtx.save();
+        if (offsetX !== 0 || offsetY !== 0 || scalePulseX !== 1 || scalePulseY !== 1) {
+          fCtx.translate(gifW / 2 + offsetX, gifH / 2 + offsetY);
+          fCtx.scale(scalePulseX, scalePulseY);
+          fCtx.translate(-gifW / 2, -gifH / 2);
+        }
+        fCtx.drawImage(webglCanvas, 0, 0, gifW, gifH);
+        fCtx.restore();
+      }
+    } else {
+      // 2D frame drawing
+      if ((frameAdj.depth3D || 0) > 0) {
+        const depth = (frameAdj.depth3D || 0) * (gifW / 384);
+        const sColor = frameAdj.depth3DColor || 'rgba(0,0,0,0.55)';
+        fCtx.save();
+        fCtx.filter = `blur(${Math.max(2, Math.round(depth * 0.4))}px) drop-shadow(0 0 ${Math.round(depth * 0.3)}px ${sColor})`;
+        fCtx.globalAlpha = 0.55;
+        fCtx.translate(gifW / 2 + offsetX, gifH / 2 + offsetY + depth * 0.8);
+        if (curRotZ !== 0) fCtx.rotate((curRotZ * Math.PI) / 180);
+        fCtx.scale(scalePulseX * (frameAdj.flipH ? -1 : 1), scalePulseY * (frameAdj.flipV ? -1 : 1));
+        fCtx.drawImage(gifOffCtx ? gifOffCanvas : img, -rawTexW / 2, -rawTexH / 2, rawTexW, rawTexH);
+        fCtx.restore();
+      }
 
       fCtx.save();
-      fCtx.filter = `blur(${Math.max(2, Math.round(depth * 0.4))}px) drop-shadow(0 0 ${Math.round(depth * 0.3)}px ${sColor})`;
-      fCtx.globalAlpha = 0.55;
-      if (animPreset === 'swing') {
-        fCtx.translate(gifW / 2 + shadowOffX, gifH / 2 - drawH / 2 + shadowOffY);
-        if (rotZ !== 0) fCtx.rotate((rotZ * Math.PI) / 180);
-        fCtx.translate(0, drawH / 2);
-      } else {
-        fCtx.translate(gifW / 2 + shadowOffX, gifH / 2 + shadowOffY);
-        if (rotZ !== 0) fCtx.rotate((rotZ * Math.PI) / 180);
-      }
+      fCtx.translate(gifW / 2 + offsetX, gifH / 2 + offsetY);
+      if (curRotZ !== 0) fCtx.rotate((curRotZ * Math.PI) / 180);
       fCtx.scale(scalePulseX * (frameAdj.flipH ? -1 : 1), scalePulseY * (frameAdj.flipV ? -1 : 1));
-      fCtx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+      fCtx.drawImage(gifOffCtx ? gifOffCanvas : img, -rawTexW / 2, -rawTexH / 2, rawTexW, rawTexH);
       fCtx.restore();
     }
-
-    // Render active frame
-    fCtx.save();
-    fCtx.filter = gifFilterRules || 'none';
-
-    if (animPreset === 'swing') {
-      // Swing anchored at top-center
-      fCtx.translate(gifW / 2 + offsetX, gifH / 2 - drawH / 2 + offsetY);
-      if (rotZ !== 0) fCtx.rotate((rotZ * Math.PI) / 180);
-      fCtx.translate(0, drawH / 2);
-    } else {
-      fCtx.translate(gifW / 2 + offsetX, gifH / 2 + offsetY);
-      if (rotZ !== 0) fCtx.rotate((rotZ * Math.PI) / 180);
-    }
-
-    if (skewX !== 0 || (frameAdj.skewX || 0) !== 0 || (frameAdj.skewY || 0) !== 0) {
-      const totalSkX = (((skewX || 0) + (frameAdj.skewX || 0)) * Math.PI) / 180;
-      const totalSkY = ((frameAdj.skewY || 0) * Math.PI) / 180;
-      fCtx.transform(1, Math.tan(totalSkY), Math.tan(totalSkX), 1, 0, 0);
-    }
-
-    fCtx.scale(scalePulseX * (frameAdj.flipH ? -1 : 1), scalePulseY * (frameAdj.flipV ? -1 : 1));
-    fCtx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
-    fCtx.restore();
   }
 
   // 1. Pre-pass Palette Sampling:

@@ -15,7 +15,7 @@ export function tagSvgElements(svgEl) {
     if (['defs', 'clippath', 'mask', 'filter', 'metadata', 'style', 'title', 'desc'].includes(tag)) {
       return;
     }
-    if (visualTagNames.includes(tag)) {
+    if (visualTagNames.includes(tag) || el.hasAttribute('data-layer-id')) {
       if (!el.getAttribute('data-layer-id')) {
         el.setAttribute('data-layer-id', `layer_${layerIndex}`);
       }
@@ -23,9 +23,10 @@ export function tagSvgElements(svgEl) {
         el.setAttribute('data-orig-transform', el.getAttribute('transform') || '');
       }
       layerIndex++;
+      return;
     } else if (tag === 'g') {
       const children = Array.from(el.children);
-      const hasVisualChildren = children.some(c => visualTagNames.includes(c.tagName.toLowerCase()) || c.tagName.toLowerCase() === 'g');
+      const hasVisualChildren = children.some(c => visualTagNames.includes(c.tagName.toLowerCase()) || c.tagName.toLowerCase() === 'g' || c.hasAttribute('data-layer-id'));
       if (hasVisualChildren) {
         children.forEach(c => processElement(c));
       }
@@ -60,7 +61,7 @@ export function extractSvgLayers(svgCode) {
         return;
       }
 
-      if (visualTagNames.includes(tag)) {
+      if (visualTagNames.includes(tag) || el.hasAttribute('data-layer-id')) {
         let layerId = el.getAttribute('data-layer-id');
         if (!layerId) {
           layerId = `layer_${layerIndex}`;
@@ -72,6 +73,12 @@ export function extractSvgLayers(svgCode) {
 
         // Determine primary color
         let rawColor = el.getAttribute('fill') || el.getAttribute('stroke') || el.style.fill || el.style.stroke;
+        if (!rawColor && tag === 'g') {
+          const firstChild = el.querySelector('[fill], [stroke]');
+          if (firstChild) {
+            rawColor = firstChild.getAttribute('fill') || firstChild.getAttribute('stroke') || firstChild.style.fill || firstChild.style.stroke;
+          }
+        }
         let color = normalizeColor(rawColor) || '#38bdf8';
 
         // Descriptive layer name
@@ -88,9 +95,10 @@ export function extractSvgLayers(svgCode) {
         });
 
         layerIndex++;
+        return;
       } else if (tag === 'g') {
         const children = Array.from(el.children);
-        const hasVisualChildren = children.some(c => visualTagNames.includes(c.tagName.toLowerCase()) || c.tagName.toLowerCase() === 'g');
+        const hasVisualChildren = children.some(c => visualTagNames.includes(c.tagName.toLowerCase()) || c.tagName.toLowerCase() === 'g' || c.hasAttribute('data-layer-id'));
         if (hasVisualChildren) {
           children.forEach(c => processElement(c));
         }
@@ -305,6 +313,9 @@ export function applyLayerTransforms(
         const numOnly = cleanId.replace(/\D/g, '');
         const el = svgEl.querySelector(`[data-layer-id="${rawId}"]`) ||
                    svgEl.querySelector(`[data-layer-id="${cleanId}"]`) ||
+                   svgEl.querySelector(`[data-layer-id="pf_studio_${cleanId}"]`) ||
+                   svgEl.querySelector(`[id="${rawId}"]`) ||
+                   svgEl.querySelector(`[id="${cleanId}"]`) ||
                    (numOnly ? svgEl.querySelector(`[data-layer-id="layer_${numOnly}"]`) : null);
         if (!el) return;
 
@@ -332,10 +343,10 @@ export function applyLayerTransforms(
 
         // Custom Filters & Effects (Glow, Blur, Brightness, 3D Extrusion)
         const filters = [];
-        if (style.glow && style.glow.enabled) {
+        if (style.glow && style.glow.enabled && Number(style.glow.radius) > 0) {
           const glowColor = style.glow.color || '#38bdf8';
-          const glowRadius = style.glow.radius || 12;
-          filters.push(`drop-shadow(0 0 ${glowRadius}px ${glowColor})`);
+          const glowRadius = Number(style.glow.radius);
+          filters.push(`drop-shadow(0 0 ${glowRadius}px ${glowColor}) drop-shadow(0 0 ${Math.max(1, Math.round(glowRadius * 0.4))}px ${glowColor})`);
         }
         if (style.blur && Number(style.blur) > 0) {
           filters.push(`blur(${style.blur}px)`);
