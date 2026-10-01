@@ -3,6 +3,69 @@ import { transformSvgStyle } from './styleTransformer';
 import { applyLayerTransforms, extractSvgLayers } from './layerUtils';
 import { GIFEncoder, quantize, applyPalette } from 'gifenc';
 
+/**
+ * Converts a 2D canvas to a Uint8Array containing pure PNG binary data
+ */
+export function canvasToPngBytes(canvas) {
+  const dataUrl = canvas.toDataURL('image/png');
+  const base64 = dataUrl.split(',')[1];
+  const binaryString = atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+}
+
+/**
+ * Packs multiple PNG images into a standard Microsoft Windows .ICO file blob
+ * Fully valid in all modern browsers, Windows Explorer, and design software
+ * @param {Array<{ width: number, height: number, data: Uint8Array }>} images
+ * @returns {Blob}
+ */
+export function createIcoBlob(images) {
+  const count = images.length;
+  const headerSize = 6 + 16 * count;
+  let totalSize = headerSize;
+  for (const img of images) {
+    totalSize += img.data.byteLength;
+  }
+
+  const buffer = new ArrayBuffer(totalSize);
+  const view = new DataView(buffer);
+
+  // 1. ICONDIR Header (6 bytes)
+  view.setUint16(0, 0, true); // Reserved (must be 0)
+  view.setUint16(2, 1, true); // Type 1 = Icon (.ico)
+  view.setUint16(4, count, true); // Number of images
+
+  // 2. ICONDIRENTRY list (16 bytes each)
+  let currentOffset = headerSize;
+  let entryOffset = 6;
+
+  for (const img of images) {
+    const w = img.width >= 256 ? 0 : img.width;
+    const h = img.height >= 256 ? 0 : img.height;
+    view.setUint8(entryOffset + 0, w); // Width
+    view.setUint8(entryOffset + 1, h); // Height
+    view.setUint8(entryOffset + 2, 0); // Color palette count (0 = no palette / 32bpp)
+    view.setUint8(entryOffset + 3, 0); // Reserved
+    view.setUint16(entryOffset + 4, 1, true); // Color planes (1)
+    view.setUint16(entryOffset + 6, 32, true); // Bits per pixel (32-bit RGBA)
+    view.setUint32(entryOffset + 8, img.data.byteLength, true); // Size of image data
+    view.setUint32(entryOffset + 12, currentOffset, true); // File offset of image data
+
+    // Copy PNG data into the buffer
+    new Uint8Array(buffer, currentOffset, img.data.byteLength).set(img.data);
+
+    currentOffset += img.data.byteLength;
+    entryOffset += 16;
+  }
+
+  return new Blob([buffer], { type: 'image/x-icon' });
+}
+
 export async function downloadAsset({
   svgCode,
   filename,
@@ -67,9 +130,13 @@ export async function downloadAsset({
     (window.innerWidth < 768 && 'ontouchstart' in window)
   );
   const maxSafeDim = isMobile ? 4096 : 8192;
-  const targetWidth = Math.min(width || size, maxSafeDim);
-  const targetHeight = Math.min(height || size, maxSafeDim);
-  const baseFilename = autoTagDimensions ? `${safeFilename}-${targetWidth}x${targetHeight}` : safeFilename;
+  const isIco = format === 'ico';
+  const requestedSize = Math.min(width || size, maxSafeDim);
+  // For ICO, always render the master SVG raster canvas at a high-res 1024x1024
+  // so downscaled icon mipmaps (512, 256, 128, 64, 48, 32, 16) have crystal-clear vector fidelity!
+  const targetWidth = isIco ? 1024 : requestedSize;
+  const targetHeight = isIco ? 1024 : Math.min(height || size, maxSafeDim);
+  const baseFilename = autoTagDimensions ? `${safeFilename}-${requestedSize}x${requestedSize}` : safeFilename;
 
   // DIRECT PURE VECTOR SVG EXPORT
   if (format === 'svg') {
@@ -253,7 +320,9 @@ export async function downloadAsset({
         (adjustments.extrusionDepth && adjustments.extrusionDepth > 0) ||
         (adjustments.layerStyles && Object.values(adjustments.layerStyles).some(s => (s?.glow?.enabled && (s.glow.radius || 12) > 0) || (s?.blur && Number(s.blur) > 0)))
       );
-      if (hasAnyBlurOrGlow) {
+      if (format === 'ico') {
+        paddingRatio = has3D ? 0.85 : 0.98; // Desktop icons fill 98% of the canvas edge-to-edge!
+      } else if (hasAnyBlurOrGlow) {
         paddingRatio = 0.92;
       }
       if (has3D) {
@@ -346,6 +415,78 @@ export async function downloadAsset({
           ctx.transform(1, Math.tan((skY * Math.PI) / 180), Math.tan((skX * Math.PI) / 180), 1, 0, 0);
           ctx.drawImage(img, -drawWidth / 2, -drawHeight / 2, drawWidth, drawHeight);
           ctx.restore();
+        }
+      }
+
+      // ICO Multi-Resolution Windows / Favicon Package Branch
+      if (format === 'ico') {
+        if (shouldCancel && shouldCancel()) {
+          URL.revokeObjectURL(blobUrl);
+          reject(new Error('EXPORT_CANCELLED'));
+          return;
+        }
+
+        if (onProgress) onProgress({ percent: 88, stage: 'Building High-Definition .ICO Package...', details: '512px, 256px, 128px, 64px, 48px, 32px, 16px' });
+        await new Promise(r => setTimeout(r, 0));
+
+        try {
+          // Standard Windows & Web Favicon sizes in DESCENDING order (largest first!)
+          // Crucial: Image #0 must be the highest resolution (512px / 256px) so image viewers, Photos app, and browsers display Full HD!
+          const allIcoSizes = [512, 256, 128, 64, 48, 32, 16];
+          const targetSz = Math.min(512, Math.max(16, requestedSize || 256));
+          const icoSizes = allIcoSizes.filter(s => s <= targetSz);
+          if (icoSizes.length === 0) icoSizes.push(targetSz);
+
+          // Step-down downsampling canvas map for ultra-crisp mipmapping (prevents bilinear skip blur)
+          const sizeCanvases = {};
+          let prevCanvas = canvas; // Master canvas is 1024x1024
+
+          for (const s of allIcoSizes) {
+            const sc = document.createElement('canvas');
+            sc.width = s;
+            sc.height = s;
+            const sCtx = sc.getContext('2d');
+            sCtx.imageSmoothingEnabled = true;
+            sCtx.imageSmoothingQuality = 'high';
+            // Downsample in smooth 2x steps (or from 128 for 48px)
+            const src = (s === 48) ? (sizeCanvases[128] || canvas) : prevCanvas;
+            sCtx.drawImage(src, 0, 0, s, s);
+            sizeCanvases[s] = sc;
+            if (s !== 48) {
+              prevCanvas = sc;
+            }
+          }
+
+          const images = [];
+          for (const sz of icoSizes) {
+            const sc = sizeCanvases[sz];
+            if (sc) {
+              const pngBytes = canvasToPngBytes(sc);
+              images.push({ width: sz, height: sz, data: pngBytes });
+            }
+          }
+
+          if (images.length === 0) {
+            const pngBytes = canvasToPngBytes(canvas);
+            images.push({ width: targetSz, height: targetSz, data: pngBytes });
+          }
+
+          const icoBlob = createIcoBlob(images);
+          URL.revokeObjectURL(blobUrl);
+
+          const icoFilename = autoTagDimensions
+            ? (targetSz >= 256 ? `${safeFilename}-favicon.ico` : `${safeFilename}-${targetSz}x${targetSz}.ico`)
+            : `${safeFilename}.ico`;
+
+          if (onProgress) onProgress({ percent: 96, stage: 'Saving High-Res .ICO File...', details: icoFilename });
+          await triggerDownload(icoBlob, icoFilename);
+          if (onProgress) onProgress({ percent: 100, stage: 'Export Complete!', details: 'High-Res .ICO icon saved successfully' });
+          resolve(true);
+          return;
+        } catch (err) {
+          URL.revokeObjectURL(blobUrl);
+          reject(err);
+          return;
         }
       }
 

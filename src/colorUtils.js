@@ -206,6 +206,7 @@ export function getLinkedGradientColors(svgCode, targetColor) {
 
 /**
  * Extracts all unique colors present in the SVG (from fill, stroke, stop-color, inline styles, etc.)
+ * Strictly inspects visible elements and referenced gradients/patterns to avoid extracting unused colors.
  * Returns an array of objects: [{ color: '#3b82f6', count: 2 }, ...]
  */
 export function extractSvgColors(svgCode) {
@@ -214,6 +215,7 @@ export function extractSvgColors(svgCode) {
   const colorCounts = new Map();
 
   const addColor = (rawVal) => {
+    if (!rawVal) return;
     const normalized = normalizeColor(rawVal);
     if (normalized) {
       colorCounts.set(normalized, (colorCounts.get(normalized) || 0) + 1);
@@ -224,42 +226,165 @@ export function extractSvgColors(svgCode) {
     if (typeof window !== 'undefined' && window.DOMParser) {
       const parser = new DOMParser();
       const doc = parser.parseFromString(svgCode, 'image/svg+xml');
-      const allNodes = doc.querySelectorAll('*');
+      const svgEl = doc.querySelector('svg');
+      if (!svgEl) return [];
 
-      allNodes.forEach((node) => {
-        // Direct Attributes
-        ['fill', 'stroke', 'stop-color', 'flood-color', 'lighting-color', 'color'].forEach((attr) => {
-          const val = node.getAttribute(attr);
-          if (val) addColor(val);
-        });
+      // 1. Parse <style> tags to map CSS class selectors -> color properties & extract embedded colors
+      const cssRulesMap = new Map();
+      const styleTags = doc.querySelectorAll('style');
+      styleTags.forEach(styleTag => {
+        const cssText = styleTag.textContent || '';
 
-        // Inline Style Attributes
-        const style = node.getAttribute('style');
-        if (style) {
-          const fillMatch = style.match(/fill\s*:\s*([^;]+)/i);
-          if (fillMatch) addColor(fillMatch[1]);
+        // Extract direct colors from CSS (hex, rgb/rgba, hsl/hsla)
+        const hexes = cssText.match(/#[0-9a-fA-F]{3,8}\b/g) || [];
+        hexes.forEach(h => addColor(h));
+        const rgbs = cssText.match(/rgba?\(\s*\d+\s*,\s*\d+\s*,\s*\d+(?:\s*,\s*[\d.]+%?)?\s*\)/gi) || [];
+        rgbs.forEach(r => addColor(r));
+        const hsls = cssText.match(/hsla?\([^)]+\)/gi) || [];
+        hsls.forEach(h => addColor(h));
 
-          const strokeMatch = style.match(/stroke\s*:\s*([^;]+)/i);
-          if (strokeMatch) addColor(strokeMatch[1]);
-
-          const stopColorMatch = style.match(/stop-color\s*:\s*([^;]+)/i);
-          if (stopColorMatch) addColor(stopColorMatch[1]);
-
-          const colorMatch = style.match(/(?:^|;)\s*color\s*:\s*([^;]+)/i);
-          if (colorMatch) addColor(colorMatch[1]);
+        const ruleRegex = /([^{]+)\{([^}]+)\}/g;
+        let match;
+        while ((match = ruleRegex.exec(cssText)) !== null) {
+          const selector = match[1].trim();
+          const body = match[2].trim();
+          const fillM = body.match(/fill\s*:\s*([^;]+)/i);
+          const strokeM = body.match(/stroke\s*:\s*([^;]+)/i);
+          const colorM = body.match(/(?:^|;)\s*color\s*:\s*([^;]+)/i);
+          const stopM = body.match(/stop-color\s*:\s*([^;]+)/i);
+          cssRulesMap.set(selector, {
+            fill: fillM ? fillM[1].trim() : null,
+            stroke: strokeM ? strokeM[1].trim() : null,
+            color: colorM ? colorM[1].trim() : null,
+            stopColor: stopM ? stopM[1].trim() : null,
+          });
         }
       });
+
+      // 2. Collect referenced URL IDs (e.g. gradients, patterns)
+      const referencedUrlIds = new Set();
+      const checkUrlRef = (val) => {
+        if (!val || typeof val !== 'string') return;
+        const m = val.match(/url\(["']?#([^"'\)]+)["']?\)/i);
+        if (m) referencedUrlIds.add(m[1]);
+      };
+
+      // 3. Find only VISIBLE rendering nodes (ignore non-rendering defs, masks, clipPaths, metadata)
+      const visualElements = svgEl.querySelectorAll('path, rect, circle, ellipse, polygon, polyline, line, text, g');
+
+      visualElements.forEach(node => {
+        // Skip elements nested inside non-rendering containers
+        if (node.closest('defs, clipPath, mask, filter, metadata, style, title, desc')) {
+          return;
+        }
+        const display = node.getAttribute('display') || node.style?.display;
+        const visibility = node.getAttribute('visibility') || node.style?.visibility;
+        if (display === 'none' || visibility === 'hidden') {
+          return;
+        }
+
+        // Direct attributes
+        const fill = node.getAttribute('fill');
+        const stroke = node.getAttribute('stroke');
+        const color = node.getAttribute('color');
+
+        if (fill) {
+          checkUrlRef(fill);
+          addColor(fill);
+        }
+        if (stroke) {
+          checkUrlRef(stroke);
+          addColor(stroke);
+        }
+        if (color) addColor(color);
+
+        // Inline styles
+        const style = node.getAttribute('style');
+        if (style) {
+          const fillM = style.match(/fill\s*:\s*([^;]+)/i);
+          if (fillM) {
+            checkUrlRef(fillM[1]);
+            addColor(fillM[1]);
+          }
+          const strokeM = style.match(/stroke\s*:\s*([^;]+)/i);
+          if (strokeM) {
+            checkUrlRef(strokeM[1]);
+            addColor(strokeM[1]);
+          }
+          const colorM = style.match(/(?:^|;)\s*color\s*:\s*([^;]+)/i);
+          if (colorM) addColor(colorM[1]);
+        }
+
+        // CSS Classes applied to this node
+        const classAttr = node.getAttribute('class');
+        if (classAttr) {
+          const classes = classAttr.split(/\s+/);
+          classes.forEach(cls => {
+            const rule = cssRulesMap.get(`.${cls}`) || cssRulesMap.get(cls);
+            if (rule) {
+              if (rule.fill) {
+                checkUrlRef(rule.fill);
+                addColor(rule.fill);
+              }
+              if (rule.stroke) {
+                checkUrlRef(rule.stroke);
+                addColor(rule.stroke);
+              }
+              if (rule.color) addColor(rule.color);
+            }
+          });
+        }
+      });
+
+      // 4. Extract stop-colors ONLY from referenced linearGradient/radialGradient elements
+      referencedUrlIds.forEach(id => {
+        const gradEl = doc.getElementById(id);
+        if (gradEl && (gradEl.tagName.toLowerCase().includes('gradient') || gradEl.tagName.toLowerCase() === 'pattern')) {
+          const stops = gradEl.querySelectorAll('stop');
+          stops.forEach(stop => {
+            const stopColor = stop.getAttribute('stop-color') || stop.style?.stopColor;
+            if (stopColor) addColor(stopColor);
+
+            // Inline style on stop
+            const stopStyle = stop.getAttribute('style');
+            if (stopStyle) {
+              const stopColorM = stopStyle.match(/stop-color\s*:\s*([^;]+)/i);
+              if (stopColorM) addColor(stopColorM[1]);
+            }
+          });
+        }
+      });
+
+      // If we found colors using DOMParser, return them
+      if (colorCounts.size > 0) {
+        return Array.from(colorCounts.entries())
+          .map(([color, count]) => ({ color, count }))
+          .sort((a, b) => b.count - a.count);
+      }
     }
   } catch (err) {
-    console.warn('DOMParser failed to extract colors, using regex fallback:', err);
+    console.warn('DOMParser failed to extract colors, using fallback:', err);
   }
 
-  // Regex fallback / supplement for hex & rgb colors inside SVG markup
-  const hexMatches = svgCode.match(/#([0-9a-fA-F]{3,8})\b/g) || [];
-  hexMatches.forEach(hex => addColor(hex));
+  // Fallback ONLY if DOMParser couldn't find any (clean regex on direct fill/stroke/stop-color & CSS colors)
+  const attrRegex = /(?:fill|stroke|stop-color|color)=["']([^"']+)["']/gi;
+  let match;
+  while ((match = attrRegex.exec(svgCode)) !== null) {
+    addColor(match[1]);
+  }
 
-  const rgbMatches = svgCode.match(/rgba?\(\s*\d+\s*,\s*\d+\s*,\s*\d+(?:\s*,\s*[\d.]+\s*)?\)/gi) || [];
-  rgbMatches.forEach(rgb => addColor(rgb));
+  // Also extract colors from <style> blocks in fallback
+  const styleBlocks = svgCode.match(/<style[^>]*>([\s\S]*?)<\/style>/gi);
+  if (styleBlocks) {
+    styleBlocks.forEach(block => {
+      const hexes = block.match(/#[0-9a-fA-F]{3,8}\b/g) || [];
+      hexes.forEach(h => addColor(h));
+      const rgbs = block.match(/rgba?\(\s*\d+\s*,\s*\d+\s*,\s*\d+(?:\s*,\s*[\d.]+%?)?\s*\)/gi) || [];
+      rgbs.forEach(r => addColor(r));
+      const hsls = block.match(/hsla?\([^)]+\)/gi) || [];
+      hsls.forEach(h => addColor(h));
+    });
+  }
 
   // Convert to sorted array
   return Array.from(colorCounts.entries())
@@ -355,12 +480,25 @@ export function replaceSvgColors(svgCode, colorReplacements) {
         if (style) {
           let updatedStyle = style;
           for (const [orig, repl] of Object.entries(activeReplacements)) {
-            // Replace in style e.g. fill: #3b82f6 or fill:#3b82f6
-            const styleRegex = new RegExp(`(fill|stroke|stop-color|flood-color|color)\\s*:\\s*(${orig.replace('#', '#?')})`, 'gi');
-            updatedStyle = updatedStyle.replace(styleRegex, `$1: ${repl}`);
+            // Replace in style e.g. fill: #3b82f6 or fill:#3b82f6 or background: #3b82f6
+            const escapedOrig = orig.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const styleRegex = new RegExp(escapedOrig, 'gi');
+            updatedStyle = updatedStyle.replace(styleRegex, repl);
           }
           node.setAttribute('style', updatedStyle);
         }
+      });
+
+      // Also replace colors inside <style> tags (CSS rules)
+      const styleTags = doc.querySelectorAll('style');
+      styleTags.forEach(styleTag => {
+        let text = styleTag.textContent || '';
+        for (const [orig, repl] of Object.entries(activeReplacements)) {
+          const escapedOrig = orig.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const regex = new RegExp(escapedOrig, 'gi');
+          text = text.replace(regex, repl);
+        }
+        styleTag.textContent = text;
       });
 
       const serializer = new XMLSerializer();

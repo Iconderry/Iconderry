@@ -7,32 +7,125 @@ const visualTagNames = ['path', 'rect', 'circle', 'ellipse', 'polygon', 'polylin
 /**
  * Tags all visual shape elements in an SVG DOM element with data-layer-id.
  */
+function extractClassTransforms(svgEl) {
+  const map = {};
+  if (!svgEl) return map;
+  const styleTags = svgEl.querySelectorAll('style');
+  styleTags.forEach(st => {
+    const text = st.textContent || '';
+    const ruleRegex = /\.([a-zA-Z0-9_-]+)\s*\{([^}]*)\}/g;
+    let rm;
+    while ((rm = ruleRegex.exec(text)) !== null) {
+      const cls = rm[1];
+      const decls = rm[2];
+      const tm = decls.match(/transform\s*:\s*([^;]+);?/i);
+      if (tm && !tm[1].includes('var(')) {
+        map[cls] = tm[1].trim();
+      }
+    }
+  });
+  return map;
+}
+
+function extractClassColors(svgEl) {
+  const map = {};
+  if (!svgEl) return map;
+  const styleTags = svgEl.querySelectorAll('style');
+  styleTags.forEach(st => {
+    const text = st.textContent || '';
+    const ruleRegex = /\.([a-zA-Z0-9_-]+)\s*\{([^}]*)\}/g;
+    let rm;
+    while ((rm = ruleRegex.exec(text)) !== null) {
+      const cls = rm[1];
+      const decls = rm[2];
+      const colMatch = decls.match(/(?:background(?:-color)?|border(?:-top|-left|-right|-bottom)?(?:-color)?|color)\s*:\s*([^;]+);?/i);
+      if (colMatch) {
+        map[cls] = colMatch[1].trim();
+      }
+    }
+  });
+  return map;
+}
+
+export function isSystemWrapper(el) {
+  if (!el) return true;
+  if (el.hasAttribute('data-css-wrapper')) return true;
+  if (el.getAttribute('xmlns') === 'http://www.w3.org/1999/xhtml') return true;
+  if (el.classList?.contains('css_preview_root') || el.classList?.contains('css_preview_scaler') || el.classList?.contains('css_preview_outer')) return true;
+  if (el.parentElement?.tagName?.toLowerCase() === 'foreignobject') return true;
+  const scaler = el.closest('foreignObject')?.querySelector('.css_preview_scaler');
+  if (scaler && (el === scaler || !scaler.contains(el))) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Calculates cumulative CSS transform matrix of parent elements inside foreignObject
+ * Used to unproject screen deltas so dragged sub-elements move in 1:1 lockstep with the mouse and selection box
+ */
+export function getParentTransformMatrix(node) {
+  let matrix = new DOMMatrix();
+  if (!node || typeof window === 'undefined') return matrix;
+  let current = node.parentElement;
+  while (current && !current.classList?.contains('css_preview_scaler') && current.tagName?.toLowerCase() !== 'foreignobject' && current.tagName?.toLowerCase() !== 'svg') {
+    const style = window.getComputedStyle(current);
+    const tr = style.transform;
+    if (tr && tr !== 'none') {
+      try {
+        const m = new DOMMatrix(tr);
+        matrix = m.multiply(matrix);
+      } catch (_) {}
+    }
+    current = current.parentElement;
+  }
+  return matrix;
+}
+
+/**
+ * Tags all visual shape elements in an SVG DOM element with data-layer-id.
+ */
 export function tagSvgElements(svgEl) {
   if (!svgEl) return;
   let layerIndex = 0;
-  const processElement = (el) => {
-    const tag = el.tagName.toLowerCase();
-    if (['defs', 'clippath', 'mask', 'filter', 'metadata', 'style', 'title', 'desc'].includes(tag)) {
-      return;
+  const shapes = svgEl.querySelectorAll('path, rect, circle, ellipse, polygon, polyline, line, text');
+  shapes.forEach(el => {
+    if (el.closest('defs, clippath, mask, filter, metadata, style, title, desc')) return;
+    if (!el.getAttribute('data-layer-id')) {
+      el.setAttribute('data-layer-id', `layer_${layerIndex}`);
     }
-    if (visualTagNames.includes(tag) || el.hasAttribute('data-layer-id')) {
-      if (!el.getAttribute('data-layer-id')) {
-        el.setAttribute('data-layer-id', `layer_${layerIndex}`);
+    if (!el.hasAttribute('data-orig-transform')) {
+      el.setAttribute('data-orig-transform', el.getAttribute('transform') || '');
+    }
+    layerIndex++;
+  });
+
+  const classTransforms = extractClassTransforms(svgEl);
+
+  // Also tag visual HTML elements inside foreignObject
+  const htmlElements = svgEl.querySelectorAll('foreignObject div, foreignObject span, foreignObject section, foreignObject p, foreignObject button, foreignObject a');
+  htmlElements.forEach(el => {
+    if (isSystemWrapper(el)) return;
+    if (!el.getAttribute('data-layer-id')) {
+      el.setAttribute('data-layer-id', `layer_${layerIndex}`);
+    }
+    if (!el.hasAttribute('data-base-transform')) {
+      let baseTr = '';
+      if (el.className && typeof el.className === 'string') {
+        const classes = el.className.split(/\s+/);
+        for (const c of classes) {
+          if (classTransforms[c]) {
+            baseTr = classTransforms[c];
+            break;
+          }
+        }
       }
-      if (!el.hasAttribute('data-orig-transform')) {
-        el.setAttribute('data-orig-transform', el.getAttribute('transform') || '');
-      }
-      layerIndex++;
-      return;
-    } else if (tag === 'g') {
-      const children = Array.from(el.children);
-      const hasVisualChildren = children.some(c => visualTagNames.includes(c.tagName.toLowerCase()) || c.tagName.toLowerCase() === 'g' || c.hasAttribute('data-layer-id'));
-      if (hasVisualChildren) {
-        children.forEach(c => processElement(c));
+      if (baseTr) {
+        el.setAttribute('data-base-transform', baseTr);
       }
     }
-  };
-  Array.from(svgEl.children).forEach(child => processElement(child));
+    layerIndex++;
+  });
 }
 
 /**
@@ -49,41 +142,110 @@ export function extractSvgLayers(svgCode) {
 
     const parser = new DOMParser();
     const doc = parser.parseFromString(svgCode, 'image/svg+xml');
+    const parserError = doc.querySelector('parsererror');
+    if (parserError) {
+      console.warn('SVG parse error in extractSvgLayers:', parserError.textContent);
+      return { layers: [], taggedSvg: svgCode };
+    }
     const svgEl = doc.querySelector('svg');
     if (!svgEl) return { layers: [], taggedSvg: svgCode };
 
     const layers = [];
     let layerIndex = 0;
 
-    const processElement = (el) => {
+    const shapes = svgEl.querySelectorAll('path, rect, circle, ellipse, polygon, polyline, line, text');
+    shapes.forEach(el => {
+      if (el.closest('defs, clippath, mask, filter, metadata, style, title, desc')) return;
       const tag = el.tagName.toLowerCase();
-      if (['defs', 'clippath', 'mask', 'filter', 'metadata', 'style', 'title', 'desc'].includes(tag)) {
-        return;
+      let layerId = el.getAttribute('data-layer-id');
+      if (!layerId) {
+        layerId = `layer_${layerIndex}`;
+        el.setAttribute('data-layer-id', layerId);
+      }
+      if (!el.hasAttribute('data-orig-transform')) {
+        el.setAttribute('data-orig-transform', el.getAttribute('transform') || '');
       }
 
-      if (visualTagNames.includes(tag) || el.hasAttribute('data-layer-id')) {
+      // Determine primary color
+      let rawColor = el.getAttribute('fill') || el.getAttribute('stroke') || el.style.fill || el.style.stroke;
+      let color = normalizeColor(rawColor) || '#38bdf8';
+
+      // Descriptive layer name
+      let name = el.getAttribute('data-layer-name') ||
+                 (el.getAttribute('id') ? el.getAttribute('id').replace(/[-_]/g, ' ') : `${tag.charAt(0).toUpperCase() + tag.slice(1)} ${layerIndex + 1}`);
+
+      layers.push({
+        id: layerId,
+        index: layerIndex,
+        tag,
+        name,
+        color,
+        rawColor: rawColor || color
+      });
+
+      layerIndex++;
+    });
+
+    const classTransforms = extractClassTransforms(svgEl);
+    const classColors = extractClassColors(svgEl);
+
+    // Also extract HTML elements inside foreignObject
+    const foreignObject = svgEl.querySelector('foreignObject');
+    if (foreignObject) {
+      const htmlElements = foreignObject.querySelectorAll('div, span, section, p, button, a');
+      htmlElements.forEach(el => {
+        if (isSystemWrapper(el)) return;
+        const tag = el.tagName.toLowerCase();
         let layerId = el.getAttribute('data-layer-id');
         if (!layerId) {
           layerId = `layer_${layerIndex}`;
           el.setAttribute('data-layer-id', layerId);
         }
-        if (!el.hasAttribute('data-orig-transform')) {
-          el.setAttribute('data-orig-transform', el.getAttribute('transform') || '');
-        }
 
-        // Determine primary color
-        let rawColor = el.getAttribute('fill') || el.getAttribute('stroke') || el.style.fill || el.style.stroke;
-        if (!rawColor && tag === 'g') {
-          const firstChild = el.querySelector('[fill], [stroke]');
-          if (firstChild) {
-            rawColor = firstChild.getAttribute('fill') || firstChild.getAttribute('stroke') || firstChild.style.fill || firstChild.style.stroke;
+        if (!el.hasAttribute('data-base-transform')) {
+          let baseTr = '';
+          if (el.className && typeof el.className === 'string') {
+            const classes = el.className.split(/\s+/);
+            for (const c of classes) {
+              if (classTransforms[c]) {
+                baseTr = classTransforms[c];
+                break;
+              }
+            }
+          }
+          if (baseTr) {
+            el.setAttribute('data-base-transform', baseTr);
           }
         }
-        let color = normalizeColor(rawColor) || '#38bdf8';
 
-        // Descriptive layer name
-        let name = el.getAttribute('data-layer-name') ||
-                   (el.getAttribute('id') ? el.getAttribute('id').replace(/[-_]/g, ' ') : `${tag.charAt(0).toUpperCase() + tag.slice(1)} ${layerIndex + 1}`);
+        // Determine layer name from class or id
+        let name = '';
+        if (el.className && typeof el.className === 'string') {
+          const firstClass = el.className.split(/\s+/).find(c => c && !c.startsWith('css_'));
+          if (firstClass) {
+            name = firstClass
+              .replace(/_part_/gi, ' ')
+              .replace(/[-_]+/g, ' ')
+              .replace(/\b\w/g, c => c.toUpperCase())
+              .trim();
+          }
+        }
+        if (!name) {
+          name = el.getAttribute('id') ? el.getAttribute('id').replace(/[-_]/g, ' ') : `Element ${layerIndex + 1}`;
+        }
+
+        let rawColor = el.style.backgroundColor || el.style.background || el.style.borderColor || el.style.color;
+        if (!rawColor && el.className && typeof el.className === 'string') {
+          const classes = el.className.split(/\s+/);
+          for (const c of classes) {
+            if (classColors[c]) {
+              rawColor = classColors[c];
+              break;
+            }
+          }
+        }
+        if (!rawColor) rawColor = '#38bdf8';
+        let color = normalizeColor(rawColor) || '#38bdf8';
 
         layers.push({
           id: layerId,
@@ -91,21 +253,13 @@ export function extractSvgLayers(svgCode) {
           tag,
           name,
           color,
-          rawColor: rawColor || color
+          rawColor,
+          isHtml: true
         });
 
         layerIndex++;
-        return;
-      } else if (tag === 'g') {
-        const children = Array.from(el.children);
-        const hasVisualChildren = children.some(c => visualTagNames.includes(c.tagName.toLowerCase()) || c.tagName.toLowerCase() === 'g' || c.hasAttribute('data-layer-id'));
-        if (hasVisualChildren) {
-          children.forEach(c => processElement(c));
-        }
-      }
-    };
-
-    Array.from(svgEl.children).forEach(child => processElement(child));
+      });
+    }
 
     const serializer = new XMLSerializer();
     const taggedSvg = serializer.serializeToString(doc);
@@ -148,6 +302,11 @@ export function applyLayerTransforms(
 
     const parser = new DOMParser();
     const doc = parser.parseFromString(svgCode, 'image/svg+xml');
+    const parserError = doc.querySelector('parsererror');
+    if (parserError) {
+      console.warn('SVG parse error in applyLayerTransforms:', parserError.textContent);
+      return svgCode;
+    }
     const svgEl = doc.querySelector('svg');
     if (!svgEl) return svgCode;
 
@@ -276,7 +435,7 @@ export function applyLayerTransforms(
           ? (el.getAttribute('data-orig-transform') || '')
           : (el.getAttribute('transform') || '');
         if (!el.hasAttribute('data-orig-transform')) {
-          el.setAttribute('data-orig-transform', existingTransform.replace(/translate\([^)]*\)/gi, '').trim());
+          el.setAttribute('data-orig-transform', existingTransform.trim());
         }
 
         // Clean out any existing transform CSS
@@ -300,13 +459,12 @@ export function applyLayerTransforms(
           }
         }
 
-        // Apply hardware-accelerated 3D and 360-degree rotation CSS on the element
+        // Apply hardware-accelerated 3D transforms only when 3D rotation or elevation is active.
+        // For pure 2D position/rotation/scaling, SVG transform attribute provides exact viewBox-aligned rendering.
         const has3DLayer = rotateX !== 0 || rotateY !== 0 || z !== 0;
         const cssTransform = has3DLayer
           ? `transform-box: fill-box; transform-origin: center; transform: perspective(800px) translate3d(${x}px, ${y}px, ${z}px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) rotate(${rotate}deg);`
-          : (x !== 0 || y !== 0 || rotate !== 0)
-            ? `transform-box: fill-box; transform-origin: center; transform: translate(${x}px, ${y}px) rotate(${rotate}deg);`
-            : '';
+          : '';
 
         if (cssTransform) {
           cleanStyle = `${cleanStyle ? cleanStyle + '; ' : ''}${cssTransform}`;
@@ -315,7 +473,7 @@ export function applyLayerTransforms(
           el.setAttribute('style', cleanStyle);
         }
 
-        const origAttr = (el.getAttribute('data-orig-transform') || '').replace(/translate\([^)]*\)/gi, '').trim();
+        const origAttr = (el.getAttribute('data-orig-transform') || '').trim();
         const transformParts = [];
 
         // Center origin calculation: if cx, cy are provided, translate to origin, rotate & scale, then translate back
@@ -342,6 +500,25 @@ export function applyLayerTransforms(
           transformParts.push(origAttr);
         }
         el.setAttribute('transform', transformParts.join(' '));
+
+        if (el.closest('foreignObject') || el.tagName.toLowerCase() === 'div' || el.tagName.toLowerCase() === 'span') {
+          // For HTML elements, SVG transform attribute doesn't render; apply as CSS transform on style attribute
+          const baseTransform = el.getAttribute('data-base-transform') || '';
+          const transformTokens = [];
+          if (x !== 0 || y !== 0) transformTokens.push(`translate(${x}px, ${y}px)`);
+          if (rotate !== 0) transformTokens.push(`rotate(${rotate}deg)`);
+          if (effectiveScaleX !== 1 || effectiveScaleY !== 1) transformTokens.push(`scale(${effectiveScaleX}, ${effectiveScaleY})`);
+          if (baseTransform) transformTokens.push(baseTransform);
+          const htmlTransform = transformTokens.join(' ') || 'none';
+
+          el.style.transform = htmlTransform;
+          el.style.transformOrigin = 'center center';
+          const curStyle = (el.getAttribute('style') || '')
+            .replace(/transform-origin\s*:\s*[^;]+;?/gi, '')
+            .replace(/transform\s*:\s*[^;]+;?/gi, '')
+            .trim();
+          el.setAttribute('style', `${curStyle ? curStyle + '; ' : ''}transform-origin: center center; transform: ${htmlTransform};`);
+        }
       });
     }
 
@@ -363,16 +540,27 @@ export function applyLayerTransforms(
         if (style.fill) {
           el.setAttribute('fill', style.fill);
           el.style.setProperty('fill', style.fill, 'important');
+          if (el.closest('foreignObject') || el.tagName.toLowerCase() === 'div') {
+            el.style.setProperty('background-color', style.fill, 'important');
+            el.style.setProperty('background', style.fill, 'important');
+          }
         }
 
         // Custom Stroke Color & Width
         if (style.stroke) {
           el.setAttribute('stroke', style.stroke);
           el.style.setProperty('stroke', style.stroke, 'important');
+          if (el.closest('foreignObject') || el.tagName.toLowerCase() === 'div') {
+            el.style.setProperty('border-color', style.stroke, 'important');
+          }
         }
         if (style.strokeWidth !== undefined && style.strokeWidth !== null && style.strokeWidth !== '') {
           el.setAttribute('stroke-width', String(style.strokeWidth));
           el.style.setProperty('stroke-width', `${style.strokeWidth}px`, 'important');
+          if (el.closest('foreignObject') || el.tagName.toLowerCase() === 'div') {
+            el.style.setProperty('border-width', `${style.strokeWidth}px`, 'important');
+            el.style.setProperty('border-style', 'solid', 'important');
+          }
         }
 
         // Custom Opacity
@@ -474,24 +662,26 @@ export function calculateArtworkBounds(
   const globalGlowRadius = adjustments?.shadowBlur ? Number(adjustments.shadowBlur) : 0;
   const globalBlurRadius = adjustments?.blur ? Number(adjustments.blur) : 0;
 
-  // Find all leaf visual nodes (shapes, paths, rects, circles, texts, etc.)
-  const visualTags = ['path', 'rect', 'circle', 'ellipse', 'polygon', 'polyline', 'line', 'text'];
+  // Find all leaf visual nodes (shapes, paths, rects, circles, texts, and foreign HTML visual elements)
+  const visualTags = ['path', 'rect', 'circle', 'ellipse', 'polygon', 'polyline', 'line', 'text', 'div', 'span', 'section', 'p', 'button', 'a'];
   const nodes = Array.from(svgEl.querySelectorAll('*')).filter(el => {
     const tag = el.tagName.toLowerCase();
     if (['defs', 'clippath', 'mask', 'filter', 'metadata', 'style', 'title', 'desc'].includes(tag)) return false;
+    if (isSystemWrapper(el)) return false;
     if (el.getAttribute('display') === 'none' || el.getAttribute('visibility') === 'hidden') return false;
     if (el.getAttribute('opacity') === '0' || el.style.opacity === '0') return false;
 
     // Check if element is in deletedLayerIds
     const rawId = el.getAttribute('data-layer-id');
-    if (rawId && deletedLayerIds && deletedLayerIds.includes(rawId)) return false;
+    const cleanId = rawId ? rawId.replace(/^pf_studio_/i, '') : null;
+    if (rawId && deletedLayerIds && (deletedLayerIds.includes(rawId) || (cleanId && deletedLayerIds.includes(cleanId)))) return false;
 
     // Filter out invisible guide rects and full-canvas background rects with no visible fill or stroke
     const fill = el.getAttribute('fill') || el.style.fill || '';
     const stroke = el.getAttribute('stroke') || el.style.stroke || '';
     const isNoneFill = !fill || fill === 'none' || fill === 'transparent';
     const isNoneStroke = !stroke || stroke === 'none' || stroke === 'transparent' || el.getAttribute('stroke-width') === '0';
-    if (isNoneFill && isNoneStroke) return false;
+    if (!el.closest('foreignObject') && isNoneFill && isNoneStroke) return false;
 
     // Filter out elements that are pure full-size transparent background rects
     if (tag === 'rect') {
@@ -570,9 +760,9 @@ export function calculateArtworkBounds(
       } catch (_) {}
     }
 
-    // Drop shadow light diffuses out: Gaussian tails (3.5x radius) + shadow offset
+    // Drop shadow light diffuses out: Gaussian tails (1.5x radius) + shadow offset
     const effectiveGlowRadius = Math.max(glowRadius, glowRadius * Math.max(scaleX, 1));
-    const glowSpread = glowRadius > 0 ? (effectiveGlowRadius * 3.5 + Math.max(dsDx, dsDy) + 12) : (Math.max(dsDx, dsDy) > 0 ? Math.max(dsDx, dsDy) + 8 : 0);
+    const glowSpread = glowRadius > 0 ? (effectiveGlowRadius * 1.5 + Math.max(dsDx, dsDy) + 4) : (Math.max(dsDx, dsDy) > 0 ? Math.max(dsDx, dsDy) + 4 : 0);
 
     // 2. Blur Spread (per-layer + global blur)
     let blurRadius = globalBlurRadius;
@@ -679,9 +869,11 @@ export function calculateArtworkBounds(
 
   // Generous breathing frame padding ("thodi door par cut hona chaiye")
   // Ensures elements, outer glows, shadows, and blur are comfortably spaced inside the frame
-  const padRatio = Math.max(Number(paddingPercent) || 0.12, 0.12);
+  const padRatio = typeof paddingPercent === 'number' && !isNaN(paddingPercent)
+    ? paddingPercent
+    : 0.08;
   const maxContentDim = Math.max(contentWidth, contentHeight);
-  const pad = Math.max(maxContentDim * padRatio, 28);
+  const pad = Math.max(0, Math.round(maxContentDim * padRatio));
 
   const paddedMinX = svgMinX - pad;
   const paddedMinY = svgMinY - pad;

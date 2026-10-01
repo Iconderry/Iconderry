@@ -7,9 +7,9 @@ export default {
   theme: {
     extend: {
       colors: {
-        darkBg: '#0b0f19',
-        cardBg: '#131b2e',
-        cardBorder: '#1e293b'
+        darkBg: '#121316',
+        cardBg: '#18191f',
+        cardBorder: '#22242c'
       }
     },
   },

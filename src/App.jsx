@@ -12,16 +12,22 @@ import {
   Crosshair, AlignCenter, AlignLeft, AlignRight, Bold, Italic, Type, Square, Highlighter, Eraser, PenTool,
   HelpCircle, Smartphone, MousePointer, Keyboard,
   FolderPlus, Folder, Tag, Edit2, FileUp, Grid2X2, Grid3X3, ArrowUpDown, Filter,
-  Save, ClipboardPaste, Loader2
+  Save, ClipboardPaste, Loader2, BookOpen, ShieldCheck, User, LogOut
 } from 'lucide-react';
 import { INITIAL_ELEMENTS } from './initialData';
 import { downloadAsset } from './converter';
 import { extractSvgColors, replaceSvgColors, scopeSvgIds, normalizeColor, getLinkedGradientColors, adjustColorBrightness, applyUniversalStroke, hslToHex, hexToHsl } from './colorUtils';
 import { STYLE_RENDER_MODES, transformSvgStyle } from './styleTransformer';
-import { extractSvgLayers, applyLayerTransforms, calculateArtworkBounds } from './layerUtils';
+import { extractSvgLayers, applyLayerTransforms, calculateArtworkBounds, tagSvgElements, isSystemWrapper, getParentTransformMatrix } from './layerUtils';
 import { supabase } from './supabaseClient';
 import { GOOGLE_FONTS_LIST, TEXT_PRESETS, SHAPES_PRESETS, smoothFreehandPath, injectCanvasObjectsIntoSvg } from './canvasProElements';
 import { saveElementsToDB, loadElementsFromDB } from './idbStorage';
+import BlogView from './BlogView';
+import LicenseView from './LicenseView';
+import { isCssOrHtmlContent, convertCssToSvg, normalizeForeignObjectSvg } from './cssToSvgConverter';
+import AssetDetailModal from './AssetDetailModal';
+import AuthModal from './AuthModal';
+
 
 export const GRADIENT_PRESETS = [
   { id: 'cyber_neon', name: 'Cyber Neon', from: '#06b6d4', to: '#3b82f6', angle: 135 },
@@ -1076,44 +1082,80 @@ const PRESETS_3D = [
   { id: 'flat_front', name: 'Reset Front', icon: '🎯', rx: 0, ry: 0, rz: 0, desc: 'Level 0° front view' }
 ];
 
-// Interactive 3D Gyro Orbit Trackball
-function Trackball3DPad({ rotateX, rotateY, onChange, onReset, appTheme }) {
+// Interactive 3D Gyro Orbit Trackball with zero-lag direct GPU transforms
+function Trackball3DPad({
+  rotateX,
+  rotateY,
+  onChange,
+  onLiveChange,
+  onDragStart,
+  onDragEnd,
+  onReset,
+  appTheme
+}) {
   const padRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [liveX, setLiveX] = useState(rotateX || 0);
+  const [liveY, setLiveY] = useState(rotateY || 0);
+  const liveXRef = useRef(rotateX || 0);
+  const liveYRef = useRef(rotateY || 0);
+  const isDraggingRef = useRef(false);
   const dragStartRef = useRef({ x: 0, y: 0, rx: 0, ry: 0 });
+
+  useEffect(() => {
+    if (!isDraggingRef.current) {
+      setLiveX(rotateX || 0);
+      setLiveY(rotateY || 0);
+      liveXRef.current = rotateX || 0;
+      liveYRef.current = rotateY || 0;
+    }
+  }, [rotateX, rotateY]);
 
   const handlePointerDown = (e) => {
     e.preventDefault();
     setIsDragging(true);
+    isDraggingRef.current = true;
     dragStartRef.current = {
       x: e.clientX,
       y: e.clientY,
-      rx: rotateX,
-      ry: rotateY
+      rx: liveXRef.current,
+      ry: liveYRef.current
     };
-    e.currentTarget.setPointerCapture(e.pointerId);
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch (_) { }
+    onDragStart?.();
   };
 
   const handlePointerMove = (e) => {
-    if (!isDragging) return;
+    if (!isDraggingRef.current) return;
     const dx = e.clientX - dragStartRef.current.x;
     const dy = e.clientY - dragStartRef.current.y;
-    // Dragging horizontally changes Yaw (rotateY), dragging vertically changes Pitch (rotateX)
-    const newRy = Math.round(Math.max(-85, Math.min(85, dragStartRef.current.ry + dx * 0.75)));
-    const newRx = Math.round(Math.max(-85, Math.min(85, dragStartRef.current.rx - dy * 0.75)));
-    onChange(newRx, newRy);
+    // Dragging right (dx > 0) turns icon right (increases rotateY in clockwise orbit)
+    // Dragging down (dy > 0) tilts icon top forward (decreases rotateX)
+    const newRy = Math.round(Math.max(-85, Math.min(85, dragStartRef.current.ry + dx * 0.5)));
+    const newRx = Math.round(Math.max(-85, Math.min(85, dragStartRef.current.rx - dy * 0.5)));
+    liveXRef.current = newRx;
+    liveYRef.current = newRy;
+    setLiveX(newRx);
+    setLiveY(newRy);
+    onLiveChange?.(newRx, newRy);
   };
 
   const handlePointerUp = (e) => {
+    if (!isDraggingRef.current) return;
     setIsDragging(false);
+    isDraggingRef.current = false;
     try {
       e.currentTarget.releasePointerCapture(e.pointerId);
     } catch (_) { }
+    onDragEnd?.();
+    onChange?.(liveXRef.current, liveYRef.current);
   };
 
   // Map rotateX [-85, 85] and rotateY [-85, 85] to puck position [-36px, 36px]
-  const puckX = Math.round((rotateY / 85) * 36);
-  const puckY = Math.round((-rotateX / 85) * 36);
+  const puckX = Math.round((liveY / 85) * 36);
+  const puckY = Math.round((-liveX / 85) * 36);
 
   return (
     <div className={`p-3 rounded-2xl border flex flex-col items-center gap-2 select-none ${appTheme === 'dark' ? 'bg-slate-900/80 border-slate-800' : 'bg-slate-50 border-slate-200 shadow-sm'
@@ -1161,7 +1203,7 @@ function Trackball3DPad({ rotateX, rotateY, onChange, onReset, appTheme }) {
         <div
           className="w-10 h-10 rounded-lg border-2 border-cyan-400/80 pointer-events-none transition-transform duration-75 flex items-center justify-center shadow-lg shadow-cyan-500/20"
           style={{
-            transform: `perspective(200px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`,
+            transform: `perspective(200px) rotateX(${liveX}deg) rotateY(${liveY}deg)`,
             background: appTheme === 'dark' ? 'rgba(6, 182, 212, 0.15)' : 'rgba(6, 182, 212, 0.25)'
           }}
         >
@@ -1179,12 +1221,82 @@ function Trackball3DPad({ rotateX, rotateY, onChange, onReset, appTheme }) {
 
       {/* Degree Readout Badges */}
       <div className="w-full flex items-center justify-between text-[11px] font-mono font-semibold px-2">
-        <span className="text-cyan-400">Pitch (X): {rotateX > 0 ? `+${rotateX}` : rotateX}&deg;</span>
-        <span className="text-blue-400">Yaw (Y): {rotateY > 0 ? `+${rotateY}` : rotateY}&deg;</span>
+        <span className="text-cyan-400">Pitch (X): {liveX > 0 ? `+${liveX}` : liveX}&deg;</span>
+        <span className="text-blue-400">Yaw (Y): {liveY > 0 ? `+${liveY}` : liveY}&deg;</span>
       </div>
     </div>
   );
 }
+
+// Hardware-accelerated fast transform slider with live direct RAF GPU transforms
+function FastTransformSlider({
+  min,
+  max,
+  step = 1,
+  value,
+  onChange,
+  onLiveChange,
+  onDragStart,
+  onDragEnd,
+  className = "theme-slider w-full",
+  accentColor,
+  title
+}) {
+  const [localVal, setLocalVal] = useState(value);
+  const isDraggingRef = useRef(false);
+  const latestValRef = useRef(value);
+
+  useEffect(() => {
+    if (!isDraggingRef.current) {
+      setLocalVal(value);
+      latestValRef.current = value;
+    }
+  }, [value]);
+
+  const handlePointerDown = (e) => {
+    isDraggingRef.current = true;
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch (_) { }
+    onDragStart?.();
+  };
+
+  const handleInput = (e) => {
+    const num = Number(e.target.value);
+    latestValRef.current = num;
+    setLocalVal(num);
+    onLiveChange?.(num);
+  };
+
+  const handlePointerUp = (e) => {
+    if (!isDraggingRef.current) return;
+    isDraggingRef.current = false;
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch (_) { }
+    onDragEnd?.();
+    onChange?.(latestValRef.current);
+  };
+
+  return (
+    <input
+      type="range"
+      min={min}
+      max={max}
+      step={step}
+      value={localVal}
+      onPointerDown={handlePointerDown}
+      onInput={handleInput}
+      onChange={handleInput}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+      className={className}
+      style={accentColor ? { accentColor } : undefined}
+      title={title}
+    />
+  );
+}
+
 
 const PC_HELP_GUIDE = [
   {
@@ -1302,15 +1414,19 @@ export default function App() {
           const sanitized = parsed.map(item => {
             if (initialMap.has(item.id)) {
               const initialItem = initialMap.get(item.id);
+              const cleanCode = normalizeForeignObjectSvg(item.originalSvgCode || item.svgCode || initialItem.svgCode);
               return {
                 ...initialItem,
                 ...item,
-                originalSvgCode: item.originalSvgCode || item.svgCode || initialItem.svgCode
+                svgCode: cleanCode,
+                originalSvgCode: cleanCode
               };
             }
+            const cleanCode = normalizeForeignObjectSvg(item.originalSvgCode || item.svgCode);
             return {
               ...item,
-              originalSvgCode: item.originalSvgCode || item.svgCode
+              svgCode: cleanCode,
+              originalSvgCode: cleanCode
             };
           });
 
@@ -1330,16 +1446,33 @@ export default function App() {
     }));
   });
 
-  // Instant load from IndexedDB on startup/refresh (holds all 51+ elements with full SVGs, bypassing 5MB localStorage limit)
+  // Instant load from IndexedDB on startup/refresh (holds all elements with full SVGs, bypassing 5MB localStorage limit)
   useEffect(() => {
     loadElementsFromDB().then((cached) => {
       if (Array.isArray(cached) && cached.length > 0) {
         setElements(prev => {
+          const cachedIds = new Set(cached.map(c => c.id));
+          const normalizedCached = cached.map(item => ({
+            ...item,
+            svgCode: normalizeForeignObjectSvg(item.svgCode),
+            originalSvgCode: normalizeForeignObjectSvg(item.originalSvgCode || item.svgCode)
+          }));
+          const newFromInitial = INITIAL_ELEMENTS
+            .filter(item => !cachedIds.has(item.id))
+            .map(el => ({ ...el, originalSvgCode: el.svgCode, downloads: el.downloads || 0 }));
+
+          if (newFromInitial.length > 0) {
+            const merged = [...normalizedCached, ...newFromInitial];
+            saveElementsToDB(merged);
+            return merged;
+          }
           if (cached.length > prev.length) {
-            return cached;
+            return normalizedCached;
           }
           return prev;
         });
+      } else {
+        saveElementsToDB(INITIAL_ELEMENTS);
       }
     });
   }, []);
@@ -1368,7 +1501,56 @@ export default function App() {
   const [assetType, setAssetType] = useState('filled'); // 'silhouette' | 'linear' | 'filled' | '3d'
   const [isAddingNewCat, setIsAddingNewCat] = useState(false);
   const [newCatInput, setNewCatInput] = useState('');
-  const [detectedShapeNotice, setDetectedShapeNotice] = useState('');
+  const [detailModalAsset, setDetailModalAsset] = useState(null);
+
+  // Supabase User Auth State
+  const [authUser, setAuthUser] = useState(null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+
+  // Listen for Supabase Auth session changes
+  useEffect(() => {
+    if (!supabase) return;
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setAuthUser(session?.user || null);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuthUser(session?.user || null);
+    });
+
+    return () => subscription?.unsubscribe?.();
+  }, []);
+
+  // Dynamic URL Deep Linking: (?icon=id) opens modal on initial load or browser back/forward
+  useEffect(() => {
+    if (!elements || elements.length === 0) return;
+    const params = new URLSearchParams(window.location.search);
+    const iconId = params.get('icon');
+    if (iconId && (!detailModalAsset || detailModalAsset.id !== iconId)) {
+      const match = elements.find(e => String(e.id) === String(iconId));
+      if (match) {
+        setDetailModalAsset(match);
+      }
+    }
+  }, [elements]);
+
+  // Sync URL query param & document.title when detailModalAsset changes
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (detailModalAsset) {
+      url.searchParams.set('icon', detailModalAsset.id);
+      window.history.replaceState({}, '', url.toString());
+      document.title = `${detailModalAsset.title} - Free Icon Download | Iconderry`;
+    } else {
+      if (url.searchParams.has('icon')) {
+        url.searchParams.delete('icon');
+        window.history.replaceState({}, '', url.toString());
+      }
+      document.title = 'Iconderry - Advanced Visual Grading & 8K Multi-Format Engine';
+    }
+  }, [detailModalAsset]);
 
   // Bulk Upload State
   const [bulkFiles, setBulkFiles] = useState([]);
@@ -1399,6 +1581,10 @@ export default function App() {
   const [isGalleryAdminMode, setIsGalleryAdminMode] = useState(false);
   const [isSavingGalleryDefault, setIsSavingGalleryDefault] = useState(false);
   const [saveDefaultSuccess, setSaveDefaultSuccess] = useState('');
+  const [showCardSafeZone, setShowCardSafeZone] = useState(true);
+  const [pendingDeletedIds, setPendingDeletedIds] = useState([]);
+  const [isSavingGalleryDeletions, setIsSavingGalleryDeletions] = useState(false);
+  const [galleryAdminToast, setGalleryAdminToast] = useState('');
 
   // App Theming & Settings Panel
   const [appTheme, setAppTheme] = useState(() => {
@@ -1516,17 +1702,30 @@ export default function App() {
   const updateTransformBoxRef = useRef(null);
   const lastCanvasClickRef = useRef({ time: 0, layerId: null, x: 0, y: 0 });
   const clipboardLayersRef = useRef(null);
+  const cardGuideRef = useRef(null);
+  const canvasViewportRef = useRef(null);
 
   // Sync refs when zoomLevel is updated externally
   useEffect(() => {
     if (!animFrameIdRef.current) {
       currentZoomRef.current = zoomLevel;
     }
+    if (canvasViewportRef.current) {
+      canvasViewportRef.current.style.setProperty('--stage-zoom', zoomLevel);
+      canvasViewportRef.current.style.setProperty('--inv-zoom', 1 / (zoomLevel || 1));
+    }
   }, [zoomLevel]);
 
-  // Butter-smooth inertial LERP animation loop (absorbs physical mouse wheel notches into continuous silky gliding)
+  // Butter-smooth inertial LERP animation loop with zero-lag direct GPU transform
   const startSmoothZoomLoop = () => {
     if (animFrameIdRef.current) return;
+
+    if (canvasViewportRef.current) {
+      canvasViewportRef.current.style.willChange = 'transform';
+    }
+    if (canvasSvgContainerRef.current) {
+      canvasSvgContainerRef.current.style.pointerEvents = 'none';
+    }
 
     const tick = () => {
       const curZ = currentZoomRef.current;
@@ -1538,34 +1737,61 @@ export default function App() {
       const diffPanX = tgtPan.x - curPan.x;
       const diffPanY = tgtPan.y - curPan.y;
 
-      const isZoomDone = Math.abs(diffZ) < 0.0008;
-      const isPanDone = Math.abs(diffPanX) < 0.4 && Math.abs(diffPanY) < 0.4;
+      const isZoomDone = Math.abs(diffZ) < 0.003;
+      const isPanDone = Math.abs(diffPanX) < 1.0 && Math.abs(diffPanY) < 1.0;
 
       if (isZoomDone && isPanDone) {
         currentZoomRef.current = tgtZ;
+        const finalPan = tgtZ <= 1.05 ? { x: 0, y: 0 } : tgtPan;
+        canvasPanRef.current = finalPan;
+        targetPanRef.current = finalPan;
+
+        // Final commit to React state once deceleration settles
         setZoomLevel(Number(tgtZ.toFixed(3)));
-        if (tgtZ <= 1.05) {
-          setCanvasPan({ x: 0, y: 0 });
-          targetPanRef.current = { x: 0, y: 0 };
-        } else {
-          setCanvasPan(tgtPan);
+        setCanvasPan(finalPan);
+
+        if (canvasViewportRef.current) {
+          canvasViewportRef.current.style.transform = `translate3d(${finalPan.x}px, ${finalPan.y}px, 0px) scale(${tgtZ})`;
+          canvasViewportRef.current.style.setProperty('--stage-zoom', tgtZ);
+          canvasViewportRef.current.style.setProperty('--inv-zoom', 1 / tgtZ);
+          canvasViewportRef.current.style.willChange = 'auto';
         }
+        if (canvasSvgContainerRef.current) {
+          canvasSvgContainerRef.current.style.pointerEvents = '';
+        }
+
+        const badge = document.getElementById('live-zoom-badge');
+        if (badge) badge.textContent = `${Math.round(tgtZ * 100)}%`;
+
         animFrameIdRef.current = null;
         return;
       }
 
-      // Easing factor 0.16 produces a fluid, luxurious ease-out deceleration curve
-      const ease = 0.16;
+      // Ultra-snappy 0.55 easing factor (immediate 2-3 frame response for zero sluggishness)
+      const ease = 0.55;
       const nextZ = curZ + diffZ * ease;
       currentZoomRef.current = nextZ;
-      setZoomLevel(Number(nextZ.toFixed(3)));
 
       const nextPanX = curPan.x + diffPanX * ease;
       const nextPanY = curPan.y + diffPanY * ease;
-      setCanvasPan({
+      canvasPanRef.current = {
         x: Math.round(nextPanX),
         y: Math.round(nextPanY)
-      });
+      };
+
+      // Direct GPU transform update on the 2D viewport container during gliding (pure GPU compositor, zero reflow!)
+      if (canvasViewportRef.current) {
+        canvasViewportRef.current.style.transform = `translate3d(${canvasPanRef.current.x}px, ${canvasPanRef.current.y}px, 0px) scale(${nextZ})`;
+      }
+
+      // Smooth scale card safe zone frame synchronously with canvas
+      if (cardGuideRef.current) {
+        cardGuideRef.current.style.transform = `translate(-50%, -50%) translate(${canvasPanRef.current.x}px, ${canvasPanRef.current.y}px) scale(${nextZ})`;
+      }
+
+      // Live update zoom percentage badge in UI
+      const badge = document.getElementById('live-zoom-badge');
+      if (badge) badge.textContent = `${Math.round(nextZ * 100)}%`;
 
       animFrameIdRef.current = requestAnimationFrame(tick);
     };
@@ -1580,25 +1806,32 @@ export default function App() {
     if (e.stopPropagation) e.stopPropagation();
 
     const delta = e.deltaY;
-    // Standard notch normalization
     const clampedDelta = Math.max(-120, Math.min(120, delta));
-    // Multiplicative scale factor: ~18% smooth magnification per tick
-    const zoomIntensity = 0.0018;
+    // Fast, responsive zoom multiplier (~38% magnification/reduction per notch)
+    const zoomIntensity = 0.0038;
     const factor = Math.exp(-clampedDelta * zoomIntensity);
 
     const prevTarget = targetZoomRef.current;
-    const nextTarget = Math.min(5, Math.max(0.1, prevTarget * factor));
+    const nextTarget = Math.min(6, Math.max(0.4, Number((prevTarget * factor).toFixed(3))));
     targetZoomRef.current = nextTarget;
 
-    // Smooth auto-centering towards default center (0, 0) as user zooms out
-    if (nextTarget <= 1.05) {
-      targetPanRef.current = { x: 0, y: 0 };
-    } else if (nextTarget < prevTarget) {
-      const ratio = Math.max(0, (nextTarget - 1) / Math.max(0.01, prevTarget - 1));
-      targetPanRef.current = {
-        x: Math.round(targetPanRef.current.x * ratio),
-        y: Math.round(targetPanRef.current.y * ratio)
-      };
+    // Zoom centered towards mouse cursor position
+    const wsEl = canvasWorkspaceRef.current;
+    if (wsEl) {
+      const wsRect = wsEl.getBoundingClientRect();
+      const cx = e.clientX - (wsRect.left + wsRect.width / 2);
+      const cy = e.clientY - (wsRect.top + wsRect.height / 2);
+
+      if (nextTarget <= 1.05) {
+        targetPanRef.current = { x: 0, y: 0 };
+      } else {
+        const curPan = targetPanRef.current;
+        const zoomRatio = nextTarget / prevTarget;
+        targetPanRef.current = {
+          x: Math.round(cx - (cx - curPan.x) * zoomRatio),
+          y: Math.round(cy - (cy - curPan.y) * zoomRatio)
+        };
+      }
     }
 
     startSmoothZoomLoop();
@@ -1735,8 +1968,15 @@ export default function App() {
     // 2. Direct Left Click on Canvas: Vector Part Drag OR Marquee Drag-to-Select
     if (e.button === 0) {
       // 1. If clicked on a button or UI control, ignore canvas pointer down completely
-      if (e.target.closest('button') || e.target.closest('.pointer-events-auto') || e.target.closest('[data-no-canvas-click]')) {
-        return;
+      const isInsideSvg = Boolean(canvasSvgContainerRef.current && canvasSvgContainerRef.current.contains(e.target));
+      if (!isInsideSvg) {
+        if (e.target.closest('button') || e.target.closest('.pointer-events-auto') || e.target.closest('[data-no-canvas-click]')) {
+          return;
+        }
+      } else {
+        if (e.target.closest('button') || e.target.closest('[data-no-canvas-click]')) {
+          return;
+        }
       }
 
       // If dual fingers or pinch active, do not select or drag
@@ -1745,51 +1985,72 @@ export default function App() {
       }
 
       let targetLayerEl = e.target.closest('[data-layer-id]');
+      if (targetLayerEl && isSystemWrapper(targetLayerEl)) {
+        targetLayerEl = null;
+      }
       const currentSelected = selectedLayerIdsRef.current || [];
 
-      // Fabric.js style Proximity Hit-Testing:
-      // If mouse is clicked slightly off a thin stroke or during a rapid jerk, probe 16px radius around point
+      // Proximity / Direct SVG Shape or HTML Element Hit-Testing
+      if (!targetLayerEl && canvasSvgContainerRef.current) {
+        const svgContainer = canvasSvgContainerRef.current;
+        const svgEl = svgContainer.querySelector('svg');
+        if (svgEl) tagSvgElements(svgEl);
+
+        const shapeEl = e.target.closest('path, rect, circle, ellipse, polygon, polyline, line, text, foreignObject div, foreignObject span, foreignObject section, foreignObject p, foreignObject button, foreignObject a');
+        if (shapeEl && svgContainer.contains(shapeEl) && !isSystemWrapper(shapeEl)) {
+          targetLayerEl = shapeEl.closest('[data-layer-id]') || shapeEl;
+        }
+      }
+
+      // Proximity Hit-Testing: Fast check for SVG or HTML elements under cursor
       if (!targetLayerEl && canvasSvgContainerRef.current) {
         const svgContainer = canvasSvgContainerRef.current;
         const elsUnderPoint = document.elementsFromPoint ? document.elementsFromPoint(e.clientX, e.clientY) : [];
         for (const el of elsUnderPoint) {
-          const layer = el.closest('[data-layer-id]');
-          if (layer && svgContainer.contains(layer)) {
-            targetLayerEl = layer;
+          if (!svgContainer.contains(el) || isSystemWrapper(el)) continue;
+          const layer = el.closest('[data-layer-id]') || el.closest('path, rect, circle, ellipse, polygon, polyline, line, text, foreignObject div, foreignObject span, foreignObject section, foreignObject p, foreignObject button, foreignObject a');
+          if (layer && !isSystemWrapper(layer)) {
+            targetLayerEl = layer.closest('[data-layer-id]') || layer;
             break;
-          }
-        }
-
-        if (!targetLayerEl) {
-          const radialOffsets = [
-            [0, -8], [0, 8], [-8, 0], [8, 0],
-            [-8, -8], [8, -8], [-8, 8], [8, 8],
-            [0, -16], [0, 16], [-16, 0], [16, 0],
-            [-12, -12], [12, -12], [-12, 12], [12, 12]
-          ];
-          for (const [ox, oy] of radialOffsets) {
-            const probeEls = document.elementsFromPoint ? document.elementsFromPoint(e.clientX + ox, e.clientY + oy) : [];
-            for (const el of probeEls) {
-              const layer = el.closest('[data-layer-id]');
-              if (layer && svgContainer.contains(layer)) {
-                targetLayerEl = layer;
-                break;
-              }
-            }
-            if (targetLayerEl) break;
           }
         }
       }
 
-      // Check if clicked anywhere inside the active Transform Bounding Box of selected elements (+12px tolerance)
-      const isInsideTransformBox = Boolean(
-        transformBox &&
-        currentSelected.length > 0 &&
-        e.clientX >= (transformBox.minLeft - 12) &&
-        e.clientX <= (transformBox.maxRight + 12) &&
-        e.clientY >= (transformBox.minTop - 12) &&
-        e.clientY <= (transformBox.maxBottom + 12)
-      );
+      // Proximity Hit-Testing for thin stroke vector lines (5px cross radius)
+      if (!targetLayerEl && canvasSvgContainerRef.current) {
+        const svgContainer = canvasSvgContainerRef.current;
+        const proximityOffsets = [
+          { x: -5, y: 0 }, { x: 5, y: 0 }, { x: 0, y: -5 }, { x: 0, y: 5 },
+          { x: -4, y: -4 }, { x: 4, y: -4 }, { x: -4, y: 4 }, { x: 4, y: 4 }
+        ];
+        for (const off of proximityOffsets) {
+          const els = document.elementsFromPoint ? document.elementsFromPoint(e.clientX + off.x, e.clientY + off.y) : [];
+          for (const el of els) {
+            if (!svgContainer.contains(el) || isSystemWrapper(el)) continue;
+            const layer = el.closest('[data-layer-id]') || el.closest('path, rect, circle, ellipse, polygon, polyline, line, text, foreignObject div, foreignObject span, foreignObject section, foreignObject p, foreignObject button, foreignObject a');
+            if (layer && !isSystemWrapper(layer)) {
+              targetLayerEl = layer.closest('[data-layer-id]') || layer;
+              break;
+            }
+          }
+          if (targetLayerEl) break;
+        }
+      }
+
+
+
+      // Check if clicked anywhere inside the active Transform Bounding Box of selected elements
+      // (Using exact screen bounding client rect so it works flawlessly across all zoom levels and 3D tilts!)
+      let isInsideTransformBox = false;
+      if (!targetLayerEl && transformBoxRef.current && currentSelected.length > 0) {
+        const bRect = transformBoxRef.current.getBoundingClientRect();
+        isInsideTransformBox = (
+          e.clientX >= bRect.left &&
+          e.clientX <= bRect.right &&
+          e.clientY >= bRect.top &&
+          e.clientY <= bRect.bottom
+        );
+      }
 
       // Case A: Clicked directly on a Vector Shape / Part OR inside the active Bounding Box of selected elements
       if (targetLayerEl || isInsideTransformBox) {
@@ -1818,9 +2079,6 @@ export default function App() {
 
           if (belongingGroup) {
             if (isDoubleClickOnLayer) {
-              // DOUBLE CLICK ON ELEMENT INSIDE GROUP:
-              // Sub-select ONLY this individual element part so it can be dragged separately anywhere!
-              // The group itself in layerGroups remains intact until explicitly ungrouped.
               activeIds = [layerId];
               setSelectedLayerIds([layerId]);
               setSelectedLayerId(layerId);
@@ -1834,12 +2092,9 @@ export default function App() {
               setSelectedLayerIds(activeIds);
               setSelectedLayerId(activeIds[activeIds.length - 1] || null);
             } else {
-              // Normal Click on grouped item:
-              // If this individual element was ALREADY sub-selected inside the group, keep dragging it separately!
               if (currentSelected.length === 1 && currentSelected[0] === layerId) {
                 activeIds = [layerId];
               } else {
-                // Otherwise, normal single click selects the entire group
                 activeIds = belongingGroup;
                 setSelectedLayerIds(belongingGroup);
                 setSelectedLayerId(belongingGroup[0]);
@@ -1847,14 +2102,12 @@ export default function App() {
             }
           } else {
             if (e.shiftKey || e.ctrlKey || e.metaKey) {
-              // Shift / Ctrl / Cmd + Click: Toggle element in/out of multi-selection
               activeIds = currentSelected.includes(layerId)
                 ? currentSelected.filter(id => id !== layerId)
                 : [...currentSelected, layerId];
               setSelectedLayerIds(activeIds);
               setSelectedLayerId(activeIds[activeIds.length - 1] || null);
             } else {
-              // Normal Click: If already part of multi-select, keep group; otherwise select only this element
               if (currentSelected.includes(layerId) && currentSelected.length > 1) {
                 activeIds = currentSelected;
               } else {
@@ -1865,28 +2118,15 @@ export default function App() {
             }
           }
         } else if (isInsideTransformBox) {
-          // Grabbed empty space inside the bounding box of selected elements: drag ALL currently selected parts!
           activeIds = currentSelected;
         }
 
         if (activeIds.length === 0) return;
 
-        // Synchronously update selection refs so all subsequent methods and closures read the accurate target
         selectedLayerIdsRef.current = activeIds;
         selectedLayerIdRef.current = activeIds[0] || null;
 
-        // Immediately compute fresh transformBox for activeIds synchronously
         const freshBox = updateTransformBox(activeIds);
-        const startTransformBox = freshBox ? { ...freshBox } : (transformBox ? { ...transformBox } : null);
-
-        // Instantly align the bounding box frame to freshBox in DOM if frame already exists
-        if (transformBoxRef.current && freshBox) {
-          transformBoxRef.current.style.left = `${freshBox.x}px`;
-          transformBoxRef.current.style.top = `${freshBox.y}px`;
-          transformBoxRef.current.style.width = `${freshBox.width}px`;
-          transformBoxRef.current.style.height = `${freshBox.height}px`;
-          transformBoxRef.current.style.transform = '';
-        }
 
         e.preventDefault();
         e.stopPropagation();
@@ -1897,7 +2137,6 @@ export default function App() {
         activeTargetLayerElRef.current = targetLayerEl;
         activePointerIdRef.current = e.pointerId;
 
-        // Capture pointer on canvasWorkspaceRef (guaranteed stable in DOM, never destroyed by React re-renders)
         try {
           const captureEl = canvasWorkspaceRef.current;
           if (e.pointerId !== undefined && captureEl?.setPointerCapture) {
@@ -1905,57 +2144,47 @@ export default function App() {
           }
         } catch (_) { }
 
-        // Store initial transforms for all active layers so they move together in sync
         const initialTransforms = {};
         activeIds.forEach(id => {
-          initialTransforms[id] = layerTransformsRef.current[id] || { x: 0, y: 0, rotate: 0 };
+          const cleanId = String(id).replace(/^pf_studio_/i, '');
+          initialTransforms[cleanId] = layerTransformsRef.current[cleanId] || layerTransformsRef.current[id] || { x: 0, y: 0, z: 0, rotate: 0, rotateX: 0, rotateY: 0 };
+          initialTransforms[id] = initialTransforms[cleanId];
         });
         layerDragInitialTransformsRef.current = initialTransforms;
 
-        const svgEl = canvasSvgContainerRef.current?.querySelector('svg');
-        const vb = svgEl?.viewBox?.baseVal;
-        const svgRect = svgEl?.getBoundingClientRect();
-        const vbWidth = (vb && vb.width > 0) ? vb.width : (svgRect?.width || 100);
-        const vbHeight = (vb && vb.height > 0) ? vb.height : (svgRect?.height || 100);
-        const scaleX = (svgRect && svgRect.width > 0) ? (vbWidth / svgRect.width) : 1;
-        const scaleY = (svgRect && svgRect.height > 0) ? (vbHeight / svgRect.height) : 1;
+        const svgContainer = canvasSvgContainerRef.current;
+        const svgEl = svgContainer?.querySelector('svg');
         const invScreenCTM = svgEl?.getScreenCTM ? svgEl.getScreenCTM()?.inverse() : null;
 
-        const containerW = canvasSvgContainerRef.current?.offsetWidth || Math.round(iconWidth * zoomLevel);
-        const containerH = canvasSvgContainerRef.current?.offsetHeight || Math.round(iconHeight * zoomLevel);
-        const padLeft = parseFloat(getComputedStyle(canvasSvgContainerRef.current || document.body).paddingLeft) || 0;
-        const padRight = parseFloat(getComputedStyle(canvasSvgContainerRef.current || document.body).paddingRight) || 0;
-        const padTop = parseFloat(getComputedStyle(canvasSvgContainerRef.current || document.body).paddingTop) || 0;
-        const padBottom = parseFloat(getComputedStyle(canvasSvgContainerRef.current || document.body).paddingBottom) || 0;
-        const contentW = Math.max(10, containerW - padLeft - padRight);
-        const contentH = Math.max(10, containerH - padTop - padBottom);
-        const svgToContainerScale = (vbWidth > 0 && contentW > 0) ? Math.min(contentW / vbWidth, contentH / vbHeight) : 1;
+        const vb = svgEl?.viewBox?.baseVal;
+        const vbWidth = (vb && vb.width > 0) ? vb.width : (svgEl?.clientWidth || iconWidth);
+        const vbHeight = (vb && vb.height > 0) ? vb.height : (svgEl?.clientHeight || iconHeight);
+        const padLeft = parseFloat(getComputedStyle(svgContainer || document.body).paddingLeft) || 0;
+        const padRight = parseFloat(getComputedStyle(svgContainer || document.body).paddingRight) || 0;
+        const padTop = parseFloat(getComputedStyle(svgContainer || document.body).paddingTop) || 0;
+        const padBottom = parseFloat(getComputedStyle(svgContainer || document.body).paddingBottom) || 0;
+        const contentW = Math.max(10, iconWidth - padLeft - padRight);
+        const contentH = Math.max(10, iconHeight - padTop - padBottom);
+        const svgToContainerScaleX = contentW / vbWidth;
+        const svgToContainerScaleY = contentH / vbHeight;
 
-        const wsEl = canvasWorkspaceRef.current;
-        const wsRect = wsEl ? wsEl.getBoundingClientRect() : null;
-        const zoomScaleX = wsEl?.offsetWidth > 0 ? (wsRect.width / wsEl.offsetWidth) : 1;
-        const zoomScaleY = wsEl?.offsetHeight > 0 ? (wsRect.height / wsEl.offsetHeight) : 1;
-
-        // Query active DOM nodes once at start so we can update them directly during drag with 0 SVG re-parsing
-        const svgContainer = canvasSvgContainerRef.current;
         const activeDomNodes = activeIds.map(id => {
           const cleanId = String(id).replace(/^pf_studio_/i, '');
           const numOnly = cleanId.replace(/\D/g, '');
           const node = svgContainer?.querySelector(`[data-layer-id="${id}"]`) ||
             svgContainer?.querySelector(`[data-layer-id="${cleanId}"]`) ||
             (numOnly ? svgContainer?.querySelector(`[data-layer-id="layer_${numOnly}"]`) : null);
-          const rawOrig = node?.hasAttribute('data-orig-transform')
-            ? (node.getAttribute('data-orig-transform') || '')
-            : (node?.getAttribute('transform') || '');
-          const origAttr = rawOrig.replace(/translate\([^)]*\)/gi, '').trim();
-          return { id, node, origAttr };
+          const origAttr = node ? (node.getAttribute('data-orig-transform') || '') : '';
+          const baseTransform = node ? (node.getAttribute('data-base-transform') || '') : '';
+          const isHtml = node ? (Boolean(node.closest('foreignObject')) || node.tagName?.toLowerCase() === 'div' || node.tagName?.toLowerCase() === 'span') : false;
+          const parentMatrix = (isHtml && node) ? getParentTransformMatrix(node) : null;
+          const invParentMatrix = (parentMatrix && !parentMatrix.isIdentity) ? parentMatrix.inverse() : null;
+          return { id, cleanId, node, origAttr, baseTransform, isHtml, invParentMatrix };
         }).filter(item => item.node);
 
         let hasActuallyMoved = false;
-        // Threshold: 12px for finger touch on mobile to prevent accidental dragging during pinch zoom; 3px for mouse
-        const DRAG_THRESHOLD = e.pointerType === 'touch' ? 12 : 3;
+        const DRAG_THRESHOLD = e.pointerType === 'touch' ? 8 : 2;
         let dragRafId = null;
-
         let latestDx = 0;
         let latestDy = 0;
         let latestSvgDx = 0;
@@ -1964,13 +2193,11 @@ export default function App() {
         const handleLayerMove = (moveEvt) => {
           if (!isDraggingLayerRef.current) return;
 
-          // Safety: If pointer is mouse and no buttons are pressed, release drag immediately!
           if (moveEvt.pointerType === 'mouse' && moveEvt.buttons === 0) {
             handleLayerUp(moveEvt);
             return;
           }
 
-          // If user begins two-finger pinch/pan or multiple touches detected, immediately abort layer drag!
           if (isPinchingRef.current || activePointersRef.current.size >= 2 || (moveEvt.touches && moveEvt.touches.length >= 2)) {
             isDraggingLayerRef.current = false;
             document.body.classList.remove('is-dragging-layer');
@@ -2000,7 +2227,7 @@ export default function App() {
 
           if (!hasActuallyMoved) {
             if (Math.hypot(rawDx, rawDy) < DRAG_THRESHOLD) {
-              return; // Plain tap: do NOT touch transforms!
+              return;
             }
             hasActuallyMoved = true;
             document.body.classList.add('is-dragging-layer');
@@ -2010,6 +2237,7 @@ export default function App() {
 
           latestDx = rawDx;
           latestDy = rawDy;
+
           if (invScreenCTM && svgEl?.createSVGPoint) {
             const pt0 = svgEl.createSVGPoint();
             pt0.x = 0; pt0.y = 0;
@@ -2017,11 +2245,12 @@ export default function App() {
             pt1.x = rawDx; pt1.y = rawDy;
             const p0 = pt0.matrixTransform(invScreenCTM);
             const p1 = pt1.matrixTransform(invScreenCTM);
-            latestSvgDx = Math.round(p1.x - p0.x);
-            latestSvgDy = Math.round(p1.y - p0.y);
+            latestSvgDx = p1.x - p0.x;
+            latestSvgDy = p1.y - p0.y;
           } else {
-            latestSvgDx = Math.round(rawDx * scaleX);
-            latestSvgDy = Math.round(rawDy * scaleY);
+            const curZoom = currentZoomRef.current || zoomLevel || 1;
+            latestSvgDx = (rawDx / curZoom) / svgToContainerScaleX;
+            latestSvgDy = (rawDy / curZoom) / svgToContainerScaleY;
           }
 
           if (dragRafId) return;
@@ -2032,40 +2261,73 @@ export default function App() {
             const curSvgDx = latestSvgDx;
             const curSvgDy = latestSvgDy;
 
-            // 1. Direct smooth DOM updates on active SVG nodes - zero DOM destruction, zero flickering!
-            activeDomNodes.forEach(({ id, node, origAttr }) => {
-              const init = initialTransforms[id] || { x: 0, y: 0, rotate: 0, scaleX: 1, scaleY: 1 };
-              const targetX = init.x + curSvgDx;
-              const targetY = init.y + curSvgDy;
+            // Direct smooth SVG transform updates on active nodes in viewBox space
+            activeDomNodes.forEach(({ id, cleanId, node, origAttr, baseTransform, isHtml, invParentMatrix }) => {
+              const init = initialTransforms[cleanId] || initialTransforms[id] || { x: 0, y: 0, rotate: 0, scaleX: 1, scaleY: 1, rotateX: 0, rotateY: 0, z: 0 };
+              
+              let effectiveDx = curSvgDx;
+              let effectiveDy = curSvgDy;
+              if (invParentMatrix) {
+                const localDelta = invParentMatrix.transformPoint(new DOMPoint(curSvgDx, curSvgDy));
+                effectiveDx = localDelta.x;
+                effectiveDy = localDelta.y;
+              }
+
+              const targetX = Number((init.x + effectiveDx).toFixed(3));
+              const targetY = Number((init.y + effectiveDy).toFixed(3));
+              const rx = init.rotateX || 0;
+              const ry = init.rotateY || 0;
+              const z = init.z || 0;
+              const rot = init.rotate || 0;
+              const scaleX = init.scaleX ?? 1;
+              const scaleY = init.scaleY ?? 1;
+              const cx = init.cx || 0;
+              const cy = init.cy || 0;
+              const has3DLayer = rx !== 0 || ry !== 0 || z !== 0;
 
               const parts = [];
               if (targetX !== 0 || targetY !== 0) {
                 parts.push(`translate(${targetX} ${targetY})`);
               }
-              const hasRotate = init.rotate && init.rotate !== 0;
-              const hasScale = (init.scaleX !== undefined && init.scaleX !== 1) || (init.scaleY !== undefined && init.scaleY !== 1);
+              const hasRotate = rot !== 0;
+              const hasScale = scaleX !== 1 || scaleY !== 1;
               if (hasRotate || hasScale) {
-                const cx = init.cx || 0;
-                const cy = init.cy || 0;
                 if (cx !== 0 || cy !== 0) {
                   parts.push(`translate(${cx} ${cy})`);
-                  if (hasRotate) parts.push(`rotate(${init.rotate})`);
-                  if (hasScale) parts.push(`scale(${init.scaleX || 1} ${init.scaleY || 1})`);
+                  if (hasRotate) parts.push(`rotate(${rot})`);
+                  if (hasScale) parts.push(`scale(${scaleX} ${scaleY})`);
                   parts.push(`translate(${-cx} ${-cy})`);
                 } else {
-                  if (hasRotate) parts.push(`rotate(${init.rotate})`);
-                  if (hasScale) parts.push(`scale(${init.scaleX || 1} ${init.scaleY || 1})`);
+                  if (hasRotate) parts.push(`rotate(${rot})`);
+                  if (hasScale) parts.push(`scale(${scaleX} ${scaleY})`);
                 }
               }
               if (origAttr) parts.push(origAttr);
               node.setAttribute('transform', parts.join(' '));
+
+              if (isHtml || node.closest('foreignObject') || node.tagName?.toLowerCase() === 'div' || node.tagName?.toLowerCase() === 'span') {
+                const transformTokens = [];
+                if (targetX !== 0 || targetY !== 0) transformTokens.push(`translate(${targetX}px, ${targetY}px)`);
+                if (rot !== 0) transformTokens.push(`rotate(${rot}deg)`);
+                if (scaleX !== 1 || scaleY !== 1) transformTokens.push(`scale(${scaleX}, ${scaleY})`);
+                if (baseTransform) transformTokens.push(baseTransform);
+                node.style.transform = transformTokens.join(' ') || 'none';
+                node.style.transformOrigin = 'center center';
+              } else if (has3DLayer) {
+                node.style.transformBox = 'fill-box';
+                node.style.transformOrigin = 'center';
+                node.style.transform = `perspective(800px) translate3d(${targetX}px, ${targetY}px, ${z}px) rotateX(${rx}deg) rotateY(${ry}deg) rotate(${rot}deg)`;
+              } else {
+                node.style.transform = '';
+              }
             });
 
-            // 2. Direct transform on Transform Bounding Box for 60/120fps tracking in container space
-            if (transformBoxRef.current && startTransformBox) {
-              const boxDx = curSvgDx * svgToContainerScale;
-              const boxDy = curSvgDy * svgToContainerScale;
-              transformBoxRef.current.style.transform = `translate3d(${boxDx}px, ${boxDy}px, 0px)`;
+            // Direct transform on Transform Bounding Box frame in container space for 1:1 lockstep tracking
+            if (transformBoxRef.current) {
+              const boxDx = curSvgDx * svgToContainerScaleX;
+              const boxDy = curSvgDy * svgToContainerScaleY;
+              const base3D = has3D ? ` translate3d(0, 0, ${adjustments.translateZ || 0}px) rotateX(${adjustments.rotateX || 0}deg) rotateY(${adjustments.rotateY || 0}deg)` : '';
+              transformBoxRef.current.style.transform = `translate3d(${boxDx}px, ${boxDy}px, 0px)${base3D}`;
             }
           });
         };
@@ -2091,78 +2353,112 @@ export default function App() {
             if (isDraggingLayerRef.current) {
               isDraggingLayerRef.current = false;
               if (hasActuallyMoved) {
-                const clientX = upEvt?.clientX ?? (layerDragStartPosRef.current.x + latestDx);
-                const clientY = upEvt?.clientY ?? (layerDragStartPosRef.current.y + latestDy);
-                const rawDx = clientX - layerDragStartPosRef.current.x;
-                const rawDy = clientY - layerDragStartPosRef.current.y;
-                let finalSvgDx = latestSvgDx;
-                let finalSvgDy = latestSvgDy;
-                if (invScreenCTM && svgEl?.createSVGPoint) {
-                  const pt0 = svgEl.createSVGPoint();
-                  pt0.x = 0; pt0.y = 0;
-                  const pt1 = svgEl.createSVGPoint();
-                  pt1.x = rawDx; pt1.y = rawDy;
-                  const p0 = pt0.matrixTransform(invScreenCTM);
-                  const p1 = pt1.matrixTransform(invScreenCTM);
-                  finalSvgDx = Math.round(p1.x - p0.x);
-                  finalSvgDy = Math.round(p1.y - p0.y);
-                }
+                const finalSvgDx = latestSvgDx;
+                const finalSvgDy = latestSvgDy;
 
-                // 1. GUARANTEED: Synchronously apply the final transform to DOM nodes immediately.
-                // Even on ultra-fast flick releases, this ensures SVG DOM nodes are already at their exact target position!
-                activeDomNodes.forEach(({ id, node, origAttr }) => {
-                  const init = initialTransforms[id] || { x: 0, y: 0, rotate: 0, scaleX: 1, scaleY: 1 };
-                  const targetX = init.x + finalSvgDx;
-                  const targetY = init.y + finalSvgDy;
+                // 1. Commit new transforms to layerTransformsRef
+                const updatedTransforms = { ...layerTransformsRef.current };
+                activeIds.forEach(id => {
+                  const cleanId = String(id).replace(/^pf_studio_/i, '');
+                  const domInfo = activeDomNodes.find(item => item.id === id || item.cleanId === cleanId);
+                  const init = initialTransforms[cleanId] || initialTransforms[id] || { x: 0, y: 0, rotate: 0, scaleX: 1, scaleY: 1, rotateX: 0, rotateY: 0, z: 0 };
+                  
+                  let effectiveDx = finalSvgDx;
+                  let effectiveDy = finalSvgDy;
+                  if (domInfo?.invParentMatrix) {
+                    const localDelta = domInfo.invParentMatrix.transformPoint(new DOMPoint(finalSvgDx, finalSvgDy));
+                    effectiveDx = localDelta.x;
+                    effectiveDy = localDelta.y;
+                  }
+
+                  const newX = Number((init.x + effectiveDx).toFixed(3));
+                  const newY = Number((init.y + effectiveDy).toFixed(3));
+                  updatedTransforms[cleanId] = {
+                    ...(layerTransformsRef.current[cleanId] || {}),
+                    x: newX,
+                    y: newY
+                  };
+                  if (id !== cleanId) {
+                    updatedTransforms[id] = updatedTransforms[cleanId];
+                  }
+                });
+                layerTransformsRef.current = updatedTransforms;
+
+                // 2. Synchronously ensure DOM node transform attribute is finalized
+                activeDomNodes.forEach(({ id, cleanId, node, origAttr, baseTransform, isHtml, invParentMatrix }) => {
+                  const init = initialTransforms[cleanId] || initialTransforms[id] || { x: 0, y: 0, rotate: 0, scaleX: 1, scaleY: 1, rotateX: 0, rotateY: 0, z: 0 };
+                  
+                  let effectiveDx = finalSvgDx;
+                  let effectiveDy = finalSvgDy;
+                  if (invParentMatrix) {
+                    const localDelta = invParentMatrix.transformPoint(new DOMPoint(finalSvgDx, finalSvgDy));
+                    effectiveDx = localDelta.x;
+                    effectiveDy = localDelta.y;
+                  }
+
+                  const targetX = Number((init.x + effectiveDx).toFixed(3));
+                  const targetY = Number((init.y + effectiveDy).toFixed(3));
+                  const rx = init.rotateX || 0;
+                  const ry = init.rotateY || 0;
+                  const z = init.z || 0;
+                  const rot = init.rotate || 0;
+                  const scaleX = init.scaleX ?? 1;
+                  const scaleY = init.scaleY ?? 1;
+                  const cx = init.cx || 0;
+                  const cy = init.cy || 0;
+                  const has3DLayer = rx !== 0 || ry !== 0 || z !== 0;
 
                   const parts = [];
                   if (targetX !== 0 || targetY !== 0) {
                     parts.push(`translate(${targetX} ${targetY})`);
                   }
-                  const hasRotate = init.rotate && init.rotate !== 0;
-                  const hasScale = (init.scaleX !== undefined && init.scaleX !== 1) || (init.scaleY !== undefined && init.scaleY !== 1);
+                  const hasRotate = rot !== 0;
+                  const hasScale = scaleX !== 1 || scaleY !== 1;
                   if (hasRotate || hasScale) {
-                    const cx = init.cx || 0;
-                    const cy = init.cy || 0;
                     if (cx !== 0 || cy !== 0) {
                       parts.push(`translate(${cx} ${cy})`);
-                      if (hasRotate) parts.push(`rotate(${init.rotate})`);
-                      if (hasScale) parts.push(`scale(${init.scaleX || 1} ${init.scaleY || 1})`);
+                      if (hasRotate) parts.push(`rotate(${rot})`);
+                      if (hasScale) parts.push(`scale(${scaleX} ${scaleY})`);
                       parts.push(`translate(${-cx} ${-cy})`);
                     } else {
-                      if (hasRotate) parts.push(`rotate(${init.rotate})`);
-                      if (hasScale) parts.push(`scale(${init.scaleX || 1} ${init.scaleY || 1})`);
+                      if (hasRotate) parts.push(`rotate(${rot})`);
+                      if (hasScale) parts.push(`scale(${scaleX} ${scaleY})`);
                     }
                   }
                   if (origAttr) parts.push(origAttr);
                   node.setAttribute('transform', parts.join(' '));
+
+                  if (isHtml || node.closest('foreignObject') || node.tagName?.toLowerCase() === 'div' || node.tagName?.toLowerCase() === 'span') {
+                    const transformTokens = [];
+                    if (targetX !== 0 || targetY !== 0) transformTokens.push(`translate(${targetX}px, ${targetY}px)`);
+                    if (rot !== 0) transformTokens.push(`rotate(${rot}deg)`);
+                    if (scaleX !== 1 || scaleY !== 1) transformTokens.push(`scale(${scaleX}, ${scaleY})`);
+                    if (baseTransform) transformTokens.push(baseTransform);
+                    node.style.transform = transformTokens.join(' ') || 'none';
+                    node.style.transformOrigin = 'center center';
+                  } else if (has3DLayer) {
+                    node.style.transformBox = 'fill-box';
+                    node.style.transformOrigin = 'center';
+                    node.style.transform = `perspective(800px) translate3d(${targetX}px, ${targetY}px, ${z}px) rotateX(${rx}deg) rotateY(${ry}deg) rotate(${rot}deg)`;
+                  } else {
+                    node.style.transform = '';
+                  }
                 });
 
-                // 2. Synchronously update layerTransformsRef.current so immediate subsequent clicks/drags read accurate state
-                const updatedTransforms = { ...layerTransformsRef.current };
-                activeIds.forEach(id => {
-                  const init = initialTransforms[id] || { x: 0, y: 0, rotate: 0 };
-                  updatedTransforms[id] = {
-                    ...(layerTransformsRef.current[id] || { rotate: 0 }),
-                    x: init.x + finalSvgDx,
-                    y: init.y + finalSvgDy
-                  };
-                });
-                layerTransformsRef.current = updatedTransforms;
-
-                // 3. Immediately lock transformBox mathematically at the final position
+                // 3. Clear temporary transform on bounding box frame and update
                 if (transformBoxRef.current) {
                   transformBoxRef.current.style.transform = '';
                 }
                 updateTransformBox(activeIds);
 
-                // 4. Commit new transforms to React state
+                // 4. Commit to React state
                 setLayerTransforms(updatedTransforms);
 
                 justFinishedLayerDragRef.current = true;
                 setTimeout(() => {
                   justFinishedLayerDragRef.current = false;
                 }, 100);
+
                 if (dragInitialSnapshotRef.current) {
                   setUndoStack(prev => [...prev.slice(-30), dragInitialSnapshotRef.current]);
                   setRedoStack([]);
@@ -2171,10 +2467,12 @@ export default function App() {
                 if (transformBoxRef.current) {
                   transformBoxRef.current.style.transform = '';
                 }
+                updateTransformBox(activeIds);
               }
             }
           } finally {
             isDraggingLayerRef.current = false;
+            updateTransformBox(activeIds);
             window.removeEventListener('pointermove', handleLayerMove, true);
             window.removeEventListener('pointerup', handleLayerUp, true);
             window.removeEventListener('pointercancel', handleLayerUp, true);
@@ -2287,8 +2585,6 @@ export default function App() {
               if (finalHits.length > 0) {
                 setSelectedLayerIds(finalHits);
                 setSelectedLayerId(finalHits[0]);
-                setStudioTab('colors');
-                setAdjustmentSubTab('colors');
               }
             } else {
               // Simple click without drag on canvas background:
@@ -2556,30 +2852,52 @@ export default function App() {
     return combined.filter(l => !deletedLayerIds.includes(l.id));
   }, [svgLayers, duplicatedLayers, deletedLayerIds]);
 
-  const handleDeleteSelectedLayers = () => {
-    const activeIds = (selectedLayerIdsRef.current && selectedLayerIdsRef.current.length > 0)
-      ? selectedLayerIdsRef.current
-      : (selectedLayerIds && selectedLayerIds.length > 0 ? selectedLayerIds : (selectedLayerId ? [selectedLayerId] : []));
-    if (activeIds.length === 0) return;
+  const handleDeleteSelectedLayers = (overrideIds = null) => {
+    const rawIds = (overrideIds && overrideIds.length > 0)
+      ? overrideIds
+      : ((selectedLayerIdsRef.current && selectedLayerIdsRef.current.length > 0)
+        ? selectedLayerIdsRef.current
+        : (selectedLayerIds && selectedLayerIds.length > 0 ? selectedLayerIds : (selectedLayerId ? [selectedLayerId] : [])));
+    if (rawIds.length === 0) return;
     recordUndo();
-    setDeletedLayerIds(prev => Array.from(new Set([...prev, ...activeIds])));
+    const cleanIds = rawIds.map(id => String(id).replace(/^pf_studio_/i, ''));
+    setDeletedLayerIds(prev => Array.from(new Set([...prev, ...rawIds, ...cleanIds])));
+
+    // Instant direct removal from live DOM for zero-latency feedback
+    if (canvasSvgContainerRef.current) {
+      rawIds.forEach(id => {
+        const cleanId = String(id).replace(/^pf_studio_/i, '');
+        const numOnly = cleanId.replace(/\D/g, '');
+        const node = canvasSvgContainerRef.current.querySelector(`[data-layer-id="${id}"]`) ||
+          canvasSvgContainerRef.current.querySelector(`[data-layer-id="${cleanId}"]`) ||
+          (numOnly ? canvasSvgContainerRef.current.querySelector(`[data-layer-id="layer_${numOnly}"]`) : null);
+        if (node) {
+          node.remove();
+        }
+      });
+    }
+
+    selectedLayerIdsRef.current = [];
+    selectedLayerIdRef.current = null;
     setSelectedLayerIds([]);
     setSelectedLayerId(null);
     setActiveSelectedColor(null);
     setTransformBox(null);
   };
 
-  const handleDuplicateSelectedLayers = () => {
-    const activeIds = (selectedLayerIdsRef.current && selectedLayerIdsRef.current.length > 0)
-      ? selectedLayerIdsRef.current
-      : (selectedLayerIds && selectedLayerIds.length > 0 ? selectedLayerIds : (selectedLayerId ? [selectedLayerId] : []));
-    if (activeIds.length === 0) return;
+  const handleDuplicateSelectedLayers = (overrideIds = null) => {
+    const rawIds = (overrideIds && overrideIds.length > 0)
+      ? overrideIds
+      : ((selectedLayerIdsRef.current && selectedLayerIdsRef.current.length > 0)
+        ? selectedLayerIdsRef.current
+        : (selectedLayerIds && selectedLayerIds.length > 0 ? selectedLayerIds : (selectedLayerId ? [selectedLayerId] : [])));
+    if (rawIds.length === 0) return;
     recordUndo();
     const newDuplicated = [];
     const newSelectedIds = [];
     const newTransforms = { ...layerTransformsRef.current };
 
-    activeIds.forEach(id => {
+    rawIds.forEach(id => {
       const dupId = `dup_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
       newDuplicated.push({ id: dupId, sourceId: id });
       newSelectedIds.push(dupId);
@@ -2596,6 +2914,8 @@ export default function App() {
     setLayerTransforms(newTransforms);
     setSelectedLayerIds(newSelectedIds);
     setSelectedLayerId(newSelectedIds[0]);
+    selectedLayerIdsRef.current = newSelectedIds;
+    selectedLayerIdRef.current = newSelectedIds[0];
   };
 
   // Center Selected Element(s) to Canvas Center (or Reset Canvas Pan/Zoom if no element selected)
@@ -2632,16 +2952,34 @@ export default function App() {
         const el = svgContainer.querySelector(`[data-layer-id="${id}"]`) ||
           svgContainer.querySelector(`[data-layer-id="${cleanId}"]`) ||
           svgContainer.querySelector(`[data-layer-id="pf_studio_${cleanId}"]`);
-        if (el && typeof el.getBBox === 'function') {
-          try {
-            const bbox = el.getBBox();
-            if (bbox && (bbox.width > 0 || bbox.height > 0)) {
-              minX = Math.min(minX, bbox.x);
-              minY = Math.min(minY, bbox.y);
-              maxX = Math.max(maxX, bbox.x + bbox.width);
-              maxY = Math.max(maxY, bbox.y + bbox.height);
-            }
-          } catch (_) { }
+        if (el) {
+          if (typeof el.getBBox === 'function') {
+            try {
+              const bbox = el.getBBox();
+              if (bbox && (bbox.width > 0 || bbox.height > 0)) {
+                minX = Math.min(minX, bbox.x);
+                minY = Math.min(minY, bbox.y);
+                maxX = Math.max(maxX, bbox.x + bbox.width);
+                maxY = Math.max(maxY, bbox.y + bbox.height);
+              }
+            } catch (_) { }
+          } else {
+            try {
+              const r = el.getBoundingClientRect();
+              const svgR = svgEl.getBoundingClientRect();
+              if (r && svgR && svgR.width > 0 && svgR.height > 0) {
+                const scale = vbWidth / svgR.width;
+                const ex = (r.left - svgR.left) * scale;
+                const ey = (r.top - svgR.top) * scale;
+                const ew = r.width * scale;
+                const eh = r.height * scale;
+                minX = Math.min(minX, ex);
+                minY = Math.min(minY, ey);
+                maxX = Math.max(maxX, ex + ew);
+                maxY = Math.max(maxY, ey + eh);
+              }
+            } catch (_) { }
+          }
         }
       });
 
@@ -2825,8 +3163,6 @@ export default function App() {
       setSelectedLayerId(allIds[0]);
       selectedLayerIdRef.current = allIds[0];
     }
-    setStudioTab('colors');
-    setAdjustmentSubTab('colors');
     setTimeout(() => {
       updateTransformBox(allIds);
     }, 20);
@@ -3142,7 +3478,7 @@ export default function App() {
         const dist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
         if (initialPinchDist > 0) {
           const scale = dist / initialPinchDist;
-          const nextZoom = Math.min(5, Math.max(0.15, Number((initialZoom * scale).toFixed(3))));
+          const nextZoom = Math.min(5, Math.max(0.4, Number((initialZoom * scale).toFixed(3))));
           targetZoomRef.current = nextZoom;
           currentZoomRef.current = nextZoom;
           setZoomLevel(nextZoom);
@@ -3521,8 +3857,118 @@ export default function App() {
   const [addElementCategory, setAddElementCategory] = useState('All');
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   const [helpSearchQuery, setHelpSearchQuery] = useState('');
-  const [helpActiveTab, setHelpActiveTab] = useState('pc'); // 'pc' | 'mobile'
   const canvasSvgContainerRef = useRef(null);
+  const transformStageRef = useRef(null);
+  const liveTransformRafRef = useRef(null);
+  const isTransformDraggingRef = useRef(false);
+  const adjustmentsRef = useRef(adjustments);
+  adjustmentsRef.current = adjustments;
+
+  // Method 1 + 2: Direct GPU hardware transform & pointer hit-test suppression for zero-lag heavy SVG editing
+  const startTransformDrag = useCallback(() => {
+    isTransformDraggingRef.current = true;
+    recordUndoRef.current?.();
+    if (canvasSvgContainerRef.current) {
+      canvasSvgContainerRef.current.style.pointerEvents = 'none';
+    }
+  }, []);
+
+  const endTransformDrag = useCallback(() => {
+    isTransformDraggingRef.current = false;
+    if (liveTransformRafRef.current) {
+      cancelAnimationFrame(liveTransformRafRef.current);
+      liveTransformRafRef.current = null;
+    }
+    if (canvasSvgContainerRef.current) {
+      canvasSvgContainerRef.current.style.pointerEvents = '';
+    }
+  }, []);
+
+  const applyLiveStageTransform = useCallback((partial) => {
+    if (!transformStageRef.current || !canvasSvgContainerRef.current) return;
+    if (liveTransformRafRef.current) {
+      cancelAnimationFrame(liveTransformRafRef.current);
+    }
+    liveTransformRafRef.current = requestAnimationFrame(() => {
+      if (!transformStageRef.current || !canvasSvgContainerRef.current) return;
+      const curAdj = adjustmentsRef.current || {};
+      const tx = partial.translateX !== undefined ? partial.translateX : (curAdj.translateX || 0);
+      const ty = partial.translateY !== undefined ? partial.translateY : (curAdj.translateY || 0);
+      const tz = partial.translateZ !== undefined ? partial.translateZ : (curAdj.translateZ || 0);
+      const rx = partial.rotateX !== undefined ? partial.rotateX : (curAdj.rotateX || 0);
+      const ry = partial.rotateY !== undefined ? partial.rotateY : (curAdj.rotateY || 0);
+      const rot = partial.rotation !== undefined ? partial.rotation : (curAdj.rotation || 0);
+      const skewX = curAdj.skewX || 0;
+      const skewY = curAdj.skewY || 0;
+      const flipH = curAdj.flipH ? -1 : 1;
+      const flipV = curAdj.flipV ? -1 : 1;
+      const persp = curAdj.perspective || 1200;
+      const is3DActive = (rx !== 0 || ry !== 0 || tz !== 0 || (curAdj.depth3D && curAdj.depth3D > 0));
+
+      transformStageRef.current.style.perspective = is3DActive ? `${persp}px` : '';
+      transformStageRef.current.style.perspectiveOrigin = '50% 50%';
+      transformStageRef.current.style.transformStyle = 'preserve-3d';
+      transformStageRef.current.style.transform = `translate3d(${tx}px, ${ty}px, 0px) rotate(${rot}deg) skew(${skewX}deg, ${skewY}deg) scale(${flipH}, ${flipV})`;
+
+      const rot3dCss = is3DActive
+        ? `translate3d(0, 0, ${tz}px) rotateX(${rx}deg) rotateY(${ry}deg)`
+        : '';
+      canvasSvgContainerRef.current.style.transform = rot3dCss;
+      canvasSvgContainerRef.current.style.transformOrigin = '50% 50%';
+      canvasSvgContainerRef.current.style.transformStyle = 'preserve-3d';
+      canvasSvgContainerRef.current.style.backfaceVisibility = 'hidden';
+
+      if (transformBoxRef.current) {
+        transformBoxRef.current.style.transform = rot3dCss;
+        transformBoxRef.current.style.transformOrigin = '50% 50%';
+        transformBoxRef.current.style.transformStyle = 'preserve-3d';
+      }
+    });
+  }, []);
+
+  const applyLiveLayerTransform = useCallback((targetIds, partial) => {
+    const ids = Array.isArray(targetIds) ? targetIds : [targetIds];
+    if (ids.length === 0 || !canvasSvgContainerRef.current) return;
+    if (liveTransformRafRef.current) {
+      cancelAnimationFrame(liveTransformRafRef.current);
+    }
+    liveTransformRafRef.current = requestAnimationFrame(() => {
+      ids.forEach(rawId => {
+        const cleanId = String(rawId).replace(/^pf_studio_/i, '');
+        const numOnly = cleanId.replace(/\D/g, '');
+        const el = canvasSvgContainerRef.current?.querySelector(`[data-layer-id="${rawId}"]`) ||
+          canvasSvgContainerRef.current?.querySelector(`[data-layer-id="${cleanId}"]`) ||
+          (numOnly ? canvasSvgContainerRef.current?.querySelector(`[data-layer-id="layer_${numOnly}"]`) : null);
+        if (!el) return;
+        const cur = layerTransformsRef.current[cleanId] || { x: 0, y: 0, z: 0, rotate: 0, rotateX: 0, rotateY: 0 };
+        const x = partial.x !== undefined ? partial.x : (cur.x || 0);
+        const y = partial.y !== undefined ? partial.y : (cur.y || 0);
+        const z = partial.z !== undefined ? partial.z : (cur.z || 0);
+        const rx = partial.rotateX !== undefined ? partial.rotateX : (cur.rotateX || 0);
+        const ry = partial.rotateY !== undefined ? partial.rotateY : (cur.rotateY || 0);
+        const rot = partial.rotate !== undefined ? partial.rotate : (cur.rotate || 0);
+        const has3DLayer = rx !== 0 || ry !== 0 || z !== 0;
+
+        const cssTransform = has3DLayer
+          ? `transform-box: fill-box; transform-origin: center; transform: perspective(800px) translate3d(${x}px, ${y}px, ${z}px) rotateX(${rx}deg) rotateY(${ry}deg) rotate(${rot}deg);`
+          : (x !== 0 || y !== 0 || rot !== 0)
+            ? `transform-box: fill-box; transform-origin: center; transform: translate(${x}px, ${y}px) rotate(${rot}deg);`
+            : '';
+
+        const origStyle = el.getAttribute('style') || '';
+        let cleanStyle = origStyle
+          .replace(/transform-box\s*:\s*[^;]+;?/gi, '')
+          .replace(/transform-origin\s*:\s*[^;]+;?/gi, '')
+          .replace(/transform\s*:\s*[^;]+;?/gi, '')
+          .trim();
+        if (cssTransform) {
+          cleanStyle = `${cleanStyle ? cleanStyle + '; ' : ''}${cssTransform}`;
+        }
+        el.setAttribute('style', cleanStyle);
+      });
+    });
+  }, []);
+
 
   const filteredPresets = useMemo(() => {
     return EFFECT_PRESETS.filter(preset => {
@@ -3600,8 +4046,37 @@ export default function App() {
 
   // Library Sorting & Grid View Density
   const [sortBy, setSortBy] = useState('recent'); // 'recent' | 'popular' | 'name'
-  const [viewDensity, setViewDensity] = useState('comfortable'); // 'comfortable' | 'compact'
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
+
+  // Filters Drag-to-Scroll & Independent Wheel Isolation
+  const filtersScrollRef = useRef(null);
+  const isDraggingFiltersRef = useRef(false);
+  const startYFiltersRef = useRef(0);
+  const scrollTopFiltersRef = useRef(0);
+  const hasDraggedFiltersRef = useRef(false);
+
+  const handleFiltersMouseDown = (e) => {
+    if (e.button !== 0 || !filtersScrollRef.current) return;
+    isDraggingFiltersRef.current = true;
+    hasDraggedFiltersRef.current = false;
+    startYFiltersRef.current = e.pageY - filtersScrollRef.current.offsetTop;
+    scrollTopFiltersRef.current = filtersScrollRef.current.scrollTop;
+  };
+
+  const handleFiltersMouseMove = (e) => {
+    if (!isDraggingFiltersRef.current || !filtersScrollRef.current) return;
+    const y = e.pageY - filtersScrollRef.current.offsetTop;
+    const walk = (y - startYFiltersRef.current) * 1.4;
+    if (Math.abs(walk) > 4) {
+      hasDraggedFiltersRef.current = true;
+      e.preventDefault();
+      filtersScrollRef.current.scrollTop = scrollTopFiltersRef.current - walk;
+    }
+  };
+
+  const handleFiltersMouseUp = () => {
+    isDraggingFiltersRef.current = false;
+  };
 
   // Undo / Redo History Stacks
   const [undoStack, setUndoStack] = useState([]);
@@ -3649,9 +4124,65 @@ export default function App() {
       setDuplicatedLayers([]);
       setLayerGroups({});
       setLayerOrder(layers.map(l => l.id));
-      setSelectedLayerId(layers.length > 0 ? layers[0].id : null);
-      setSelectedLayerIds(layers.length > 0 ? [layers[0].id] : []);
+      setSelectedLayerId(null);
+      setSelectedLayerIds([]);
+      setActiveSelectedColor(null);
       setTransformBox(null);
+      setAdjustments(prev => ({
+        ...prev,
+        colorReplacements: {},
+        rotateX: 0,
+        rotateY: 0,
+        translateZ: 0,
+        rotation: 0,
+        translateX: 0,
+        translateY: 0,
+        skewX: 0,
+        skewY: 0,
+        flipH: false,
+        flipV: false
+      }));
+
+      // Calculate natural aspect ratio from SVG viewBox
+      let natRatio = 1;
+      let natW = 384;
+      let natH = 384;
+      const vbMatch = selectedAsset.svgCode.match(/viewBox=["']\s*([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s*["']/i);
+      if (vbMatch) {
+        const vbW = parseFloat(vbMatch[3]);
+        const vbH = parseFloat(vbMatch[4]);
+        if (vbW > 0 && vbH > 0) {
+          natRatio = vbW / vbH;
+          if (vbW >= vbH) {
+            natW = 384;
+            natH = Math.max(32, Math.round(384 / natRatio));
+          } else {
+            natH = 384;
+            natW = Math.max(32, Math.round(384 * natRatio));
+          }
+        }
+      } else {
+        const wMatch = selectedAsset.svgCode.match(/width=["']\s*([\d.]+)/i);
+        const hMatch = selectedAsset.svgCode.match(/height=["']\s*([\d.]+)/i);
+        if (wMatch && hMatch) {
+          const w = parseFloat(wMatch[1]);
+          const h = parseFloat(hMatch[1]);
+          if (w > 0 && h > 0) {
+            natRatio = w / h;
+            if (w >= h) {
+              natW = 384;
+              natH = Math.max(32, Math.round(384 / natRatio));
+            } else {
+              natH = 384;
+              natW = Math.max(32, Math.round(384 * natRatio));
+            }
+          }
+        }
+      }
+      setIconWidth(natW);
+      setIconHeight(natH);
+      setAspectRatio(natRatio);
+      setLockAspectRatio(true);
     } else {
       setLayerOrder(prev => (prev.length > 0 ? prev : layers.map(l => l.id)));
     }
@@ -3668,12 +4199,81 @@ export default function App() {
     adjustments.is3DFloating
   );
 
-  // Compute live SVG markup with all active layer transforms, per-layer custom styles & colors, material transformations, deletions, duplications, and uniquely scoped IDs
-  const currentPreviewSvg = useMemo(() => {
+  // Gallery Card Safe Boundary Detection: Computes whether current transforms push element beyond card border
+  const cardOverflowInfo = useMemo(() => {
+    const tx = adjustments.translateX || 0;
+    const ty = adjustments.translateY || 0;
+    const tz = adjustments.translateZ || 0;
+    const scale = adjustments.scale || 1;
+
+    // Thresholds: In gallery cards, the preview box has padding around the icon.
+    // Moving more than ~18% of width/height pushes the icon into the card's outer border area.
+    const safeLimitX = Math.round(iconWidth * 0.18);
+    const safeLimitY = Math.round(iconHeight * 0.18);
+    const safeLimitZ = 160;
+
+    let isOverflowing = Math.abs(tx) > safeLimitX || Math.abs(ty) > safeLimitY || Math.abs(tz) > safeLimitZ || scale > 1.25;
+    let overflowReasons = [];
+
+    if (Math.abs(tx) > safeLimitX) overflowReasons.push(`X: ${tx > 0 ? '+' : ''}${tx}px`);
+    if (Math.abs(ty) > safeLimitY) overflowReasons.push(`Y: ${ty > 0 ? '+' : ''}${ty}px`);
+    if (Math.abs(tz) > safeLimitZ) overflowReasons.push(`Z Depth: ${tz}px`);
+    if (scale > 1.25) overflowReasons.push(`Scale: ${Math.round(scale * 100)}%`);
+
+    // Check individual layer transforms
+    if (layerTransforms && Object.keys(layerTransforms).length > 0) {
+      for (const [layerId, tr] of Object.entries(layerTransforms)) {
+        if (tr) {
+          const lx = (tr.x || 0) + tx;
+          const ly = (tr.y || 0) + ty;
+          if (Math.abs(lx) > safeLimitX + 20 || Math.abs(ly) > safeLimitY + 20) {
+            isOverflowing = true;
+            overflowReasons.push(`Layer '${String(layerId).slice(0, 10)}'`);
+            break;
+          }
+        }
+      }
+    }
+
+    return {
+      isOverflowing,
+      reasons: overflowReasons,
+      safeLimitX,
+      safeLimitY
+    };
+  }, [adjustments.translateX, adjustments.translateY, adjustments.translateZ, adjustments.scale, layerTransforms, iconWidth, iconHeight]);
+
+  // 1. Base styled SVG memo: Computes heavy XML parsing, style filters, gradients, colors, and canvas objects
+  // 1. Base styled SVG memo: Computes heavy XML parsing, style filters, gradients, colors, and canvas objects
+  // (Only recomputed when asset, colors, or visual style presets change - NEVER on layer drag or transforms!)
+  const baseStyledSvg = useMemo(() => {
     if (!selectedAsset) return '';
 
+    // Normalize foreignObject SVG so it maintains clean 200x200 layout matching viewBox
+    let sourceSvg = normalizeForeignObjectSvg(selectedAsset.svgCode || '');
+
+    // Ensure overflow: visible on root <svg> without duplicating style attribute
+    sourceSvg = sourceSvg.replace(/<svg\b([^>]*)>/i, (m, attrs) => {
+      if (/style="([^"]*)"/i.test(attrs)) {
+        return `<svg${attrs.replace(/style="([^"]*)"/i, (sm, s) => `style="${s.includes('overflow') ? s : s + '; overflow: visible;'}"`)}>`;
+      }
+      return `<svg${attrs} style="overflow: visible;">`;
+    });
+
+    // UNIVERSAL XML SANITIZER: Combine any multiple style attributes on the same tag into a single valid style attribute
+    // (Prevents any fatal XML parsing error: "Attribute style redefined")
+    sourceSvg = sourceSvg.replace(/<([a-zA-Z0-9:_-]+)([^>]*?)>/g, (fullTag, tagName, attrs) => {
+      const styleMatches = [...attrs.matchAll(/\bstyle="([^"]*)"/gi)];
+      if (styleMatches.length > 1) {
+        const combined = styleMatches.map(m => m[1]).filter(Boolean).join('; ');
+        const cleanAttrs = attrs.replace(/\bstyle="[^"]*"/gi, '').trim();
+        return `<${tagName} ${cleanAttrs} style="${combined}">`;
+      }
+      return fullTag;
+    });
+
     // 1. Tag layers if not already tagged so every element has a guaranteed data-layer-id
-    const { taggedSvg } = extractSvgLayers(selectedAsset.svgCode);
+    const { taggedSvg } = extractSvgLayers(sourceSvg);
     let colorReplaced = replaceSvgColors(taggedSvg, adjustments.colorReplacements);
 
     // 2. Visual material/style transformations (support both per-layer styles and global style mode)
@@ -3719,12 +4319,19 @@ export default function App() {
       colorReplaced = injectCanvasObjectsIntoSvg(colorReplaced, customCanvasObjects, iconWidth, iconHeight);
     }
 
-    // 4. Per-layer position offsets, rotations, scaling, deletions, duplications, DOM ordering, and per-layer custom styling
+    return colorReplaced;
+  }, [selectedAsset, layerStyles, activeStyleMode, layerOrder, svgLayers, strokeMultiplier, strokeColorMode, customStrokeColor, customCanvasObjects, iconWidth, iconHeight, iconGradientEnabled, gradientFrom, gradientTo, gradientAngle, adjustments.colorReplacements]);
+
+  // 2. Fast layer transform compositor: Takes pre-styled base SVG and applies position offsets in <2ms!
+  const currentPreviewSvg = useMemo(() => {
+    if (!baseStyledSvg) return '';
+
+    // 4. Per-layer position offsets, rotations, scaling, deletions, duplications, DOM ordering
     let transformedSvg = applyLayerTransforms(
-      colorReplaced,
+      baseStyledSvg,
       layerTransforms,
       layerOrder,
-      true,
+      true, // Guarantee data-layer-id on all visual shapes
       layerStyles,
       deletedLayerIds,
       duplicatedLayers
@@ -3739,19 +4346,20 @@ export default function App() {
       }
     }
 
-    // Force preserveAspectRatio="none" on root <svg> so height and width stretch independently
+    // If aspect ratio is locked, preserve authentic geometry (xMidYMid meet); if unlocked, allow freeform stretching (none)
+    const targetPreserveAspect = lockAspectRatio ? 'xMidYMid meet' : 'none';
     transformedSvg = transformedSvg.replace(/<svg\b([^>]*)>/i, (match, attrs) => {
       let updated = attrs;
       if (/preserveAspectRatio="[^"]*"/i.test(updated)) {
-        updated = updated.replace(/preserveAspectRatio="[^"]*"/i, 'preserveAspectRatio="none"');
+        updated = updated.replace(/preserveAspectRatio="[^"]*"/i, `preserveAspectRatio="${targetPreserveAspect}"`);
       } else {
-        updated += ' preserveAspectRatio="none"';
+        updated += ` preserveAspectRatio="${targetPreserveAspect}"`;
       }
       return `<svg${updated}>`;
     });
 
     return scopeSvgIds(transformedSvg, 'pf_studio_');
-  }, [selectedAsset, layerTransforms, layerStyles, layerOrder, deletedLayerIds, duplicatedLayers, adjustments.colorReplacements, activeStyleMode, strokeMultiplier, strokeColorMode, customStrokeColor, customCanvasObjects, iconWidth, iconHeight, iconGradientEnabled, gradientFrom, gradientTo, gradientAngle]);
+  }, [baseStyledSvg, layerTransforms, layerStyles, layerOrder, deletedLayerIds, duplicatedLayers, lockAspectRatio]);
 
   // Synchronous SVG viewBox-to-rendered screen pixel ratio (computed immediately on render)
   const svgScaleRatio = useMemo(() => {
@@ -3767,34 +4375,10 @@ export default function App() {
       if (wMatch) vbWidth = parseFloat(wMatch[1]);
     }
     if (!vbWidth || vbWidth <= 0) vbWidth = 100;
-    const renderedW = Math.max(1, Math.round(iconWidth * zoomLevel));
-    return vbWidth / renderedW;
-  }, [currentPreviewSvg, selectedAsset, iconWidth, zoomLevel]);
+    return vbWidth / (iconWidth || 512);
+  }, [currentPreviewSvg, selectedAsset, iconWidth]);
 
-  // Live scale measured directly from real DOM SVG bounding client rect (null until accurately measured)
-  const [measuredSvgScale, setMeasuredSvgScale] = useState(null);
-
-  useEffect(() => {
-    const container = canvasSvgContainerRef.current;
-    if (!container) return;
-    const svg = container.querySelector('svg');
-    if (!svg) return;
-    const vb = svg.viewBox?.baseVal;
-    let vbW = (vb && vb.width > 0) ? vb.width : 0;
-    if (!vbW) {
-      const attrW = parseFloat(svg.getAttribute('width'));
-      if (attrW && attrW > 0) vbW = attrW;
-    }
-    if (!vbW) vbW = 100;
-
-    const rect = svg.getBoundingClientRect();
-    const renderedW = rect.width > 0 ? rect.width : (iconWidth * zoomLevel);
-    if (renderedW > 0 && vbW > 0) {
-      setMeasuredSvgScale(vbW / renderedW);
-    }
-  }, [currentPreviewSvg, iconWidth, iconHeight, zoomLevel]);
-
-  const finalSvgScale = (measuredSvgScale !== null && measuredSvgScale > 0) ? measuredSvgScale : (svgScaleRatio || 1);
+  const finalSvgScale = svgScaleRatio || 1;
 
   // Detect whether currently selected icon is a stroke-based or filled vector
   const isStrokeIcon = useMemo(() => {
@@ -3921,7 +4505,16 @@ export default function App() {
     }
 
     const el = document.getElementById(`color-card-${targetColor.replace('#', '').toLowerCase()}`);
-    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    if (el) {
+      const scrollContainer = el.closest('.overflow-y-auto');
+      if (scrollContainer) {
+        const cRect = scrollContainer.getBoundingClientRect();
+        const eRect = el.getBoundingClientRect();
+        if (eRect.top < cRect.top || eRect.bottom > cRect.bottom) {
+          scrollContainer.scrollTop += (eRect.top - cRect.top) - (cRect.height / 2);
+        }
+      }
+    }
   }, [allSvgLayers, adjustments.colorReplacements]);
 
   // Open Color Wheel Popover floating directly above the clicked palette swatch
@@ -3998,7 +4591,7 @@ export default function App() {
       return null;
     }
 
-    const nodes = activeIds.map(id => {
+    let nodes = activeIds.map(id => {
       const cleanId = String(id).replace(/^pf_studio_/i, '');
       const numOnly = cleanId.replace(/\D/g, '');
       return svgContainer.querySelector(`[data-layer-id="${id}"]`) ||
@@ -4006,6 +4599,19 @@ export default function App() {
         svgContainer.querySelector(`[data-layer-id="pf_studio_${cleanId}"]`) ||
         (numOnly ? svgContainer.querySelector(`[data-layer-id="layer_${numOnly}"]`) : null);
     }).filter(Boolean);
+
+    if (nodes.length === 0 && activeIds.length > 0) {
+      const svgEl = svgContainer.querySelector('svg');
+      if (svgEl) tagSvgElements(svgEl);
+      nodes = activeIds.map(id => {
+        const cleanId = String(id).replace(/^pf_studio_/i, '');
+        const numOnly = cleanId.replace(/\D/g, '');
+        return svgContainer.querySelector(`[data-layer-id="${id}"]`) ||
+          svgContainer.querySelector(`[data-layer-id="${cleanId}"]`) ||
+          svgContainer.querySelector(`[data-layer-id="pf_studio_${cleanId}"]`) ||
+          (numOnly ? svgContainer.querySelector(`[data-layer-id="layer_${numOnly}"]`) : null);
+      }).filter(Boolean);
+    }
 
     if (nodes.length === 0) {
       setTransformBox(null);
@@ -4018,53 +4624,228 @@ export default function App() {
       return null;
     }
 
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-
-    nodes.forEach(node => {
-      if (node.getBBox && svgEl.createSVGPoint) {
-        try {
-          const bbox = node.getBBox();
-          if (bbox && (bbox.width > 0 || bbox.height > 0)) {
-            const ctm = node.getCTM ? node.getCTM() : null;
-            if (ctm) {
-              const corners = [
-                { x: bbox.x, y: bbox.y },
-                { x: bbox.x + bbox.width, y: bbox.y },
-                { x: bbox.x + bbox.width, y: bbox.y + bbox.height },
-                { x: bbox.x, y: bbox.y + bbox.height }
-              ].map(p => {
-                const pt = svgEl.createSVGPoint();
-                pt.x = p.x;
-                pt.y = p.y;
-                return pt.matrixTransform(ctm);
-              });
-              corners.forEach(p => {
-                if (p.x < minX) minX = p.x;
-                if (p.x > maxX) maxX = p.x;
-                if (p.y < minY) minY = p.y;
-                if (p.y > maxY) maxY = p.y;
-              });
-            }
-          }
-        } catch (_) { }
-      }
-    });
-
-    if (!isFinite(minX) || !isFinite(minY)) {
+    const stageEl = transformStageRef.current;
+    if (!stageEl) {
       setTransformBox(null);
       return null;
     }
 
-    const padLeft = parseFloat(getComputedStyle(svgContainer).paddingLeft) || 0;
-    const padTop = parseFloat(getComputedStyle(svgContainer).paddingTop) || 0;
+    const stageRect = stageEl.getBoundingClientRect();
+    if (!stageRect || stageRect.width <= 0 || stageRect.height <= 0) {
+      setTransformBox(null);
+      return null;
+    }
 
-    const x = padLeft + minX;
-    const y = padTop + minY;
-    const width = Math.max(8, maxX - minX);
-    const height = Math.max(8, maxY - minY);
+    const scaleX = iconWidth / stageRect.width;
+    const scaleY = iconHeight / stageRect.height;
+
+    // Accurate visual screen bounding box for any SVG element including stroke thickness and line caps
+    // Uses getBBox() + getScreenCTM() to measure true vector geometry WITHOUT filter blur/glow inflation!
+    const getVisualRect = (node) => {
+      if (!node) return null;
+      const tag = node.tagName?.toLowerCase();
+      if (tag === 'g') {
+        const children = Array.from(node.querySelectorAll('path, line, rect, circle, ellipse, polygon, polyline, text'));
+        if (children.length > 0) {
+          let gMinL = Infinity, gMinT = Infinity, gMaxR = -Infinity, gMaxB = -Infinity;
+          children.forEach(c => {
+            const cr = getVisualRect(c);
+            if (cr) {
+              if (cr.left < gMinL) gMinL = cr.left;
+              if (cr.top < gMinT) gMinT = cr.top;
+              if (cr.right > gMaxR) gMaxR = cr.right;
+              if (cr.bottom > gMaxB) gMaxB = cr.bottom;
+            }
+          });
+          if (isFinite(gMinL) && isFinite(gMinT)) {
+            return { left: gMinL, top: gMinT, right: gMaxR, bottom: gMaxB };
+          }
+        }
+      }
+
+      // HTML elements inside foreignObject
+      const isHtml = Boolean(node.closest('foreignObject')) || tag === 'div' || tag === 'span' || tag === 'section';
+      if (isHtml) {
+        // If node has visible child elements, measure the tight union of its children!
+        if (node.children && node.children.length > 0) {
+          const computed = window.getComputedStyle(node);
+          const hasOwnVisual = Boolean(
+            (computed.backgroundColor && computed.backgroundColor !== 'rgba(0, 0, 0, 0)' && computed.backgroundColor !== 'transparent') ||
+            (computed.borderWidth && parseFloat(computed.borderWidth) > 0 && computed.borderColor && computed.borderColor !== 'transparent') ||
+            (computed.boxShadow && computed.boxShadow !== 'none') ||
+            (computed.backgroundImage && computed.backgroundImage !== 'none')
+          );
+          if (!hasOwnVisual) {
+            const visualChildren = Array.from(node.querySelectorAll('div, span, section, p, button, a, svg, img')).filter(c => {
+              const cs = window.getComputedStyle(c);
+              const hasBg = cs.backgroundColor && cs.backgroundColor !== 'rgba(0, 0, 0, 0)' && cs.backgroundColor !== 'transparent';
+              const hasBorder = cs.borderWidth && parseFloat(cs.borderWidth) > 0 && cs.borderColor !== 'transparent';
+              const hasShadow = cs.boxShadow && cs.boxShadow !== 'none';
+              const hasImage = cs.backgroundImage && cs.backgroundImage !== 'none';
+              return hasBg || hasBorder || hasShadow || hasImage || c.tagName.toLowerCase() === 'svg' || c.tagName.toLowerCase() === 'img';
+            });
+            if (visualChildren.length > 0) {
+              let hMinL = Infinity, hMinT = Infinity, hMaxR = -Infinity, hMaxB = -Infinity;
+              visualChildren.forEach(c => {
+                const cr = c.getBoundingClientRect();
+                if (cr && (cr.width > 0 || cr.height > 0)) {
+                  if (cr.left < hMinL) hMinL = cr.left;
+                  if (cr.top < hMinT) hMinT = cr.top;
+                  if (cr.right > hMaxR) hMaxR = cr.right;
+                  if (cr.bottom > hMaxB) hMaxB = cr.bottom;
+                }
+              });
+              if (isFinite(hMinL) && isFinite(hMinT)) {
+                return { left: hMinL, top: hMinT, right: hMaxR, bottom: hMaxB };
+              }
+            }
+          }
+        }
+        const r = node.getBoundingClientRect();
+        if (r && (r.width > 0 || r.height > 0)) {
+          return { left: r.left, top: r.top, right: r.right, bottom: r.bottom };
+        }
+      }
+
+      // 1. High precision pure geometry bounding box via getBBox (immune to filter glow/blur expansion)
+      if (typeof node.getBBox === 'function' && typeof node.getScreenCTM === 'function') {
+        try {
+          const bbox = node.getBBox();
+          const ctm = node.getScreenCTM();
+          if (bbox && ctm && bbox.width > 0 && bbox.height > 0) {
+            const corners = [
+              { x: bbox.x, y: bbox.y },
+              { x: bbox.x + bbox.width, y: bbox.y },
+              { x: bbox.x, y: bbox.y + bbox.height },
+              { x: bbox.x + bbox.width, y: bbox.y + bbox.height }
+            ];
+            let bMinX = Infinity, bMinY = Infinity, bMaxX = -Infinity, bMaxY = -Infinity;
+            for (const pt of corners) {
+              const sx = pt.x * ctm.a + pt.y * ctm.c + ctm.e;
+              const sy = pt.x * ctm.b + pt.y * ctm.d + ctm.f;
+              if (sx < bMinX) bMinX = sx;
+              if (sx > bMaxX) bMaxX = sx;
+              if (sy < bMinY) bMinY = sy;
+              if (sy > bMaxY) bMaxY = sy;
+            }
+
+            let strokeW = 0;
+            const style = window.getComputedStyle(node);
+            const strokeAttr = node.getAttribute('stroke');
+            const strokeStyle = style.stroke;
+            const hasStroke = (strokeAttr && strokeAttr !== 'none' && strokeAttr !== 'transparent') ||
+                              (strokeStyle && strokeStyle !== 'none' && strokeStyle !== 'transparent');
+            if (hasStroke) {
+              const rawW = parseFloat(node.getAttribute('stroke-width') || style.strokeWidth || '0') || 0;
+              if (rawW > 0) strokeW = rawW;
+            }
+
+            const ctmScaleX = Math.hypot(ctm.a, ctm.b) || 1;
+            const ctmScaleY = Math.hypot(ctm.c, ctm.d) || 1;
+            const halfSwX = (strokeW / 2) * ctmScaleX;
+            const halfSwY = (strokeW / 2) * ctmScaleY;
+
+            return {
+              left: bMinX - halfSwX,
+              top: bMinY - halfSwY,
+              right: bMaxX + halfSwX,
+              bottom: bMaxY + halfSwY
+            };
+          }
+        } catch (_) {}
+      }
+
+      // 2. Fallback: getBoundingClientRect
+      const r = node.getBoundingClientRect();
+      if (!r) return null;
+
+      const style = window.getComputedStyle(node);
+      const strokeAttr = node.getAttribute('stroke');
+      const strokeStyle = style.stroke;
+      const hasStroke = (strokeAttr && strokeAttr !== 'none' && strokeAttr !== 'transparent') ||
+                        (strokeStyle && strokeStyle !== 'none' && strokeStyle !== 'transparent');
+
+      let strokeW = 0;
+      if (hasStroke) {
+        const rawW = parseFloat(node.getAttribute('stroke-width') || style.strokeWidth || '0') || 0;
+        if (rawW > 0) strokeW = rawW;
+      }
+
+      if (strokeW <= 0) {
+        return {
+          left: r.left,
+          top: r.top,
+          right: r.right,
+          bottom: r.bottom
+        };
+      }
+
+      let ctmScaleX = 1;
+      let ctmScaleY = 1;
+      try {
+        const ctm = node.getScreenCTM ? node.getScreenCTM() : null;
+        if (ctm) {
+          ctmScaleX = Math.hypot(ctm.a, ctm.b) || 1;
+          ctmScaleY = Math.hypot(ctm.c, ctm.d) || 1;
+        }
+      } catch (_) {}
+
+      const halfSwX = (strokeW / 2) * ctmScaleX;
+      const halfSwY = (strokeW / 2) * ctmScaleY;
+
+      return {
+        left: r.left - halfSwX,
+        top: r.top - halfSwY,
+        right: r.right + halfSwX,
+        bottom: r.bottom + halfSwY
+      };
+    };
+
+    let minLeft = Infinity;
+    let minTop = Infinity;
+    let maxRight = -Infinity;
+    let maxBottom = -Infinity;
+
+    if (nodes.length > 20) {
+      const svgEl = svgContainer.querySelector('svg');
+      if (nodes.length >= (allSvgLayers?.length || 999999) && svgEl) {
+        const svgRect = svgEl.getBoundingClientRect();
+        minLeft = svgRect.left;
+        minTop = svgRect.top;
+        maxRight = svgRect.right;
+        maxBottom = svgRect.bottom;
+      } else {
+        nodes.forEach(node => {
+          const r = node.getBoundingClientRect();
+          if (r && (r.width > 0 || r.height > 0)) {
+            if (r.left < minLeft) minLeft = r.left;
+            if (r.top < minTop) minTop = r.top;
+            if (r.right > maxRight) maxRight = r.right;
+            if (r.bottom > maxBottom) maxBottom = r.bottom;
+          }
+        });
+      }
+    } else {
+      nodes.forEach(node => {
+        const vr = getVisualRect(node);
+        if (vr && (vr.right > vr.left || vr.bottom > vr.top)) {
+          if (vr.left < minLeft) minLeft = vr.left;
+          if (vr.top < minTop) minTop = vr.top;
+          if (vr.right > maxRight) maxRight = vr.right;
+          if (vr.bottom > maxBottom) maxBottom = vr.bottom;
+        }
+      });
+    }
+
+    if (!isFinite(minLeft) || !isFinite(minTop)) {
+      setTransformBox(null);
+      return null;
+    }
+
+    const x = (minLeft - stageRect.left) * scaleX;
+    const y = (minTop - stageRect.top) * scaleY;
+    const width = Math.max(8, (maxRight - minLeft) * scaleX);
+    const height = Math.max(8, (maxBottom - minTop) * scaleY);
 
     const box = {
       x,
@@ -4087,7 +4868,7 @@ export default function App() {
 
     setTransformBox(box);
     return box;
-  }, [selectedLayerIds, selectedLayerId, zoomLevel, iconWidth, iconHeight]);
+  }, [selectedLayerIds, selectedLayerId, iconWidth, iconHeight, allSvgLayers]);
   updateTransformBoxRef.current = updateTransformBox;
 
   useEffect(() => {
@@ -4096,33 +4877,34 @@ export default function App() {
     const wsEl = canvasWorkspaceRef.current;
     const svgEl = canvasSvgContainerRef.current;
 
-    const rafId = requestAnimationFrame(() => {
-      updateTransformBox();
-    });
+    let animId = null;
+    const throttledUpdate = () => {
+      if (animId) return;
+      animId = requestAnimationFrame(() => {
+        animId = null;
+        updateTransformBox();
+      });
+    };
 
     let ro = null;
     if (wsEl && typeof ResizeObserver !== 'undefined') {
-      ro = new ResizeObserver(() => {
-        updateTransformBox();
-      });
+      ro = new ResizeObserver(throttledUpdate);
       ro.observe(wsEl);
       if (svgEl) ro.observe(svgEl);
     }
 
-    window.addEventListener('resize', updateTransformBox);
-    window.addEventListener('scroll', updateTransformBox, true);
+    window.addEventListener('resize', throttledUpdate, { passive: true });
+    window.addEventListener('scroll', throttledUpdate, { capture: true, passive: true });
 
     return () => {
-      cancelAnimationFrame(rafId);
+      if (animId) cancelAnimationFrame(animId);
       if (ro) ro.disconnect();
-      window.removeEventListener('resize', updateTransformBox);
-      window.removeEventListener('scroll', updateTransformBox, true);
+      window.removeEventListener('resize', throttledUpdate);
+      window.removeEventListener('scroll', throttledUpdate, { capture: true });
     };
   }, [
     updateTransformBox,
     currentPreviewSvg,
-    zoomLevel,
-    canvasPan,
     layerTransforms,
     sidebarWidth,
     mobileCanvasHeight,
@@ -4140,11 +4922,29 @@ export default function App() {
       const el = svgContainer.querySelector(`[data-layer-id="${id}"]`) ||
         svgContainer.querySelector(`[data-layer-id="${cleanId}"]`) ||
         (numOnly ? svgContainer.querySelector(`[data-layer-id="layer_${numOnly}"]`) : null);
-      if (el && el.getBBox) {
-        try {
-          const bbox = el.getBBox();
-          return { cx: bbox.x + bbox.width / 2, cy: bbox.y + bbox.height / 2 };
-        } catch (_) { }
+      if (el) {
+        if (typeof el.getBBox === 'function') {
+          try {
+            const bbox = el.getBBox();
+            return { cx: bbox.x + bbox.width / 2, cy: bbox.y + bbox.height / 2 };
+          } catch (_) { }
+        } else {
+          try {
+            const r = el.getBoundingClientRect();
+            const svgEl = svgContainer.querySelector('svg');
+            const svgR = svgEl?.getBoundingClientRect();
+            const vb = svgEl?.viewBox?.baseVal;
+            const vbWidth = (vb && vb.width > 0) ? vb.width : (svgEl?.clientWidth || 512);
+            const vbHeight = (vb && vb.height > 0) ? vb.height : (svgEl?.clientHeight || 512);
+            if (r && svgR && svgR.width > 0) {
+              const scaleX = vbWidth / svgR.width;
+              const scaleY = vbHeight / svgR.height;
+              const cx = (r.left + r.width / 2 - svgR.left) * scaleX;
+              const cy = (r.top + r.height / 2 - svgR.top) * scaleY;
+              return { cx, cy };
+            }
+          } catch (_) { }
+        }
       }
     }
     return { cx: 256, cy: 256 };
@@ -4258,6 +5058,22 @@ export default function App() {
 
     const initialTransforms = {};
     const svgContainer = canvasSvgContainerRef.current;
+    const svgEl = svgContainer?.querySelector('svg');
+    const vb = svgEl?.viewBox?.baseVal;
+    const vbWidth = (vb && vb.width > 0) ? vb.width : (svgEl?.clientWidth || 512);
+    const vbHeight = (vb && vb.height > 0) ? vb.height : (svgEl?.clientHeight || 512);
+
+    const activeDomNodes = activeIds.map(id => {
+      const cleanId = String(id).replace(/^pf_studio_/i, '');
+      const numOnly = cleanId.replace(/\D/g, '');
+      const node = svgContainer?.querySelector(`[data-layer-id="${id}"]`) ||
+        svgContainer?.querySelector(`[data-layer-id="${cleanId}"]`) ||
+        (numOnly ? svgContainer?.querySelector(`[data-layer-id="layer_${numOnly}"]`) : null);
+      const origAttr = node ? (node.getAttribute('data-orig-transform') || '') : '';
+      const baseTransform = node ? (node.getAttribute('data-base-transform') || '') : '';
+      const isHtml = node ? (Boolean(node.closest('foreignObject')) || node.tagName?.toLowerCase() === 'div' || node.tagName?.toLowerCase() === 'span') : false;
+      return { id, cleanId, node, origAttr, baseTransform, isHtml };
+    }).filter(item => item.node);
 
     let groupCx = 0;
     let groupCy = 0;
@@ -4269,16 +5085,33 @@ export default function App() {
         const el = svgContainer.querySelector(`[data-layer-id="${id}"]`) ||
           svgContainer.querySelector(`[data-layer-id="${cleanId}"]`) ||
           (numOnly ? svgContainer.querySelector(`[data-layer-id="layer_${numOnly}"]`) : null);
-        if (el && el.getBBox) {
-          try {
-            const bbox = el.getBBox();
-            if (bbox.width > 0 || bbox.height > 0) {
-              minX = Math.min(minX, bbox.x);
-              minY = Math.min(minY, bbox.y);
-              maxX = Math.max(maxX, bbox.x + bbox.width);
-              maxY = Math.max(maxY, bbox.y + bbox.height);
-            }
-          } catch (_) { }
+        if (el) {
+          if (typeof el.getBBox === 'function') {
+            try {
+              const bbox = el.getBBox();
+              if (bbox && (bbox.width > 0 || bbox.height > 0)) {
+                minX = Math.min(minX, bbox.x);
+                minY = Math.min(minY, bbox.y);
+                maxX = Math.max(maxX, bbox.x + bbox.width);
+                maxY = Math.max(maxY, bbox.y + bbox.height);
+              }
+            } catch (_) { }
+          } else {
+            try {
+              const r = el.getBoundingClientRect();
+              const svgR = svgEl?.getBoundingClientRect();
+              if (r && svgR && svgR.width > 0) {
+                const sX = vbWidth / svgR.width;
+                const sY = vbHeight / svgR.height;
+                const ex = (r.left - svgR.left) * sX;
+                const ey = (r.top - svgR.top) * sY;
+                minX = Math.min(minX, ex);
+                minY = Math.min(minY, ey);
+                maxX = Math.max(maxX, ex + r.width * sX);
+                maxY = Math.max(maxY, ey + r.height * sY);
+              }
+            } catch (_) { }
+          }
         }
       });
       if (minX < Infinity && maxX > -Infinity) {
@@ -4297,12 +5130,25 @@ export default function App() {
         const el = svgContainer.querySelector(`[data-layer-id="${id}"]`) ||
           svgContainer.querySelector(`[data-layer-id="${cleanId}"]`) ||
           (numOnly ? svgContainer.querySelector(`[data-layer-id="layer_${numOnly}"]`) : null);
-        if (el && el.getBBox) {
-          try {
-            const bbox = el.getBBox();
-            cx = bbox.x + bbox.width / 2;
-            cy = bbox.y + bbox.height / 2;
-          } catch (_) { }
+        if (el) {
+          if (typeof el.getBBox === 'function') {
+            try {
+              const bbox = el.getBBox();
+              cx = bbox.x + bbox.width / 2;
+              cy = bbox.y + bbox.height / 2;
+            } catch (_) { }
+          } else {
+            try {
+              const r = el.getBoundingClientRect();
+              const svgR = svgEl?.getBoundingClientRect();
+              if (r && svgR && svgR.width > 0) {
+                const sX = vbWidth / svgR.width;
+                const sY = vbHeight / svgR.height;
+                cx = (r.left + r.width / 2 - svgR.left) * sX;
+                cy = (r.top + r.height / 2 - svgR.top) * sY;
+              }
+            } catch (_) { }
+          }
         }
       }
       initialTransforms[id] = {
@@ -4315,6 +5161,7 @@ export default function App() {
     });
 
     let rafId = null;
+    let latestTransforms = null;
 
     const handlePointerMove = (moveEvt) => {
       moveEvt.preventDefault();
@@ -4340,17 +5187,48 @@ export default function App() {
             deltaAngle = Math.round(deltaAngle / 15) * 15;
           }
 
-          setLayerTransforms(prev => {
-            const updated = { ...prev };
-            activeIds.forEach(id => {
-              const init = initialTransforms[id];
-              updated[id] = {
-                ...init,
-                rotate: Math.round(((init.rotate || 0) + deltaAngle) % 360)
-              };
-            });
-            return updated;
+          const updated = {};
+          activeIds.forEach(id => {
+            const init = initialTransforms[id];
+            const updatedRot = Math.round(((init.rotate || 0) + deltaAngle) % 360);
+            updated[id] = {
+              ...init,
+              rotate: updatedRot
+            };
           });
+          latestTransforms = updated;
+
+          // Direct DOM live updates for 60fps real-time rotation
+          activeDomNodes.forEach(({ id, node, origAttr, baseTransform, isHtml }) => {
+            const init = initialTransforms[id];
+            if (!init) return;
+            const updatedRot = Math.round(((init.rotate || 0) + deltaAngle) % 360);
+            if (isHtml) {
+              const tokens = [];
+              if (init.x || init.y) tokens.push(`translate(${init.x}px, ${init.y}px)`);
+              tokens.push(`rotate(${updatedRot}deg)`);
+              if ((init.scaleX ?? 1) !== 1 || (init.scaleY ?? 1) !== 1) tokens.push(`scale(${init.scaleX ?? 1}, ${init.scaleY ?? 1})`);
+              if (baseTransform) tokens.push(baseTransform);
+              node.style.transform = tokens.join(' ');
+              node.style.transformOrigin = 'center center';
+            } else {
+              const parts = [];
+              if (init.x || init.y) parts.push(`translate(${init.x} ${init.y})`);
+              const cx = init.cx || 0;
+              const cy = init.cy || 0;
+              if (cx || cy) {
+                parts.push(`translate(${cx} ${cy}) rotate(${updatedRot}) scale(${init.scaleX ?? 1} ${init.scaleY ?? 1}) translate(${-cx} ${-cy})`);
+              } else {
+                parts.push(`rotate(${updatedRot}) scale(${init.scaleX ?? 1} ${init.scaleY ?? 1})`);
+              }
+              if (origAttr) parts.push(origAttr);
+              node.setAttribute('transform', parts.join(' '));
+            }
+          });
+
+          if (transformBoxRef.current) {
+            transformBoxRef.current.style.transform = `rotate(${deltaAngle}deg)`;
+          }
           return;
         }
 
@@ -4396,18 +5274,51 @@ export default function App() {
           scaleFactorY = newH / startBox.height;
         }
 
-        setLayerTransforms(prev => {
-          const updated = { ...prev };
-          activeIds.forEach(id => {
-            const init = initialTransforms[id];
-            updated[id] = {
-              ...init,
-              scaleX: Number(Math.max(0.05, init.scaleX * scaleFactorX).toFixed(4)),
-              scaleY: Number(Math.max(0.05, init.scaleY * scaleFactorY).toFixed(4))
-            };
-          });
-          return updated;
+        const updated = {};
+        activeIds.forEach(id => {
+          const init = initialTransforms[id];
+          const curScaleX = Number(Math.max(0.05, (init.scaleX ?? 1) * scaleFactorX).toFixed(4));
+          const curScaleY = Number(Math.max(0.05, (init.scaleY ?? 1) * scaleFactorY).toFixed(4));
+          updated[id] = {
+            ...init,
+            scaleX: curScaleX,
+            scaleY: curScaleY
+          };
         });
+        latestTransforms = updated;
+
+        // Direct DOM live updates for 60fps real-time scaling/stretching
+        activeDomNodes.forEach(({ id, node, origAttr, baseTransform, isHtml }) => {
+          const init = initialTransforms[id];
+          if (!init) return;
+          const curScaleX = Number(Math.max(0.05, (init.scaleX ?? 1) * scaleFactorX).toFixed(4));
+          const curScaleY = Number(Math.max(0.05, (init.scaleY ?? 1) * scaleFactorY).toFixed(4));
+          if (isHtml) {
+            const tokens = [];
+            if (init.x || init.y) tokens.push(`translate(${init.x}px, ${init.y}px)`);
+            if (init.rotate) tokens.push(`rotate(${init.rotate}deg)`);
+            tokens.push(`scale(${curScaleX}, ${curScaleY})`);
+            if (baseTransform) tokens.push(baseTransform);
+            node.style.transform = tokens.join(' ');
+            node.style.transformOrigin = 'center center';
+          } else {
+            const parts = [];
+            if (init.x || init.y) parts.push(`translate(${init.x} ${init.y})`);
+            const cx = init.cx || 0;
+            const cy = init.cy || 0;
+            if (cx || cy) {
+              parts.push(`translate(${cx} ${cy}) rotate(${init.rotate || 0}) scale(${curScaleX} ${curScaleY}) translate(${-cx} ${-cy})`);
+            } else {
+              parts.push(`rotate(${init.rotate || 0}) scale(${curScaleX} ${curScaleY})`);
+            }
+            if (origAttr) parts.push(origAttr);
+            node.setAttribute('transform', parts.join(' '));
+          }
+        });
+
+        if (transformBoxRef.current) {
+          transformBoxRef.current.style.transform = `scale(${scaleFactorX}, ${scaleFactorY})`;
+        }
       });
     };
 
@@ -4416,6 +5327,15 @@ export default function App() {
         if (rafId) {
           cancelAnimationFrame(rafId);
           rafId = null;
+        }
+        if (transformBoxRef.current) {
+          transformBoxRef.current.style.transform = '';
+        }
+        if (latestTransforms && Object.keys(latestTransforms).length > 0) {
+          setLayerTransforms(prev => ({
+            ...prev,
+            ...latestTransforms
+          }));
         }
         updateTransformBox(activeIds);
         requestAnimationFrame(() => {
@@ -4539,12 +5459,14 @@ export default function App() {
 
       // Delete / Backspace: Delete selected element(s)
       if (e.key === 'Delete' || e.key === 'Backspace') {
-        const activeIds = selectedLayerIds && selectedLayerIds.length > 0
-          ? selectedLayerIds
-          : (selectedLayerId ? [selectedLayerId] : []);
+        const activeIds = (selectedLayerIdsRef.current && selectedLayerIdsRef.current.length > 0)
+          ? selectedLayerIdsRef.current
+          : (selectedLayerIds && selectedLayerIds.length > 0
+            ? selectedLayerIds
+            : (selectedLayerId ? [selectedLayerId] : []));
         if (activeIds.length > 0) {
           e.preventDefault();
-          handleDeleteSelectedLayers();
+          handleDeleteSelectedLayers(activeIds);
         }
       }
 
@@ -4643,6 +5565,60 @@ export default function App() {
     });
   };
 
+  // Helper to extract natural aspect ratio and dimensions from SVG viewBox or width/height
+  const getSvgNaturalDimensions = (svgCode) => {
+    let naturalWidth = 384;
+    let naturalHeight = 384;
+    let naturalRatio = 1;
+
+    if (!svgCode || typeof svgCode !== 'string') {
+      return { naturalWidth, naturalHeight, naturalRatio };
+    }
+
+    try {
+      const vbMatch = svgCode.match(/viewBox=["']\s*([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s+([-\d.]+)\s*["']/i);
+      if (vbMatch) {
+        const vbW = parseFloat(vbMatch[3]);
+        const vbH = parseFloat(vbMatch[4]);
+        if (vbW > 0 && vbH > 0) {
+          naturalRatio = vbW / vbH;
+          if (Math.abs(naturalRatio - 1) < 0.01) {
+            naturalWidth = 384;
+            naturalHeight = 384;
+          } else if (naturalRatio > 1) {
+            naturalWidth = 480;
+            naturalHeight = Math.round(480 / naturalRatio);
+          } else {
+            naturalHeight = 480;
+            naturalWidth = Math.round(480 * naturalRatio);
+          }
+        }
+      } else {
+        const wMatch = svgCode.match(/\bwidth=["']([0-9.]+)(?:px)?["']/i);
+        const hMatch = svgCode.match(/\bheight=["']([0-9.]+)(?:px)?["']/i);
+        if (wMatch && hMatch) {
+          const w = parseFloat(wMatch[1]);
+          const h = parseFloat(hMatch[1]);
+          if (w > 0 && h > 0) {
+            naturalRatio = w / h;
+            if (Math.abs(naturalRatio - 1) < 0.01) {
+              naturalWidth = 384;
+              naturalHeight = 384;
+            } else if (naturalRatio > 1) {
+              naturalWidth = 480;
+              naturalHeight = Math.round(480 / naturalRatio);
+            } else {
+              naturalHeight = 480;
+              naturalWidth = Math.round(480 * naturalRatio);
+            }
+          }
+        }
+      }
+    } catch (_) { }
+
+    return { naturalWidth, naturalHeight, naturalRatio };
+  };
+
   // Reset Everything back to original upload state
   const handleResetAll = () => {
     recordUndo();
@@ -4660,12 +5636,15 @@ export default function App() {
     setLayerTransforms({});
     setLayerStyles({});
     setLayerOrder(svgLayers.map(l => l.id));
-    setSelectedLayerId(svgLayers.length > 0 ? svgLayers[0].id : null);
-    setSelectedLayerIds(svgLayers.length > 0 ? [svgLayers[0].id] : []);
-    setIconWidth(384);
-    setIconHeight(384);
+    setSelectedLayerId(null);
+    setSelectedLayerIds([]);
+    setActiveSelectedColor(null);
+    setTransformBox(null);
+    const nat = getSvgNaturalDimensions(selectedAsset?.originalSvgCode || selectedAsset?.svgCode);
+    setIconWidth(nat.naturalWidth);
+    setIconHeight(nat.naturalHeight);
     setLockAspectRatio(true);
-    setAspectRatio(1);
+    setAspectRatio(nat.naturalRatio);
     setStrokeMultiplier(1);
     setStrokeColorMode('auto');
     setCustomStrokeColor('#38bdf8');
@@ -4674,7 +5653,6 @@ export default function App() {
     setBgShapePadding(20);
     setBgShapeBorder(0);
     setBgShapeBorderColor('#38bdf8');
-    setActiveSelectedColor(null);
     setIsLayersListExpanded(false);
     setEffectCategory('All');
     targetZoomRef.current = 1;
@@ -4760,10 +5738,11 @@ export default function App() {
   // Panel 3: Dimensions Reset
   const handleResetDimensionsPanel = () => {
     recordUndo();
-    setIconWidth(384);
-    setIconHeight(384);
+    const nat = getSvgNaturalDimensions(selectedAsset?.originalSvgCode || selectedAsset?.svgCode);
+    setIconWidth(nat.naturalWidth);
+    setIconHeight(nat.naturalHeight);
     setLockAspectRatio(true);
-    setAspectRatio(1);
+    setAspectRatio(nat.naturalRatio);
     setStrokeMultiplier(1);
     setBgShape('none');
     setBgShapeColor('#1e293b');
@@ -4785,7 +5764,7 @@ export default function App() {
       flipV: false,
       rotateX: 0,
       rotateY: 0,
-      perspective: 800,
+      perspective: 1200,
       skewX: 0,
       skewY: 0,
       depth3D: 0,
@@ -4795,6 +5774,11 @@ export default function App() {
       animHeight: 16,
       animShadowSync: true
     }));
+    setLayerTransforms({});
+    setSelectedLayerId(null);
+    setSelectedLayerIds([]);
+    setActiveSelectedColor(null);
+    setTransformBox(null);
   };
 
   // Panel 5: Export Reset
@@ -4908,18 +5892,49 @@ export default function App() {
 
 
 
-  // Direct Click/Touch on Image SVG elements
+  // Direct Click/Touch on Image SVG elements or HTML/CSS elements
   const handleCanvasElementClick = (e) => {
     if (justFinishedLayerDragRef.current) return;
     let target = e.target;
-    if (!target || !(target instanceof SVGElement) || target.tagName.toLowerCase() === 'svg') {
+    if (!target || target.tagName.toLowerCase() === 'svg') {
       return;
     }
 
-    const rawLayerId = target.getAttribute('data-layer-id') || target.closest('[data-layer-id]')?.getAttribute('data-layer-id');
+    const isSvg = target instanceof SVGElement;
+    const isForeignHtml = target instanceof HTMLElement && (target.closest('foreignObject') || target.tagName.toLowerCase() === 'div');
+    if (!isSvg && !isForeignHtml) {
+      return;
+    }
+
+    if (isSystemWrapper(target)) {
+      return;
+    }
+
+    const svgContainer = canvasSvgContainerRef.current;
+    if (svgContainer) {
+      const svgEl = svgContainer.querySelector('svg');
+      if (svgEl) tagSvgElements(svgEl);
+    }
+
+    let shapeEl = target.closest('[data-layer-id]') || target.closest('path, rect, circle, ellipse, polygon, polyline, line, text, foreignObject div, foreignObject span, foreignObject section, foreignObject p, foreignObject button, foreignObject a') || target;
+    if (isSystemWrapper(shapeEl)) return;
+
+    const rawLayerId = (shapeEl && shapeEl.getAttribute('data-layer-id')) || target.getAttribute('data-layer-id') || target.closest('[data-layer-id]')?.getAttribute('data-layer-id');
     const layerId = rawLayerId ? rawLayerId.replace(/^pf_studio_/, '') : null;
+
     if (layerId) {
-      setStudioTab('colors');
+      const currentSelected = selectedLayerIdsRef.current || [];
+      let newSelectedIds = [layerId];
+      if (e.shiftKey || e.ctrlKey || e.metaKey) {
+        newSelectedIds = currentSelected.includes(layerId)
+          ? currentSelected.filter(id => id !== layerId)
+          : [...currentSelected, layerId];
+      }
+      setSelectedLayerId(newSelectedIds[newSelectedIds.length - 1] || null);
+      setSelectedLayerIds(newSelectedIds);
+      selectedLayerIdRef.current = newSelectedIds[newSelectedIds.length - 1] || null;
+      selectedLayerIdsRef.current = newSelectedIds;
+      updateTransformBoxRef.current?.(newSelectedIds);
     }
 
     let foundRawColors = [];
@@ -4979,7 +5994,7 @@ export default function App() {
       if (strokeMatch) foundRawColors.push(strokeMatch[1]);
     }
 
-    // Check computed style fallback
+    // Check computed style fallback (crucial for HTML/CSS elements)
     if (foundRawColors.length === 0 && typeof window !== 'undefined') {
       try {
         const comp = window.getComputedStyle(target);
@@ -4987,6 +6002,20 @@ export default function App() {
           foundRawColors.push(comp.fill);
         } else if (comp.stroke && comp.stroke !== 'none') {
           foundRawColors.push(comp.stroke);
+        }
+        if (comp.backgroundColor && comp.backgroundColor !== 'transparent' && comp.backgroundColor !== 'rgba(0, 0, 0, 0)') {
+          foundRawColors.push(comp.backgroundColor);
+        }
+        if (comp.borderColor && comp.borderColor !== 'transparent' && comp.borderColor !== 'rgba(0, 0, 0, 0)') {
+          foundRawColors.push(comp.borderColor);
+        }
+        if (comp.color && comp.color !== 'transparent' && comp.color !== 'rgba(0, 0, 0, 0)') {
+          foundRawColors.push(comp.color);
+        }
+        const bg = comp.background || comp.backgroundImage || '';
+        const bgMatches = bg.match(/rgba?\([^)]+\)|#[0-9a-fA-F]{3,8}/g);
+        if (bgMatches) {
+          bgMatches.forEach(c => foundRawColors.push(c));
         }
       } catch (err) {
         console.warn('Computed style check failed:', err);
@@ -5004,8 +6033,6 @@ export default function App() {
 
         const targetOrigColor = match ? match.color : norm;
         setActiveSelectedColor(targetOrigColor);
-        setStudioTab('adjustment');
-        setAdjustmentSubTab('colors');
         return;
       }
     }
@@ -5066,8 +6093,9 @@ export default function App() {
 
 
 
-  const handleOpenAsset = (item) => {
-    const cleanSvg = item.originalSvgCode || item.svgCode;
+  const handleOpenAsset = (item, initialTab = 'colors') => {
+    const rawSvg = item.originalSvgCode || item.svgCode;
+    const cleanSvg = normalizeForeignObjectSvg(rawSvg);
     if (assetCustomizationsMapRef.current) {
       delete assetCustomizationsMapRef.current[item.id];
     }
@@ -5091,10 +6119,11 @@ export default function App() {
     setSelectedLayerId(null);
     setSelectedLayerIds([]);
     setTransformBox(null);
-    setIconWidth(384);
-    setIconHeight(384);
+    const nat = getSvgNaturalDimensions(cleanSvg);
+    setIconWidth(nat.naturalWidth);
+    setIconHeight(nat.naturalHeight);
     setLockAspectRatio(true);
-    setAspectRatio(1);
+    setAspectRatio(nat.naturalRatio);
     setStrokeMultiplier(1);
     setStrokeColorMode('auto');
     setCustomStrokeColor('#38bdf8');
@@ -5105,16 +6134,26 @@ export default function App() {
     setBgShapeBorderColor('#38bdf8');
     setActiveSelectedColor(null);
     setIsLayersListExpanded(false);
-    setStudioTab('colors');
+    setStudioTab(initialTab || 'colors');
+    setIsStudioPanelOpen(true);
     targetZoomRef.current = 1;
     currentZoomRef.current = 1;
     targetPanRef.current = { x: 0, y: 0 };
+    canvasPanRef.current = { x: 0, y: 0 };
     if (animFrameIdRef.current) {
       cancelAnimationFrame(animFrameIdRef.current);
       animFrameIdRef.current = null;
     }
     setZoomLevel(1);
     setCanvasPan({ x: 0, y: 0 });
+    if (canvasViewportRef.current) {
+      canvasViewportRef.current.style.transform = 'translate3d(0px, 0px, 0px) scale(1)';
+      canvasViewportRef.current.style.setProperty('--stage-zoom', '1');
+      canvasViewportRef.current.style.setProperty('--inv-zoom', '1');
+      canvasViewportRef.current.style.willChange = 'auto';
+    }
+    const badge = document.getElementById('live-zoom-badge');
+    if (badge) badge.textContent = '100%';
     setUndoStack([]);
     setRedoStack([]);
   };
@@ -5381,8 +6420,17 @@ export default function App() {
       console.warn('DOMParser SVG extraction failed:', e);
     }
 
+    // 5. Smart CSS-to-SVG fallback: converts raw CSS rules, glassmorphism, or HTML snippets
+    if (isCssOrHtmlContent(str)) {
+      const converted = convertCssToSvg(str);
+      if (converted && converted.success && converted.svgCode) {
+        return normalizeSvgAttributes(converted.svgCode);
+      }
+    }
+
     return null;
   };
+
 
   const extractTitleFromContent = (rawText, extractedSvg = '') => {
     try {
@@ -5457,7 +6505,10 @@ export default function App() {
       setTimeout(() => setDetectedShapeNotice(''), 5000);
     }
 
-    setFormSuccess('✨ Smart Paste: SVG extracted & loaded from clipboard! Review & click Publish.');
+    const isCss = isCssOrHtmlContent(rawText);
+    setFormSuccess(isCss 
+      ? '✨ Smart CSS-to-Element: Converted raw CSS glassmorphic style into SVG Element! Review & click Publish.'
+      : '✨ Smart Paste: SVG extracted & loaded from clipboard! Review & click Publish.');
     setTimeout(() => setFormSuccess(''), 5000);
     return true;
   };
@@ -5953,6 +7004,56 @@ export default function App() {
     }
   };
 
+  const handleSaveGalleryDeletions = async () => {
+    if (pendingDeletedIds.length === 0) return;
+    
+    const count = pendingDeletedIds.length;
+    const confirmMsg = count === 1
+      ? 'Are you sure you want to permanently delete this element from Supabase and the Gallery?'
+      : `Are you sure you want to permanently delete ${count} elements from Supabase and the Gallery?`;
+    
+    if (!window.confirm(confirmMsg)) return;
+
+    setIsSavingGalleryDeletions(true);
+    try {
+      if (supabase) {
+        const { error } = await supabase
+          .from('icons')
+          .delete()
+          .in('id', pendingDeletedIds);
+        if (error) {
+          console.error('Supabase batch delete error:', error);
+          throw error;
+        }
+      }
+
+      // Update local state
+      const toDeleteSet = new Set(pendingDeletedIds);
+      setElements(prev => {
+        const next = prev.filter(el => !toDeleteSet.has(el.id));
+        try {
+          localStorage.setItem('iconderry_assets', JSON.stringify(next));
+        } catch (_) {}
+        try {
+          saveElementsToDB(next);
+        } catch (_) {}
+        return next;
+      });
+
+      // Clear from favorites if any
+      setFavorites(prev => prev.filter(favId => !toDeleteSet.has(favId)));
+
+      setPendingDeletedIds([]);
+      setGalleryAdminToast(`Successfully deleted ${count} element${count > 1 ? 's' : ''} from Supabase & Gallery!`);
+      setTimeout(() => setGalleryAdminToast(''), 5000);
+    } catch (err) {
+      console.error('Failed to delete from Supabase:', err);
+      alert('Failed to delete from Supabase: ' + (err.message || String(err)));
+    } finally {
+      setIsSavingGalleryDeletions(false);
+    }
+  };
+
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this element?')) {
       setElements(prev => prev.filter(el => el.id !== id));
@@ -6011,7 +7112,9 @@ export default function App() {
         (adjustments?.shadowBlur && Number(adjustments.shadowBlur) > 0)
       );
 
+      const isIco = exportFormat === 'ico';
       const shouldAutoFit = Boolean(
+        isIco || // For ICO desktop/app icons, always auto-fit artwork so it fills the icon boundary full-size!
         autoFitToElements ||
         hasMovedLayers ||
         hasDuplicatedLayers ||
@@ -6022,9 +7125,9 @@ export default function App() {
       if (shouldAutoFit && canvasSvgContainerRef.current) {
         autoFitViewBox = calculateArtworkBounds(
           canvasSvgContainerRef.current,
-          0.08,
+          isIco ? 0.03 : 0.08,
           deletedLayerIds,
-          autoFitFrameMode === 'square',
+          isIco || autoFitFrameMode === 'square',
           layerStyles,
           adjustments
         );
@@ -6033,7 +7136,11 @@ export default function App() {
       // Calculate true export resolution respecting artwork aspect ratio
       let finalWidth = exportSize;
       let finalHeight = exportSize;
-      if (autoFitViewBox && autoFitViewBox.width > 0 && autoFitViewBox.height > 0) {
+      if (exportFormat === 'ico') {
+        // ICO icons must strictly maintain a 1:1 square aspect ratio
+        finalWidth = exportSize;
+        finalHeight = exportSize;
+      } else if (autoFitViewBox && autoFitViewBox.width > 0 && autoFitViewBox.height > 0) {
         if (autoFitFrameMode === 'square') {
           finalWidth = exportSize;
           finalHeight = exportSize;
@@ -6304,19 +7411,35 @@ export default function App() {
   };
 
   const getComputedFilterStyle = () => {
-    const rules = [
-      `hue-rotate(${adjustments.hue}deg)`,
-      `brightness(${adjustments.brightness}%)`,
-      `saturate(${adjustments.saturation}%)`,
-      `contrast(${adjustments.contrast}%)`,
-      `sepia(${adjustments.sepia}%)`,
-      `invert(${adjustments.invert}%)`,
-      `opacity(${adjustments.opacity}%)`,
-      adjustments.blur > 0 ? `blur(${adjustments.blur}px)` : '',
-      adjustments.shadowBlur > 0
-        ? `drop-shadow(0px 0px ${adjustments.shadowBlur}px ${adjustments.shadowColor || '#38bdf8'}) drop-shadow(0px 0px ${Math.max(1, Math.round(adjustments.shadowBlur * 0.4))}px ${adjustments.shadowColor || '#38bdf8'})`
-        : ''
-    ];
+    const rules = [];
+
+    if (adjustments.hue && adjustments.hue !== 0) {
+      rules.push(`hue-rotate(${adjustments.hue}deg)`);
+    }
+    if (adjustments.brightness !== undefined && adjustments.brightness !== 100) {
+      rules.push(`brightness(${adjustments.brightness}%)`);
+    }
+    if (adjustments.saturation !== undefined && adjustments.saturation !== 100) {
+      rules.push(`saturate(${adjustments.saturation}%)`);
+    }
+    if (adjustments.contrast !== undefined && adjustments.contrast !== 100) {
+      rules.push(`contrast(${adjustments.contrast}%)`);
+    }
+    if (adjustments.sepia && adjustments.sepia !== 0) {
+      rules.push(`sepia(${adjustments.sepia}%)`);
+    }
+    if (adjustments.invert && adjustments.invert !== 0) {
+      rules.push(`invert(${adjustments.invert}%)`);
+    }
+    if (adjustments.opacity !== undefined && adjustments.opacity !== 100) {
+      rules.push(`opacity(${adjustments.opacity}%)`);
+    }
+    if (adjustments.blur && adjustments.blur > 0) {
+      rules.push(`blur(${adjustments.blur}px)`);
+    }
+    if (adjustments.shadowBlur && adjustments.shadowBlur > 0) {
+      rules.push(`drop-shadow(0px 0px ${adjustments.shadowBlur}px ${adjustments.shadowColor || '#38bdf8'})`);
+    }
 
     if ((adjustments.depth3D || 0) > 0) {
       const d = adjustments.depth3D;
@@ -6325,11 +7448,11 @@ export default function App() {
       const offX = Math.round(-Math.sin(radY) * d * 1.5);
       const offY = Math.round(Math.sin(radX) * d * 1.5 + (d * 0.8));
       const sColor = adjustments.depth3DColor || 'rgba(0,0,0,0.55)';
-      rules.push(`drop-shadow(${offX}px ${offY}px ${Math.round(d * 0.6)}px ${sColor}) drop-shadow(${Math.round(offX * 0.5)}px ${Math.round(offY * 0.5)}px ${Math.round(d * 0.3)}px ${sColor})`);
+      rules.push(`drop-shadow(${offX}px ${offY}px ${Math.round(d * 0.6)}px ${sColor})`);
     }
 
     if ((adjustments.extrusionDepth || 0) > 0) {
-      const extDepth = Math.min(40, Math.round(adjustments.extrusionDepth));
+      const extDepth = Math.min(30, Math.round(adjustments.extrusionDepth));
       const extColor = adjustments.extrusionColor || 'rgba(0,0,0,0.65)';
       const radX = ((adjustments.rotateX || 0) * Math.PI) / 180;
       const radY = ((adjustments.rotateY || 0) * Math.PI) / 180;
@@ -6338,30 +7461,19 @@ export default function App() {
       const len = Math.hypot(dirX, dirY) || 1;
       const normX = dirX / len;
       const normY = dirY / len;
-      
-      const steps = extDepth <= 4 
-        ? Array.from({ length: extDepth }, (_, i) => i + 1)
-        : [1, Math.round(extDepth * 0.35), Math.round(extDepth * 0.7), extDepth];
-      
-      steps.forEach(s => {
-        const sx = (normX * s).toFixed(1);
-        const sy = (normY * s).toFixed(1);
-        rules.push(`drop-shadow(${sx}px ${sy}px 0px ${extColor})`);
-      });
-      const endX = (normX * extDepth).toFixed(1);
-      const endY = (normY * extDepth + 2).toFixed(1);
-      const blur = Math.max(2, Math.round(extDepth * 0.35));
-      rules.push(`drop-shadow(${endX}px ${endY}px ${blur}px rgba(0,0,0,0.45))`);
+      const ex = (normX * extDepth).toFixed(1);
+      const ey = (normY * extDepth).toFixed(1);
+      rules.push(`drop-shadow(${ex}px ${ey}px 1px ${extColor})`);
     }
 
-    return rules.filter(Boolean).join(' ');
+    return rules.length > 0 ? rules.join(' ') : 'none';
   };
 
   return (
-    <div className={`min-h-screen flex flex-col font-sans transition-colors duration-200 selection:bg-blue-500 selection:text-white ${appTheme === 'dark' ? 'bg-[#0b0f19] text-slate-100' : 'bg-slate-50 text-slate-900'
+    <div className={`min-h-screen flex flex-col font-sans transition-colors duration-200 selection:bg-blue-500 selection:text-white ${appTheme === 'dark' ? 'bg-[#121316] text-slate-100' : 'bg-slate-50 text-slate-900'
       }`}>
       {/* Top Bar */}
-      <header className={`app-header-main border-b sticky top-0 z-40 px-3 sm:px-6 py-3 sm:py-4 backdrop-blur transition-colors ${appTheme === 'dark' ? 'border-slate-800 bg-[#0d1424]/90' : 'border-slate-200 bg-white/90 shadow-sm'
+      <header className={`app-header-main border-b sticky top-0 z-40 px-3 sm:px-6 py-3 sm:py-4 backdrop-blur transition-colors ${appTheme === 'dark' ? 'border-[#1f2128] bg-[#121316]/95' : 'border-slate-200 bg-white/90 shadow-sm'
         }`}>
         <div className="max-w-[1780px] w-full mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2.5 sm:gap-3">
@@ -6391,7 +7503,7 @@ export default function App() {
               onClick={() => setAppTheme(prev => prev === 'dark' ? 'light' : 'dark')}
               title={appTheme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
               className={`p-2 sm:p-2.5 rounded-xl border transition flex items-center justify-center ${appTheme === 'dark'
-                ? 'bg-slate-900 border-slate-800 text-cyan-400 hover:text-white hover:border-slate-700'
+                ? 'bg-[#18191f] border-[#22242c] text-cyan-400 hover:text-white hover:border-[#38bdf8]/40'
                 : 'bg-white border-slate-200 text-amber-500 hover:text-amber-600 hover:border-slate-300 shadow-sm'
                 }`}
             >
@@ -6399,7 +7511,8 @@ export default function App() {
             </button>
 
             {/* Tab Toggle */}
-            <div className={`flex gap-1 p-0.5 sm:p-1 rounded-xl border ${appTheme === 'dark' ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200'
+            {/* Tab Toggle (Desktop only: on mobile, handled by Native Bottom Nav) */}
+            <div className={`hidden md:flex gap-1 p-0.5 sm:p-1 rounded-xl border ${appTheme === 'dark' ? 'bg-[#18191f] border-[#22242c]' : 'bg-slate-100 border-slate-200'
               }`}>
               <button
                 onClick={() => setActiveTab('browse')}
@@ -6408,24 +7521,44 @@ export default function App() {
                   : appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
                   }`}
               >
-                <LayoutGrid className="w-3.5 h-3.5" /> <span className="hidden xs:inline">Gallery</span>
+                <LayoutGrid className="w-3.5 h-3.5" /> <span>Gallery</span>
               </button>
               <button
-                onClick={() => setActiveTab('admin')}
-                className={`flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${activeTab === 'admin'
+                onClick={() => setActiveTab('blog')}
+                className={`flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs font-semibold transition relative ${activeTab === 'blog'
                   ? 'bg-blue-600 text-white shadow-md'
                   : appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
                   }`}
               >
-                <PlusCircle className="w-3.5 h-3.5" /> <span className="hidden xs:inline">Upload</span>
+                <BookOpen className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Blog</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+              </button>
+              <button
+                onClick={() => setActiveTab('license')}
+                className={`flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${activeTab === 'license'
+                  ? 'bg-blue-600 text-white shadow-md'
+                  : appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> <span>License</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('admin')}
+                className="flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-lg text-xs font-bold tracking-wide bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/35 border border-blue-400/40 transition-all cursor-pointer active:scale-95"
+                title="Upload elements to Iconderry"
+              >
+                <UploadCloud className="w-3.5 h-3.5" />
+                <span>UPLOAD</span>
               </button>
             </div>
 
-            {/* Settings Panel Button */}
+            {/* Settings Panel Button (Desktop only: on mobile, accessible via bottom nav) */}
             <button
               onClick={() => setIsSettingsOpen(true)}
-              className={`flex items-center gap-1.5 px-2.5 sm:px-3.5 py-2 rounded-xl text-xs font-semibold border transition ${appTheme === 'dark'
-                ? 'bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:border-slate-700'
+              className={`hidden md:flex items-center gap-1.5 px-2.5 sm:px-3.5 py-2 rounded-xl text-xs font-semibold border transition ${appTheme === 'dark'
+                ? 'bg-[#18191f] border-[#22242c] text-slate-300 hover:text-white hover:border-[#38bdf8]/40'
                 : 'bg-white border-slate-200 text-slate-700 hover:text-slate-900 hover:border-slate-300 shadow-sm'
                 }`}
               title="Open Settings"
@@ -6433,19 +7566,115 @@ export default function App() {
               <Settings className="w-4 h-4 text-cyan-400" />
               <span className="hidden sm:inline">Settings</span>
             </button>
+
+
+            {/* Supabase User Authentication Button / Profile Menu */}
+            {!authUser ? (
+              <button
+                type="button"
+                onClick={() => setIsAuthModalOpen(true)}
+                className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer active:scale-95 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-md shadow-blue-600/25 border-blue-400/30"
+                title="Sign In or Register"
+              >
+                <User className="w-3.5 h-3.5" />
+                <span>Sign In</span>
+              </button>
+            ) : (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                  className={`flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl border transition-all cursor-pointer ${
+                    appTheme === 'dark'
+                      ? 'bg-[#18191f] border-[#2b2d37] hover:border-cyan-500/50 text-white'
+                      : 'bg-white border-slate-200 hover:border-blue-400 text-slate-800 shadow-sm'
+                  }`}
+                >
+                  <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white text-[11px] font-black uppercase shadow-sm">
+                    {(authUser.user_metadata?.full_name || authUser.email || 'U')[0]}
+                  </div>
+                  <span className="text-xs font-semibold max-w-[90px] truncate hidden sm:inline">
+                    {authUser.user_metadata?.full_name || authUser.email?.split('@')[0]}
+                  </span>
+                  <ChevronDown className="w-3 h-3 text-slate-400" />
+                </button>
+
+                {/* User Dropdown Menu */}
+                {isUserMenuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-30" onClick={() => setIsUserMenuOpen(false)} />
+                    <div className={`absolute right-0 mt-2 w-56 rounded-2xl border shadow-xl p-2 z-40 animate-in fade-in zoom-in-95 duration-150 ${
+                      appTheme === 'dark'
+                        ? 'bg-[#18191f] border-[#2b2d37] text-slate-200 shadow-black/80'
+                        : 'bg-white border-slate-200 text-slate-800 shadow-2xl'
+                    }`}>
+                      <div className="px-3 py-2 border-b border-slate-800/80 mb-1">
+                        <p className="text-xs font-bold truncate text-white">
+                          {authUser.user_metadata?.full_name || 'Iconderry Creator'}
+                        </p>
+                        <p className="text-[11px] text-slate-400 truncate">
+                          {authUser.email}
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedCategory('Favorites');
+                          setActiveTab('browse');
+                          setIsUserMenuOpen(false);
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium hover:bg-rose-500/10 hover:text-rose-400 transition cursor-pointer text-left"
+                      >
+                        <Heart className="w-3.5 h-3.5 text-rose-500 fill-rose-500/30" />
+                        <span>My Cloud Favorites</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveTab('admin');
+                          setIsUserMenuOpen(false);
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium hover:bg-blue-500/10 hover:text-blue-400 transition cursor-pointer text-left"
+                      >
+                        <UploadCloud className="w-3.5 h-3.5 text-blue-400" />
+                        <span>Upload New Element</span>
+                      </button>
+
+                      <div className="my-1 border-t border-slate-800/60" />
+
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (supabase) await supabase.auth.signOut();
+                          setAuthUser(null);
+                          setIsUserMenuOpen(false);
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-rose-400 hover:bg-rose-500/15 transition cursor-pointer text-left"
+                      >
+                        <LogOut className="w-3.5 h-3.5" />
+                        <span>Sign Out</span>
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </header>
 
+
       {/* Main Page Area */}
-      <main className="flex-1 p-3 sm:p-6 lg:px-8 max-w-[1780px] w-full mx-auto">
+      <main className="flex-1 p-3 sm:p-6 lg:px-8 max-w-[1780px] w-full mx-auto pb-24 md:pb-8">
         {activeTab === 'admin' ? (
           /* Admin Management Panel */
-          <div className={`max-w-4xl mx-auto border rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-xl transition ${appTheme === 'dark' ? 'bg-[#131b2e] border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-900 shadow-xl'
+          <div className={`max-w-4xl mx-auto border rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-xl transition ${appTheme === 'dark' ? 'bg-[#18191f] border-[#22242c] text-slate-100' : 'bg-white border-slate-200 text-slate-900 shadow-xl'
             }`}>
             {/* Top Admin Sub-Navigation */}
-            <div className="flex items-center justify-between flex-wrap gap-3 mb-6 pb-4 border-b border-slate-800/80">
-              <div className="flex items-center gap-1.5 p-1 rounded-2xl border bg-slate-900/60 border-slate-800">
+            <div className="flex items-center justify-between flex-wrap gap-3 mb-6 pb-4 border-b border-[#22242c]">
+              <div className="flex items-center gap-1.5 p-1 rounded-2xl border bg-[#121316] border-[#22242c]">
                 <button
                   type="button"
                   onClick={() => setAdminSection('upload')}
@@ -6752,26 +7981,48 @@ export default function App() {
                         />
                       </div>
 
-                      {/* Raw SVG Code */}
+                      {/* Raw SVG or CSS Glassmorphism Code */}
                       <div>
-                        <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center justify-between mb-1.5 flex-wrap gap-2">
                           <label className={`block text-xs font-semibold uppercase tracking-wider ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                            Raw SVG Code / HTML Snippet
+                            Raw SVG Code or CSS Glassmorphism Snippet
                           </label>
-                          <button
-                            type="button"
-                            onClick={handleClipboardPasteClick}
-                            className="text-xs font-semibold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 transition"
-                            title="Paste from your system clipboard"
-                          >
-                            <ClipboardPaste className="w-3.5 h-3.5" />
-                            <span>Paste Clipboard</span>
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const sampleCss = `.glass-card {\n  background: linear-gradient(135deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.03) 100%);\n  backdrop-filter: blur(24px) saturate(190%);\n  border: 1px solid rgba(255, 255, 255, 0.25);\n  border-top: 1.5px solid rgba(255, 255, 255, 0.7);\n  box-shadow: inset 0 1px 1px rgba(255,255,255,0.6), 0 20px 40px -15px rgba(0,0,0,0.5);\n  border-radius: 22px;\n}`;
+                                const converted = convertCssToSvg(sampleCss);
+                                if (converted.success) {
+                                  setSvgInput(converted.svgCode);
+                                  setTitle('Frosted Glass CSS Card');
+                                  setCategory('Productivity Glass');
+                                  setTags('css-art, glassmorphism, frosted, acrylic, modern-ui');
+                                  setFormSuccess('✨ Loaded Frosted Glass CSS sample and converted to SVG!');
+                                  setTimeout(() => setFormSuccess(''), 4000);
+                                }
+                              }}
+                              className="text-xs font-semibold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 transition"
+                              title="Load a pre-configured Frosted Glass CSS code to test"
+                            >
+                              <Sparkles className="w-3.5 h-3.5" />
+                              <span>Sample CSS Glass</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleClipboardPasteClick}
+                              className="text-xs font-semibold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 transition"
+                              title="Paste from your system clipboard"
+                            >
+                              <ClipboardPaste className="w-3.5 h-3.5" />
+                              <span>Paste Clipboard</span>
+                            </button>
+                          </div>
                         </div>
                         <textarea
                           required
                           rows={4}
-                          placeholder="<svg viewBox='0 0 200 200' ...> ... </svg> (or paste HTML snippet / Data URI from anywhere)"
+                          placeholder="<svg viewBox='0 0 200 200' ...> OR paste raw CSS (e.g. .glass-card { background: ...; backdrop-filter: blur(20px); border: ...; })"
                           value={svgInput}
                           onChange={(e) => {
                             const val = e.target.value;
@@ -7216,6 +8467,16 @@ export default function App() {
               </div>
             )}
           </div>
+        ) : activeTab === 'blog' ? (
+          <BlogView
+            appTheme={appTheme}
+            onOpenStudio={() => setActiveTab('browse')}
+          />
+        ) : activeTab === 'license' ? (
+          <LicenseView
+            appTheme={appTheme}
+            onOpenStudio={() => setActiveTab('browse')}
+          />
         ) : (
           /* Browse Gallery with Left Sidebar Categories/Filters */
           <>
@@ -7226,39 +8487,103 @@ export default function App() {
                     <Palette className="w-5 h-5 text-purple-400 animate-pulse" />
                   </div>
                   <div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-sm font-bold text-white">Gallery Admin Edit Mode</span>
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-purple-500 text-white shadow-sm">Active</span>
+                      {pendingDeletedIds.length > 0 && (
+                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-rose-600 text-white shadow-md animate-pulse flex items-center gap-1">
+                          <Trash2 className="w-3 h-3" />
+                          <span>{pendingDeletedIds.length} marked to delete</span>
+                        </span>
+                      )}
                     </div>
                     <p className="text-xs text-purple-200/90 mt-0.5">
-                      Gallery me kisi bhi element par click karke Studio me edit karein, fir <strong className="text-purple-300">"Save as Gallery Default"</strong> dabayein taaki wo sabhi users ke liye permanent default ban jaye.
+                      Cards ke top-right me <strong className="text-rose-400">Trash</strong> dabakar delete mark karein, fir <strong className="text-emerald-400">"Save Changes"</strong> dabakar Supabase se permanently delete karein.
                     </p>
+                    {galleryAdminToast && (
+                      <p className="text-xs text-emerald-400 font-semibold mt-1 flex items-center gap-1.5 animate-fadeIn">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>{galleryAdminToast}</span>
+                      </p>
+                    )}
                   </div>
                 </div>
-                <div className="flex items-center gap-2.5">
+
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  {/* Save Changes Button (Deletes marked items from Supabase & local state) */}
                   <button
                     type="button"
-                    onClick={() => setActiveTab('admin')}
-                    className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-700 transition"
+                    onClick={handleSaveGalleryDeletions}
+                    disabled={pendingDeletedIds.length === 0 || isSavingGalleryDeletions}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-md ${
+                      pendingDeletedIds.length > 0
+                        ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-600/30 ring-2 ring-rose-400/50 cursor-pointer active:scale-95'
+                        : 'bg-slate-800/80 text-slate-500 border border-slate-700/50 cursor-not-allowed'
+                    }`}
+                    title={pendingDeletedIds.length > 0 ? "Save and permanently delete marked items from Supabase" : "Mark cards using the trash icon to delete"}
+                  >
+                    {isSavingGalleryDeletions ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin text-white" />
+                        <span>Deleting from Supabase...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" />
+                        <span>Save Changes {pendingDeletedIds.length > 0 ? `(${pendingDeletedIds.length})` : ''}</span>
+                      </>
+                    )}
+                  </button>
+
+                  {/* Undo Selection button */}
+                  {pendingDeletedIds.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setPendingDeletedIds([])}
+                      className="px-3 py-2 rounded-xl text-xs font-semibold bg-slate-800/90 hover:bg-slate-700 text-slate-300 border border-slate-700 transition cursor-pointer"
+                    >
+                      Undo Selection
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPendingDeletedIds([]);
+                      setActiveTab('admin');
+                    }}
+                    className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-700 transition cursor-pointer"
                   >
                     Back to Admin
                   </button>
                   <button
                     type="button"
-                    onClick={() => setIsGalleryAdminMode(false)}
-                    className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white transition shadow-sm active:scale-95"
+                    onClick={() => {
+                      setPendingDeletedIds([]);
+                      setIsGalleryAdminMode(false);
+                    }}
+                    className="px-3.5 py-2 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white transition shadow-sm active:scale-95 cursor-pointer"
                   >
                     Exit Edit Mode
                   </button>
                 </div>
               </div>
             )}
+
             <div className="flex flex-col md:flex-row items-start justify-center gap-5 lg:gap-6 w-full mx-auto">
-            {/* Left Sidebar: Filters & Categories */}
-            <aside className="w-full md:w-56 lg:w-60 flex-shrink-0 md:sticky md:top-20">
+            {/* Left Sidebar: Filters & Categories (Desktop only: on mobile, horizontal pill bar is used) */}
+            <aside 
+              className="hidden md:block w-full md:w-56 lg:w-60 flex-shrink-0 md:sticky md:top-20 overscroll-contain"
+              onWheel={(e) => {
+                if (filtersScrollRef.current) {
+                  filtersScrollRef.current.scrollTop += e.deltaY;
+                  e.stopPropagation();
+                }
+              }}
+            >
               <div className={`rounded-2xl border p-3.5 sm:p-4 transition shadow-sm ${
                 appTheme === 'dark'
-                  ? 'bg-[#131b2e] border-slate-800 text-slate-100'
+                  ? 'bg-[#18191f] border-[#22242c] text-slate-100'
                   : 'bg-white border-slate-200 text-slate-900 shadow-sm'
               }`}>
                 {/* Sidebar Header with Mobile Accordion Toggle */}
@@ -7305,8 +8630,18 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Vertical Category Items */}
-                <div className={`${mobileFilterOpen ? 'flex' : 'hidden'} md:flex flex-col gap-1.5 mt-3 max-h-[60vh] md:max-h-[calc(100vh-220px)] overflow-y-auto pr-1 scrollbar-thin`}>
+                {/* Vertical Category Items (Supports mouse drag-to-scroll & isolated wheel scroll) */}
+                <div 
+                  ref={filtersScrollRef}
+                  onMouseDown={handleFiltersMouseDown}
+                  onMouseMove={handleFiltersMouseMove}
+                  onMouseUp={handleFiltersMouseUp}
+                  onMouseLeave={handleFiltersMouseUp}
+                  onWheel={(e) => {
+                    e.stopPropagation();
+                  }}
+                  className={`${mobileFilterOpen ? 'flex' : 'hidden'} md:flex flex-col gap-1.5 mt-3 max-h-[60vh] md:max-h-[calc(100vh-220px)] overflow-y-auto overscroll-contain pr-1 scrollbar-thin cursor-grab active:cursor-grabbing select-none`}
+                >
                   {categories.map((cat) => {
                     const isFavCat = cat === 'Favorites';
                     const isSelected = selectedCategory === cat;
@@ -7325,6 +8660,8 @@ export default function App() {
                       if (cat === 'Silhouettes') return <Compass className="w-3.5 h-3.5 flex-shrink-0" />;
                       if (cat === 'Badges & Stickers' || cat === 'Badges') return <Shield className="w-3.5 h-3.5 flex-shrink-0" />;
                       if (cat === '3D Elements') return <Move3d className="w-3.5 h-3.5 flex-shrink-0" />;
+                      if (cat === 'Productivity Glass') return <Layers className="w-3.5 h-3.5 flex-shrink-0 text-sky-400" />;
+                      if (cat === 'Social Glass') return <MessageSquarePlus className="w-3.5 h-3.5 flex-shrink-0 text-blue-400" />;
                       if (cat === 'Illustrations') return <Palette className="w-3.5 h-3.5 flex-shrink-0" />;
                       if (cat === 'Awards') return <Zap className="w-3.5 h-3.5 flex-shrink-0" />;
                       return <Tag className="w-3.5 h-3.5 flex-shrink-0" />;
@@ -7335,6 +8672,7 @@ export default function App() {
                         key={cat}
                         type="button"
                         onClick={() => {
+                          if (hasDraggedFiltersRef.current) return;
                           setSelectedCategory(cat);
                           setMobileFilterOpen(false);
                         }}
@@ -7348,12 +8686,13 @@ export default function App() {
                               : 'text-slate-700 border-transparent hover:text-slate-900 hover:bg-slate-100'
                         }`}
                       >
+
                         <div className="flex items-center gap-2.5 min-w-0">
                           <span className={`${
                             isSelected
                               ? 'text-white'
                               : isFavCat
-                                ? 'text-rose-500'
+                                ? 'text-rose-400'
                                 : appTheme === 'dark' ? 'text-slate-400 group-hover:text-cyan-400' : 'text-slate-500 group-hover:text-blue-600'
                           } transition-colors`}>
                             {renderCatIcon()}
@@ -7380,10 +8719,49 @@ export default function App() {
             </aside>
 
             {/* Right Main Content Area: Search Bar + Asset Grid (compact 1180px max-width for narrower cards) */}
-            <div className="flex-1 min-w-0 w-full max-w-[1180px] space-y-5">
+            <div className="flex-1 min-w-0 w-full max-w-[1180px] space-y-4 sm:space-y-5">
+              {/* Mobile Only: Horizontal Swipeable Category Bar */}
+              <div className="md:hidden flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 hide-scrollbar touch-pan-x whitespace-nowrap">
+                {categories.map((cat) => {
+                  const isFavCat = cat === 'Favorites';
+                  const isSelected = selectedCategory === cat;
+                  const count = cat === 'All'
+                    ? elements.length
+                    : isFavCat
+                      ? favorites.length
+                      : elements.filter(e => e.category === cat).length;
+                  return (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => setSelectedCategory(cat)}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold shrink-0 border transition-all cursor-pointer active:scale-95 ${
+                        isSelected
+                          ? isFavCat
+                            ? 'bg-rose-600 border-rose-600 text-white shadow-md'
+                            : 'bg-blue-600 border-blue-600 text-white shadow-md'
+                          : appTheme === 'dark'
+                            ? 'bg-[#18191f] border-[#252834] text-slate-300 active:bg-slate-800'
+                            : 'bg-white border-slate-200 text-slate-700 active:bg-slate-100 shadow-sm'
+                      }`}
+                    >
+                      {isFavCat && <Heart className={`w-3 h-3 ${isSelected ? 'fill-white' : 'fill-rose-500 text-rose-500'}`} />}
+                      <span>{cat}</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                        isSelected
+                          ? 'bg-white/25 text-white'
+                          : appTheme === 'dark' ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-500'
+                      }`}>
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
               {/* Search Bar & Active Stats */}
               <div className={`p-3 sm:p-4 rounded-2xl border transition shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 ${
-                appTheme === 'dark' ? 'bg-[#131b2e] border-slate-800' : 'bg-white border-slate-200 shadow-sm'
+                appTheme === 'dark' ? 'bg-[#18191f] border-[#22242c]' : 'bg-white border-slate-200 shadow-sm'
               }`}>
                 {/* Search Input */}
                 <div className="relative flex-1">
@@ -7393,9 +8771,9 @@ export default function App() {
                     placeholder="Search assets or tags..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className={`w-full border rounded-xl pl-10 pr-9 py-2.5 text-sm focus:outline-none focus:border-blue-500 transition ${
+                    className={`w-full border rounded-xl pl-10 pr-9 py-2.5 text-sm focus:outline-none focus:border-cyan-500 transition ${
                       appTheme === 'dark'
-                        ? 'bg-[#0f172a] border-slate-800 text-slate-100 placeholder-slate-500'
+                        ? 'bg-[#121316] border-[#22242c] text-slate-100 placeholder-slate-500'
                         : 'bg-slate-50 border-slate-200 text-slate-900 placeholder-slate-400'
                     }`}
                   />
@@ -7414,13 +8792,13 @@ export default function App() {
                 <div className="flex items-center justify-between sm:justify-end gap-2 flex-shrink-0 text-xs">
                   <span className={`px-3 py-1.5 rounded-xl font-medium border ${
                     appTheme === 'dark'
-                      ? 'bg-slate-900/60 border-slate-800 text-slate-400'
+                      ? 'bg-[#121316] border-[#22242c] text-slate-400'
                       : 'bg-slate-100 border-slate-200 text-slate-600'
                   }`}>
                     Category: <strong className={appTheme === 'dark' ? 'text-slate-200' : 'text-slate-800'}>{selectedCategory}</strong>
                   </span>
                   <span className={`px-2.5 py-1.5 rounded-xl font-bold ${
-                    appTheme === 'dark' ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' : 'bg-blue-50 text-blue-600 border border-blue-100'
+                    appTheme === 'dark' ? 'bg-[#0e2736] text-[#38bdf8] border border-cyan-800/40' : 'bg-blue-50 text-blue-600 border border-blue-100'
                   }`}>
                     {filteredElements.length > 50 && visibleCount < filteredElements.length
                       ? `Showing ${displayedElements.length} of ${filteredElements.length} elements`
@@ -7429,20 +8807,34 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Asset Grid: 5 columns on desktop, items-start prevents vertical stretch, centered */}
-              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-5 gap-3 sm:gap-3.5 items-start content-start min-h-[580px]">
+              {/* Asset Grid: Exactly 2 columns on mobile, 3 on tablet, 4-5 on desktop */}
+              <div className="gallery-grid-responsive min-h-[580px]">
                 {displayedElements.map((item) => {
                   const isFav = favorites.includes(item.id);
+                  const isMarkedForDelete = pendingDeletedIds.includes(item.id);
                   return (
                     <div
                       key={item.id}
-                      onClick={() => handleOpenAsset(item)}
-                      className={`group border rounded-xl p-2.5 sm:p-3 flex flex-col items-center cursor-pointer transition-transform transition-shadow duration-200 ease-out hover:-translate-y-2 transform-gpu will-change-transform isolate [backface-visibility:hidden] [transform:translateZ(0)] relative ${appTheme === 'dark'
-                        ? 'bg-[#131b2e] border-slate-800 hover:border-slate-700 hover:bg-[#162138] shadow-sm hover:shadow-[0_16px_32px_-6px_rgba(0,0,0,0.6),0_8px_16px_-4px_rgba(0,0,0,0.4)]'
-                        : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-white shadow-sm hover:shadow-[0_16px_32px_-6px_rgba(0,0,0,0.14),0_8px_16px_-4px_rgba(0,0,0,0.08)]'
-                        }`}
+                      onClick={() => {
+                        if (isMarkedForDelete) {
+                          setPendingDeletedIds(prev => prev.filter(x => x !== item.id));
+                          return;
+                        }
+                        if (isGalleryAdminMode) {
+                          handleOpenAsset(item);
+                        } else {
+                          setDetailModalAsset(item);
+                        }
+                      }}
+                      className={`group border rounded-xl p-2 sm:p-3 flex flex-col items-center cursor-pointer transition-transform transition-shadow duration-200 ease-out hover:-translate-y-2 active:scale-95 touch-manipulation transform-gpu will-change-transform isolate [backface-visibility:hidden] [transform:translateZ(0)] [contain:paint_layout] relative w-full min-w-0 ${
+                        isMarkedForDelete
+                          ? 'border-rose-500/90 bg-rose-950/30 opacity-75 ring-2 ring-rose-500/50 scale-[0.98]'
+                          : appTheme === 'dark'
+                            ? 'bg-[#18191f] border-[#22242c] hover:border-[#38bdf8]/60 hover:bg-[#1e2029] shadow-sm hover:shadow-[0_16px_32px_-6px_rgba(0,0,0,0.7),0_8px_16px_-4px_rgba(0,0,0,0.5)]'
+                            : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-white shadow-sm hover:shadow-[0_16px_32px_-6px_rgba(0,0,0,0.14),0_8px_16px_-4px_rgba(0,0,0,0.08)]'
+                      }`}
                     >
-                      {/* Favorite Toggle Button (Delete button removed completely as requested) */}
+                      {/* Favorite Toggle Button (top-left) */}
                       <button
                         type="button"
                         onClick={(e) => {
@@ -7450,35 +8842,72 @@ export default function App() {
                           toggleFavorite(item.id);
                         }}
                         title={isFav ? "Remove from Favorites" : "Save to Favorites"}
-                        className={`absolute top-1.5 left-1.5 p-1 rounded-md transition-opacity duration-150 z-10 ${isFav
+                        className={`absolute top-1.5 left-1.5 p-1 rounded-md transition-opacity duration-150 z-20 ${isFav
                           ? 'bg-rose-500/15 text-rose-500 opacity-100'
-                          : 'opacity-0 group-hover:opacity-100 hover:bg-slate-500/10 text-slate-400 hover:text-rose-500'
+                          : 'opacity-60 sm:opacity-0 sm:group-hover:opacity-100 hover:bg-slate-500/10 text-slate-400 hover:text-rose-500'
                           }`}
                       >
                         <Heart className={`w-3.5 h-3.5 ${isFav ? 'fill-rose-500 text-rose-500' : ''}`} />
                       </button>
 
-                      {/* Preview Container: Compact box, large crisp graphic, zero pointer jitter */}
+                      {/* Delete Button (Shown ONLY when isGalleryAdminMode is true, positioned at top-right) */}
+                      {isGalleryAdminMode && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPendingDeletedIds(prev =>
+                              prev.includes(item.id)
+                                ? prev.filter(x => x !== item.id)
+                                : [...prev, item.id]
+                            );
+                          }}
+                          title={isMarkedForDelete ? "Undo deletion" : "Mark for deletion"}
+                          className={`absolute top-1.5 right-1.5 p-1.5 rounded-lg transition-all duration-150 z-20 cursor-pointer shadow-md ${
+                            isMarkedForDelete
+                              ? 'bg-rose-600 text-white ring-2 ring-white/50 scale-110 opacity-100'
+                              : 'bg-rose-500/15 text-rose-400 border border-rose-500/40 hover:bg-rose-600 hover:text-white hover:scale-105'
+                          }`}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+
+                      {/* Marked for Delete Visual Overlay Indicator */}
+                      {isMarkedForDelete && (
+                        <div className="absolute inset-0 bg-rose-950/45 backdrop-blur-[0.5px] rounded-xl z-10 flex flex-col items-center justify-center p-2 text-center pointer-events-none">
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-rose-600 text-white shadow-md">
+                            To Delete
+                          </span>
+                          <span className="text-[9px] text-rose-200 mt-1 font-semibold">
+                            Click trash to undo
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Preview Container: Roomy padded box with overflow-visible so soft blur, glow, and 3D tilts never clip */}
                       <div
-                        className="w-full h-24 sm:h-28 flex items-center justify-center p-1 mb-1 pointer-events-none select-none overflow-hidden [&>svg]:max-w-full [&>svg]:max-h-full [&>svg]:w-auto [&>svg]:h-auto [&>svg]:block [shape-rendering:geometricPrecision]"
+                        data-gallery-preview="true"
+                        className="gallery-card-preview w-full h-20 sm:h-28 flex items-center justify-center p-1.5 sm:p-3 mb-1 pointer-events-none select-none overflow-visible [&>svg]:max-w-full [&>svg]:max-h-full [&>svg]:w-auto [&>svg]:h-auto [&>svg]:block [&>svg]:overflow-visible [shape-rendering:geometricPrecision]"
                         dangerouslySetInnerHTML={{
                           __html: scopeSvgIds(
-                            item.originalSvgCode || item.svgCode,
+                            normalizeForeignObjectSvg(item.originalSvgCode || item.svgCode),
                             `home_${String(item.id).replace(/[^a-zA-Z0-9_-]/g, '_')}_`
                           )
                         }}
                       />
-                      <h3 className={`font-semibold text-xs sm:text-[13px] text-center truncate w-full pointer-events-none select-none ${appTheme === 'dark' ? 'text-slate-200' : 'text-slate-800'}`}>
+                      <h3 className={`font-semibold text-[11px] sm:text-[13px] text-center truncate w-full px-0.5 pointer-events-none select-none ${appTheme === 'dark' ? 'text-white' : 'text-slate-800'}`}>
                         {item.title}
                       </h3>
-                      <div className={`flex items-center justify-between w-full mt-1 px-0.5 text-[10px] sm:text-[11px] pointer-events-none select-none ${appTheme === 'dark' ? 'text-slate-500' : 'text-slate-400'
+                      <div className={`flex items-center justify-between w-full mt-0.5 px-0.5 text-[9px] sm:text-[11px] pointer-events-none select-none ${appTheme === 'dark' ? 'text-slate-500' : 'text-slate-400'
                         }`}>
-                        <span>{item.category}</span>
-                        <span>{item.downloads || 0} dl</span>
+                        <span className="truncate">{item.category}</span>
+                        <span className="flex-shrink-0 ml-1">{item.downloads || 0} dl</span>
                       </div>
                     </div>
                   );
                 })}
+
               </div>
 
               {/* Load More Button: Paginate 50 elements at a time */}
@@ -7533,7 +8962,7 @@ export default function App() {
       </main>
 
       {/* Website Footer */}
-      <footer className={`border-t mt-12 py-10 transition-colors ${appTheme === 'dark' ? 'bg-[#0a0f1d] border-slate-800/80 text-slate-400' : 'bg-white border-slate-200 text-slate-600'
+      <footer className={`border-t mt-12 py-10 transition-colors ${appTheme === 'dark' ? 'bg-[#121316] border-[#1f2128] text-slate-400' : 'bg-white border-slate-200 text-slate-600'
         }`}>
         <div className="max-w-[1780px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
@@ -7565,8 +8994,13 @@ export default function App() {
               </h4>
               <ul className="space-y-1.5 text-xs">
                 <li>
-                  <button onClick={() => setActiveLegalModal('license')} className="hover:text-cyan-400 transition">
-                    Commercial License
+                  <button onClick={() => { setActiveTab('blog'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-cyan-400 transition font-semibold text-cyan-400 flex items-center gap-1.5">
+                    <BookOpen className="w-3.5 h-3.5" /> Blog &amp; Tutorials
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => { setActiveTab('license'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-cyan-400 transition flex items-center gap-1.5">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Commercial License &amp; Terms
                   </button>
                 </li>
                 <li>
@@ -7622,7 +9056,7 @@ export default function App() {
 
       {/* Full-Screen Immersive Studio Workspace */}
       {selectedAsset && (
-        <div className={`fixed inset-0 z-50 flex flex-col w-full h-full max-w-full max-h-full overflow-hidden font-sans studio-workspace select-none transition-colors duration-200 ${appTheme === 'dark' ? 'bg-[#060a12] text-slate-100' : 'bg-slate-100 text-slate-900'
+        <div className={`fixed inset-0 z-50 flex flex-col w-full h-full max-w-full max-h-full overflow-hidden font-sans studio-workspace select-none transition-colors duration-200 ${appTheme === 'dark' ? 'bg-[#121316] text-slate-100' : 'bg-slate-100 text-slate-900'
           }`}>
           {/* Gallery Default Saved Toast */}
           {saveDefaultSuccess && (
@@ -7633,14 +9067,14 @@ export default function App() {
           )}
 
           {/* Top Navigation Bar */}
-          <header className={`app-studio-header h-14 sm:h-16 px-2 sm:px-6 border-b flex items-center justify-between z-30 flex-shrink-0 transition-colors ${appTheme === 'dark' ? 'bg-[#0d1424] border-slate-800' : 'bg-white border-slate-200 shadow-sm'
+          <header className={`app-studio-header h-14 sm:h-16 px-2 sm:px-6 border-b flex items-center justify-between z-30 flex-shrink-0 transition-colors ${appTheme === 'dark' ? 'bg-[#121316] border-[#1f2128]' : 'bg-white border-slate-200 shadow-sm'
             }`}>
             {/* Left: Back & Asset Details */}
             <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink min-w-0">
               <button
                 onClick={handleCloseStudio}
                 className={`flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-xl border text-xs font-semibold transition flex-shrink-0 ${appTheme === 'dark'
-                  ? 'bg-slate-900 border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white'
+                  ? 'bg-[#18191f] border-[#22242c] hover:border-[#38bdf8]/40 text-slate-300 hover:text-white'
                   : 'bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700'
                   }`}
                 title="Back to Gallery"
@@ -7649,7 +9083,7 @@ export default function App() {
                 <span className="hidden sm:inline">Gallery</span>
               </button>
 
-              <div className={`hidden sm:block h-5 w-px ${appTheme === 'dark' ? 'bg-slate-800' : 'bg-slate-200'}`} />
+              <div className={`hidden sm:block h-5 w-px ${appTheme === 'dark' ? 'bg-[#22242c]' : 'bg-slate-200'}`} />
 
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5 sm:gap-2">
@@ -7810,7 +9244,7 @@ export default function App() {
                         </p>
                       </div>
                       <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                        {exportSize >= 1024 ? `${exportSize / 1024}K Ultra HD` : `${exportSize}px`}
+                        {exportFormat === 'ico' ? (exportSize >= 256 ? 'Multi-Res Favicon' : `${exportSize}px ICO`) : (exportSize >= 1024 ? `${exportSize / 1024}K Ultra HD` : `${exportSize}px`)}
                       </span>
                     </div>
 
@@ -7820,11 +9254,18 @@ export default function App() {
                         }`}>
                         Format
                       </label>
-                      <div className="grid grid-cols-5 gap-1">
-                        {['png', 'svg', 'webp', 'jpeg', 'gif'].map((fmt) => (
+                      <div className="grid grid-cols-6 gap-1">
+                        {['png', 'svg', 'ico', 'webp', 'jpeg', 'gif'].map((fmt) => (
                           <button
                             key={fmt}
-                            onClick={() => setExportFormat(fmt)}
+                            onClick={() => {
+                              setExportFormat(fmt);
+                              if (fmt === 'ico') {
+                                setExportSize(256);
+                              } else if (exportSize < 128) {
+                                setExportSize(512);
+                              }
+                            }}
                             className={`py-1 text-[10px] font-mono font-bold uppercase rounded-lg border transition ${exportFormat === fmt
                               ? 'bg-emerald-600 border-emerald-500 text-white shadow'
                               : appTheme === 'dark'
@@ -7871,22 +9312,32 @@ export default function App() {
                       )}
                     </div>
 
-                    {/* Resolution Options Grid (128px to 8K) */}
+                    {/* Resolution Options Grid */}
                     <div>
                       <label className={`block text-[10px] font-semibold uppercase tracking-wider mb-1.5 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'
                         }`}>
-                        Resolution ({exportSize >= 1024 ? `${exportSize / 1024}K Ultra HD` : `${exportSize}px Standard`})
+                        Resolution ({exportFormat === 'ico' ? `${exportSize}px High-Definition Icon` : (exportSize >= 1024 ? `${exportSize / 1024}K Ultra HD` : `${exportSize}px Standard`)})
                       </label>
                       <div className="grid grid-cols-4 gap-1.5">
-                        {[
-                          { size: 128, label: '128px' },
-                          { size: 256, label: '256px' },
-                          { size: 512, label: '512px' },
-                          { size: 1024, label: '1K' },
-                          { size: 2048, label: '2K' },
-                          { size: 4096, label: '4K' },
-                          { size: 8192, label: !isDesktopScreen ? '8K (PC)' : '8K' }
-                        ].map(({ size, label }) => {
+                        {(exportFormat === 'ico'
+                          ? [
+                              { size: 256, label: '256px', desc: 'Standard HD (Best)', span: true },
+                              { size: 512, label: '512px', desc: '★ Ultra-HD (Big & Sharp)', span: true },
+                              { size: 128, label: '128px', desc: 'Large Icon' },
+                              { size: 64, label: '64px', desc: 'Hi-DPI App' },
+                              { size: 32, label: '32px', desc: 'Browser Tab' },
+                              { size: 16, label: '16px', desc: 'Small Favicon' }
+                            ]
+                          : [
+                              { size: 128, label: '128px' },
+                              { size: 256, label: '256px' },
+                              { size: 512, label: '512px' },
+                              { size: 1024, label: '1K' },
+                              { size: 2048, label: '2K' },
+                              { size: 4096, label: '4K' },
+                              { size: 8192, label: !isDesktopScreen ? '8K (PC)' : '8K' }
+                            ]
+                        ).map(({ size, label, desc, span }) => {
                           const isSelected = exportSize === size;
                           return (
                             <button
@@ -7905,10 +9356,10 @@ export default function App() {
                                 : appTheme === 'dark'
                                   ? 'bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700 hover:text-white'
                                   : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200 hover:text-slate-900'
-                                } ${size === 8192 ? 'col-span-2 bg-gradient-to-r from-cyan-900/40 to-blue-900/40 border-cyan-700/50' : ''}`}
+                                } ${(size === 8192 || (exportFormat === 'ico' && span)) ? 'col-span-2 bg-gradient-to-r from-cyan-900/40 to-blue-900/40 border-cyan-700/50' : ''}`}
                             >
-                              <span className={size === 8192 && !isSelected ? 'text-cyan-300' : ''}>{label}</span>
-                              <span className="text-[9px] opacity-70 font-normal">{size}px</span>
+                              <span className={(size === 8192 || (exportFormat === 'ico' && span)) && !isSelected ? 'text-cyan-300' : ''}>{label}</span>
+                              <span className="text-[9px] opacity-70 font-normal">{desc || `${size}px`}</span>
                             </button>
                           );
                         })}
@@ -7946,7 +9397,9 @@ export default function App() {
                       <span>
                         {downloading
                           ? 'Rendering & Downloading...'
-                          : `Export ${exportSize >= 1024 ? `${exportSize / 1024}K` : `${exportSize}px`} (.${exportFormat.toUpperCase()})`}
+                          : exportFormat === 'ico'
+                            ? `Export .ICO (${exportSize}px High-Res Bundle)`
+                            : `Export ${exportSize >= 1024 ? `${exportSize / 1024}K` : `${exportSize}px`} (.${exportFormat.toUpperCase()})`}
                       </span>
                     </button>
                   </div>
@@ -7985,7 +9438,6 @@ export default function App() {
             <div
               ref={canvasWorkspaceRef}
               onPointerDown={handleCanvasPointerDown}
-              onWheel={handleWheel}
               onClick={() => {
                 if (justFinishedPanRef.current || isCtrlShiftDown) return;
                 setActiveSelectedColor(null);
@@ -7995,7 +9447,7 @@ export default function App() {
                 : isCtrlShiftDown
                   ? 'cursor-grab'
                   : ''
-                } ${appTheme === 'dark' ? 'bg-[#060a12]' : 'bg-slate-100/90'
+                } ${appTheme === 'dark' ? 'bg-[#121316]' : 'bg-slate-100/90'
                 }`}
             >
               {/* Marquee Selection Box (Figma/Illustrator Light Blue Drag Box) */}
@@ -8017,14 +9469,14 @@ export default function App() {
               {/* Floating Canvas Controls & Direct Selection Indicator (Hidden on mobile UI per user request for a completely clean, empty canvas) */}
               <div className="hidden sm:flex absolute top-2 inset-x-2 sm:top-4 sm:inset-x-6 items-center justify-between z-10 pointer-events-none gap-2">
                 {isCtrlShiftDown || isPanning ? (
-                  <div className="pointer-events-auto backdrop-blur-md border px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-xl text-[10px] sm:text-xs flex items-center gap-1.5 sm:gap-2 shadow-xl bg-cyan-950/90 border-cyan-500/60 text-cyan-300 font-semibold animate-pulse">
+                  <div className="pointer-events-auto border px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-xl text-[10px] sm:text-xs flex items-center gap-1.5 sm:gap-2 bg-cyan-950 border-cyan-500/60 text-cyan-300 font-semibold animate-pulse">
                     <Move3d className="w-3.5 h-3.5 text-cyan-400" />
                     <span>Pan View Active &bull; Drag mouse to move</span>
                   </div>
                 ) : selectedLayerIds && selectedLayerIds.length > 0 ? (
-                  <div className={`pointer-events-auto backdrop-blur-md border px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-xl text-[10px] sm:text-xs flex items-center gap-1.5 sm:gap-2 shadow-xl animate-in fade-in duration-150 ${appTheme === 'dark'
-                    ? 'bg-slate-900/95 border-cyan-500/60 text-slate-200 shadow-cyan-950/30'
-                    : 'bg-white/95 border-cyan-500/60 text-slate-800 shadow-slate-200'
+                  <div className={`pointer-events-auto border px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-xl text-[10px] sm:text-xs flex items-center gap-1.5 sm:gap-2 animate-in fade-in duration-150 ${appTheme === 'dark'
+                    ? 'bg-[#0f172a] border-cyan-500/50 text-slate-200'
+                    : 'bg-white border-slate-300 text-slate-800'
                     }`}>
                     <Layers className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
                     <span>
@@ -8066,12 +9518,12 @@ export default function App() {
                     </div>
                   </div>
                 ) : activeSelectedColor ? (
-                  <div className={`pointer-events-auto backdrop-blur-md border px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-xl text-[10px] sm:text-xs flex items-center gap-1.5 sm:gap-2 shadow-xl animate-in fade-in duration-150 ${appTheme === 'dark'
-                    ? 'bg-slate-900/95 border-cyan-500/60 text-slate-200'
-                    : 'bg-white/95 border-cyan-500/60 text-slate-800'
+                  <div className={`pointer-events-auto border px-2.5 sm:px-3.5 py-1 sm:py-1.5 rounded-xl text-[10px] sm:text-xs flex items-center gap-1.5 sm:gap-2 animate-in fade-in duration-150 ${appTheme === 'dark'
+                    ? 'bg-[#0f172a] border-cyan-500/50 text-slate-200'
+                    : 'bg-white border-slate-300 text-slate-800'
                     }`}>
                     <span
-                      className="w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-full border border-slate-400 shadow ring-2 ring-cyan-400/40"
+                      className="w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-full border border-slate-400"
                       style={{
                         backgroundColor:
                           adjustments.colorReplacements[activeSelectedColor.toLowerCase()] ||
@@ -8082,9 +9534,9 @@ export default function App() {
                     <span className={`hidden xs:inline text-[10px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>&bull; Tap canvas to deselect</span>
                   </div>
                 ) : (
-                  <div className={`pointer-events-auto backdrop-blur-md border px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[10px] sm:text-[11px] flex items-center gap-1.5 shadow-lg ${appTheme === 'dark'
-                    ? 'bg-slate-900/90 border-slate-800 text-cyan-400'
-                    : 'bg-white/90 border-slate-200 text-cyan-600 font-medium'
+                  <div className={`pointer-events-auto border px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl text-[10px] sm:text-[11px] flex items-center gap-1.5 ${appTheme === 'dark'
+                    ? 'bg-[#0f172a] border-slate-800 text-cyan-400'
+                    : 'bg-white border-slate-200 text-cyan-600 font-medium'
                     }`}>
                     <Sparkles className="w-3 h-3 text-cyan-500 flex-shrink-0" />
                     <span><strong>Touch/Click</strong> icon to change colors</span>
@@ -8093,12 +9545,12 @@ export default function App() {
                 )}
 
                 {/* Zoom Controls Pill */}
-                <div className={`pointer-events-auto flex items-center border p-0.5 sm:p-1 rounded-xl gap-0.5 sm:gap-1 shadow-lg backdrop-blur-md ${appTheme === 'dark' ? 'bg-slate-900/90 border-slate-800' : 'bg-white/95 border-slate-200'
+                <div className={`pointer-events-auto flex items-center border p-0.5 sm:p-1 rounded-xl gap-0.5 sm:gap-1 ${appTheme === 'dark' ? 'bg-[#0f172a] border-slate-800' : 'bg-white border-slate-200'
                   }`}>
                   <button
                     onClick={() => {
                       const prevTarget = targetZoomRef.current;
-                      const nextTarget = Math.max(0.1, Number((prevTarget * 0.8).toFixed(2)));
+                      const nextTarget = Math.max(0.4, Number((prevTarget * 0.8).toFixed(2)));
                       targetZoomRef.current = nextTarget;
                       if (nextTarget <= 1.05) {
                         targetPanRef.current = { x: 0, y: 0 };
@@ -8133,7 +9585,7 @@ export default function App() {
                       }`}
                     title="Click to Reset Zoom (100%) & Center Pan"
                   >
-                    {Math.round(zoomLevel * 100)}%
+                    <span id="live-zoom-badge">{Math.round(zoomLevel * 100)}%</span>
                   </button>
                   <button
                     onClick={() => {
@@ -8146,55 +9598,176 @@ export default function App() {
                   >
                     <ZoomIn className="w-3.5 h-3.5" />
                   </button>
-                  {/* Circular Help & Navigation Guide Button (?) */}
-                  <button
-                    onClick={() => {
-                      setIsHelpModalOpen(true);
-                      setHelpSearchQuery('');
-                    }}
-                    className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center font-bold text-[11px] sm:text-xs transition-all shadow-sm border hover:scale-110 active:scale-95 ml-0.5 ${appTheme === 'dark'
-                        ? 'bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500 hover:text-slate-950 border-cyan-400/40 shadow-cyan-950/40'
-                        : 'bg-cyan-100 text-cyan-700 hover:bg-cyan-500 hover:text-white border-cyan-300'
-                      }`}
-                    title="Navigation & Shortcuts Guide (?)"
-                  >
-                    ?
-                  </button>
+                    {/* Circular Help & Navigation Guide Button (?) */}
+                    <button
+                      onClick={() => {
+                        setIsHelpModalOpen(true);
+                        setHelpSearchQuery('');
+                      }}
+                      className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center font-bold text-[11px] sm:text-xs transition-all shadow-sm border hover:scale-110 active:scale-95 ml-0.5 ${appTheme === 'dark'
+                          ? 'bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500 hover:text-slate-950 border-cyan-400/40 shadow-cyan-950/40'
+                          : 'bg-cyan-100 text-cyan-700 hover:bg-cyan-500 hover:text-white border-cyan-300'
+                        }`}
+                      title="Navigation & Shortcuts Guide (?)"
+                    >
+                      ?
+                    </button>
+                  </div>
+
+                  {/* Gallery Card Safe Boundary Guide Toggle (ONLY visible when entered via Admin Edit Gallery Defaults) */}
+                  {isGalleryAdminMode && (
+                    <div className={`pointer-events-auto flex items-center border p-0.5 sm:p-1 rounded-xl gap-1 shadow-lg backdrop-blur-md ${
+                      showCardSafeZone
+                        ? 'bg-purple-950/80 border-purple-500/50 shadow-purple-950/30'
+                        : appTheme === 'dark' ? 'bg-slate-900/90 border-slate-800' : 'bg-white/95 border-slate-200'
+                    }`}>
+                      <button
+                        type="button"
+                        onClick={() => setShowCardSafeZone(prev => !prev)}
+                        className={`px-2 py-1 rounded-lg text-[10px] sm:text-xs font-semibold flex items-center gap-1.5 transition ${
+                          showCardSafeZone
+                            ? 'bg-purple-600 text-white shadow-sm'
+                            : appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                        }`}
+                        title="Toggle Gallery Card Safe Boundary Guide"
+                      >
+                        <Scan className="w-3.5 h-3.5 text-purple-300" />
+                        <span className="hidden xs:inline">Card Guide</span>
+                        <span className={`text-[9px] px-1 py-0.2 rounded font-mono font-bold ${showCardSafeZone ? 'bg-purple-900/60 text-purple-200' : 'bg-slate-800 text-slate-400'}`}>
+                          {showCardSafeZone ? 'ON' : 'OFF'}
+                        </span>
+                      </button>
+                    </div>
+                  )}
                 </div>
-              </div>
 
+                {/* Gallery Card Safe Boundary Guide Visual Frame (ONLY active in Admin Gallery Edit Mode) */}
+                {isGalleryAdminMode && showCardSafeZone && !exportProgress && (
+                  <div
+                    ref={cardGuideRef}
+                    style={{
+                      position: 'absolute',
+                      left: '50%',
+                      top: '50%',
+                      transform: `translate(-50%, -50%) translate(${canvasPan.x}px, ${canvasPan.y}px) scale(${zoomLevel})`,
+                      width: `${Math.round(iconWidth * 1.34)}px`,
+                      height: `${Math.round(iconHeight * 1.52)}px`,
+                      pointerEvents: 'none',
+                      zIndex: 4
+                    }}
+                    className={`rounded-2xl border-2 transition-all duration-200 flex flex-col justify-between shadow-2xl backdrop-blur-[0.5px] select-none ${
+                      cardOverflowInfo.isOverflowing
+                        ? 'border-rose-500/90 bg-rose-500/[0.04] shadow-rose-950/40 ring-4 ring-rose-500/25'
+                        : 'border-purple-500/50 bg-purple-500/[0.03] shadow-purple-950/30'
+                    }`}
+                  >
+                    {/* Top Header of Mock Gallery Card */}
+                    <div className={`flex items-center justify-between px-3 py-1.5 rounded-t-xl text-[10px] font-bold border-b transition-colors ${
+                      cardOverflowInfo.isOverflowing
+                        ? 'bg-rose-950/90 text-rose-200 border-rose-500/40'
+                        : 'bg-purple-950/85 text-purple-200 border-purple-500/30'
+                    }`}>
+                      <span className="flex items-center gap-1.5 font-bold">
+                        <Scan className="w-3 h-3 text-purple-400" />
+                        <span>Gallery Card Outer Border</span>
+                      </span>
+                      <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold uppercase tracking-wider ${
+                        cardOverflowInfo.isOverflowing
+                          ? 'bg-rose-600 text-white animate-pulse shadow-sm'
+                          : 'bg-purple-600/50 text-purple-200 border border-purple-400/30'
+                      }`}>
+                        {cardOverflowInfo.isOverflowing ? '⚠️ Overflow Warning' : 'Card Frame Guide'}
+                      </span>
+                    </div>
 
+                    {/* Center Safe Zone (Dashed inner boundary matching SVG center bounds) */}
+                    <div className="flex-1 flex items-center justify-center p-2 relative">
+                      <div
+                        style={{
+                          width: `${iconWidth}px`,
+                          height: `${iconHeight}px`
+                        }}
+                        className={`rounded-xl border-2 border-dashed transition-all flex items-start justify-center p-1.5 ${
+                          cardOverflowInfo.isOverflowing
+                            ? 'border-rose-400/80 bg-rose-500/[0.04]'
+                            : 'border-emerald-400/60 bg-emerald-500/[0.02]'
+                        }`}
+                      >
+                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border shadow-sm ${
+                          cardOverflowInfo.isOverflowing
+                            ? 'bg-rose-950/90 text-rose-300 border-rose-500/50'
+                            : 'bg-emerald-950/90 text-emerald-300 border-emerald-500/40'
+                        }`}>
+                          {cardOverflowInfo.isOverflowing ? '❌ Element Exceeding Card Boundary' : '🟢 Card Safe Zone (Keep Element Inside)'}
+                        </span>
+                      </div>
+                    </div>
 
-              {/* Floating SVG Icon or Background Badge Shape with Interactive Selection, Custom Dimensions & Smooth Zoom */}
-              <div
-                className={
-                  (!exportProgress && adjustments.is3DFloating && adjustments.animPreset !== 'none')
-                    ? getPresetAnimClass(adjustments.animPreset || 'float')
-                    : ''
-                }
-                style={{
-                  '--anim-speed': `${adjustments.animSpeed || 2.2}s`,
-                  '--anim-amp': `${adjustments.animHeight || 16}px`,
-                  '--anim-amp-val': `${adjustments.animHeight || 16}`,
-                  display: 'inline-block',
-                  perspective: '1200px',
-                  transformStyle: 'preserve-3d',
-                  transformOrigin: adjustments.animPreset === 'swing' ? 'top center' : 'center center',
-                  animationPlayState: exportProgress ? 'paused' : 'running'
-                }}
-              >
-                {/* 3D & Vector Transform Space: Holds both SVG and Interactive Selection Bounding Box */}
+                    {/* Mock Card Footer (Title & Category representation) */}
+                    <div className={`px-3 py-1.5 rounded-b-xl border-t flex items-center justify-between text-[10px] transition-colors ${
+                      cardOverflowInfo.isOverflowing
+                        ? 'bg-rose-950/90 text-rose-300 border-rose-500/40'
+                        : 'bg-slate-950/90 text-slate-400 border-purple-500/30'
+                    }`}>
+                      <span className="font-semibold text-slate-300 truncate max-w-[150px]">
+                        {selectedAsset?.title || 'Element Title'}
+                      </span>
+                      <span className="text-[9px] text-slate-500 font-mono">
+                        {selectedAsset?.category || 'Badges'}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* 2D Smooth Pan & Zoom Viewport Container (Guarantees razor-sharp vector rasterization in Chromium GPU compositor) */}
                 <div
+                  ref={canvasViewportRef}
                   style={{
-                    position: 'relative',
-                    width: `${Math.round(iconWidth * zoomLevel)}px`,
-                    height: `${Math.round(iconHeight * zoomLevel)}px`,
-                    transform: `translate(${canvasPan.x + (adjustments.translateX || 0)}px, ${canvasPan.y + (adjustments.translateY || 0)}px) ${has3D ? `perspective(${adjustments.perspective || 800}px) translateZ(${adjustments.translateZ || 0}px) rotateX(${adjustments.rotateX || 0}deg) rotateY(${adjustments.rotateY || 0}deg) ` : ''}rotate(${adjustments.rotation || 0}deg) skew(${adjustments.skewX || 0}deg, ${adjustments.skewY || 0}deg) scale(${adjustments.flipH ? -1 : 1}, ${adjustments.flipV ? -1 : 1})`,
+                    transform: `translate3d(${canvasPan.x}px, ${canvasPan.y}px, 0px) scale(${zoomLevel})`,
                     transformOrigin: 'center center',
-                    transformStyle: has3D ? 'preserve-3d' : undefined,
-                    willChange: isPanning ? 'transform' : 'auto'
+                    '--stage-zoom': zoomLevel,
+                    '--inv-zoom': 1 / (zoomLevel || 1),
+                    overflow: 'visible'
                   }}
+                  className="inline-flex items-center justify-center pointer-events-auto overflow-visible"
                 >
+                  {/* Floating SVG Icon or Background Badge Shape with Interactive Selection, Custom Dimensions & Smooth Zoom */}
+                  <div
+                    className={
+                      (!exportProgress && adjustments.is3DFloating && adjustments.animPreset !== 'none')
+                        ? getPresetAnimClass(adjustments.animPreset || 'float')
+                        : ''
+                    }
+                    style={{
+                      '--anim-speed': `${adjustments.animSpeed || 2.2}s`,
+                      '--anim-amp': `${adjustments.animHeight || 16}px`,
+                      '--anim-amp-val': `${adjustments.animHeight || 16}`,
+                      display: 'inline-block',
+                      overflow: 'visible',
+                      ...(adjustments.is3DFloating && adjustments.animPreset !== 'none' ? {
+                        perspective: '1200px',
+                        transformStyle: 'preserve-3d',
+                        transformOrigin: adjustments.animPreset === 'swing' ? 'top center' : 'center center'
+                      } : {}),
+                      animationPlayState: exportProgress ? 'paused' : 'running'
+                    }}
+                  >
+                    {/* 3D & Vector Transform Space: Holds both SVG and Interactive Selection Bounding Box */}
+                    <div
+                      ref={transformStageRef}
+                      style={{
+                        position: 'relative',
+                        width: `${iconWidth}px`,
+                        height: `${iconHeight}px`,
+                        perspective: has3D ? `${adjustments.perspective || 1200}px` : undefined,
+                        perspectiveOrigin: '50% 50%',
+                        transformStyle: 'preserve-3d',
+                        transform: `translate3d(${adjustments.translateX || 0}px, ${adjustments.translateY || 0}px, 0px) rotate(${adjustments.rotation || 0}deg) skew(${adjustments.skewX || 0}deg, ${adjustments.skewY || 0}deg) scale(${adjustments.flipH ? -1 : 1}, ${adjustments.flipV ? -1 : 1})`,
+                        transformOrigin: '50% 50%',
+                        backfaceVisibility: 'visible',
+                        overflow: 'visible'
+                      }}
+                    >
                   <div
                     ref={canvasSvgContainerRef}
                     onPointerDown={handleCanvasPointerDown}
@@ -8228,12 +9801,17 @@ export default function App() {
                       '--zoom-level': zoomLevel,
                       '--sel-w': `${Math.max(0.02, Number((0.9 / zoomLevel).toFixed(4)))}px`,
                       '--hover-w': `${Math.max(0.015, Number((0.75 / zoomLevel).toFixed(4)))}px`,
-                      '--sel-outline-w': `${Math.max(0.001, Number((2 * finalSvgScale).toFixed(5)))}px`,
-                      '--sel-outline-off': `${Math.max(0.001, Number((2 * finalSvgScale).toFixed(5)))}px`,
-                      '--hover-outline-w': `${Math.max(0.001, Number((1.5 * finalSvgScale).toFixed(5)))}px`,
-                      '--hover-outline-off': `${Math.max(0.001, Number((2 * finalSvgScale).toFixed(5)))}px`,
+                      '--sel-outline-w': `calc(${Math.max(0.001, Number((2 * finalSvgScale).toFixed(5)))}px * var(--inv-zoom, ${1 / zoomLevel}))`,
+                      '--sel-outline-off': `calc(${Math.max(0.001, Number((2 * finalSvgScale).toFixed(5)))}px * var(--inv-zoom, ${1 / zoomLevel}))`,
+                      '--hover-outline-w': `calc(${Math.max(0.001, Number((1.5 * finalSvgScale).toFixed(5)))}px * var(--inv-zoom, ${1 / zoomLevel}))`,
+                      '--hover-outline-off': `calc(${Math.max(0.001, Number((2 * finalSvgScale).toFixed(5)))}px * var(--inv-zoom, ${1 / zoomLevel}))`,
                       width: '100%',
                       height: '100%',
+                      overflow: 'visible',
+                      transform: has3D ? `translate3d(0, 0, ${adjustments.translateZ || 0}px) rotateX(${adjustments.rotateX || 0}deg) rotateY(${adjustments.rotateY || 0}deg)` : undefined,
+                      transformOrigin: '50% 50%',
+                      transformStyle: 'preserve-3d',
+                      backfaceVisibility: 'hidden',
                       filter: getComputedFilterStyle(),
                       backgroundColor: bgShape !== 'none' ? (bgGradientEnabled ? undefined : bgShapeColor) : 'transparent',
                       background: bgShape !== 'none' && bgGradientEnabled ? `linear-gradient(${gradientAngle}deg, ${gradientFrom}, ${gradientTo})` : undefined,
@@ -8242,7 +9820,7 @@ export default function App() {
                       clipPath: bgShape === 'hexagon' ? 'polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%)' : 'none',
                       border: bgShape !== 'none' && bgShapeBorder > 0 ? `${bgShapeBorder}px solid ${bgShapeBorderColor}` : 'none'
                     }}
-                    className={`flex items-center justify-center interactive-svg-canvas select-none [&>svg]:w-full [&>svg]:h-full [&>svg]:block [shape-rendering:geometricPrecision] [text-rendering:geometricPrecision] ${bgShape !== 'none' ? 'shadow-2xl' : ''
+                    className={`flex items-center justify-center interactive-svg-canvas select-none overflow-visible [&>svg]:w-full [&>svg]:h-full [&>svg]:block [shape-rendering:geometricPrecision] [text-rendering:geometricPrecision] ${bgShape !== 'none' ? 'shadow-2xl' : ''
                       } ${studioTab === 'draw' ? 'pointer-events-none' : 'cursor-pointer'}`}
                     dangerouslySetInnerHTML={{ __html: currentPreviewSvg }}
                   />
@@ -8274,7 +9852,7 @@ export default function App() {
                     </svg>
                   )}
 
-                  {/* Interactive Transform Bounding Box with 8 resize handles & rotation button - Unified Frame in 3D Space */}
+                  {/* Interactive Transform Bounding Box with 8 resize handles & rotation button - Unified Frame in 3D Space (Counter-Scaled for Constant Crisp 1x Screen Size) */}
                   {transformBox && !isPanning && studioTab !== 'draw' && (
                     <div
                       ref={transformBoxRef}
@@ -8284,120 +9862,234 @@ export default function App() {
                         top: `${transformBox.y}px`,
                         width: `${transformBox.width}px`,
                         height: `${transformBox.height}px`,
-                        pointerEvents: 'none'
+                        transform: has3D ? `translate3d(0, 0, ${adjustments.translateZ || 0}px) rotateX(${adjustments.rotateX || 0}deg) rotateY(${adjustments.rotateY || 0}deg)` : undefined,
+                        transformOrigin: '50% 50%',
+                        transformStyle: 'preserve-3d',
+                        pointerEvents: 'none',
+                        borderWidth: `calc(1.5px * var(--inv-zoom, ${1 / zoomLevel}))`,
+                        borderStyle: 'solid',
+                        borderColor: '#38bdf8',
+                        boxShadow: `0 0 calc(8px * var(--inv-zoom, ${1 / zoomLevel})) rgba(56,189,248,0.45)`
                       }}
-                      className="z-30 border-2 border-[#38bdf8] shadow-[0_0_12px_rgba(56,189,248,0.45)] rounded-none"
+                      className="z-30 rounded-none"
                     >
-                      {/* 4 Corner Proportional Resize Dots */}
+                      {/* 4 Corner Proportional Resize Dots (Counter-scaled to stay constant crisp 1x size) */}
                       <div
-                        onPointerDown={(e) => handleTransformHandleDown(e, 'nw')}
-                        className="pointer-events-auto absolute -top-2 -left-2 w-3.5 h-3.5 bg-white rounded-full border-2 border-[#38bdf8] shadow-md cursor-nwse-resize hover:scale-125 transition-transform"
-                        title="Drag to scale proportionally"
-                      />
-                      <div
-                        onPointerDown={(e) => handleTransformHandleDown(e, 'ne')}
-                        className="pointer-events-auto absolute -top-2 -right-2 w-3.5 h-3.5 bg-white rounded-full border-2 border-[#38bdf8] shadow-md cursor-nesw-resize hover:scale-125 transition-transform"
-                        title="Drag to scale proportionally"
-                      />
-                      <div
-                        onPointerDown={(e) => handleTransformHandleDown(e, 'se')}
-                        className="pointer-events-auto absolute -bottom-2 -right-2 w-3.5 h-3.5 bg-white rounded-full border-2 border-[#38bdf8] shadow-md cursor-nwse-resize hover:scale-125 transition-transform"
-                        title="Drag to scale proportionally"
-                      />
-                      <div
-                        onPointerDown={(e) => handleTransformHandleDown(e, 'sw')}
-                        className="pointer-events-auto absolute -bottom-2 -left-2 w-3.5 h-3.5 bg-white rounded-full border-2 border-[#38bdf8] shadow-md cursor-nesw-resize hover:scale-125 transition-transform"
-                        title="Drag to scale proportionally"
-                      />
-
-                      {/* 4 Mid-Edge Stretch Pills/Bars */}
-                      <div
-                        onPointerDown={(e) => handleTransformHandleDown(e, 'n')}
-                        className="pointer-events-auto absolute -top-1.5 left-1/2 -translate-x-1/2 w-4 h-2 bg-white rounded-full border border-[#38bdf8] shadow-sm cursor-ns-resize hover:scale-125 transition-transform"
-                        title="Drag to change height"
-                      />
-                      <div
-                        onPointerDown={(e) => handleTransformHandleDown(e, 's')}
-                        className="pointer-events-auto absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-4 h-2 bg-white rounded-full border border-[#38bdf8] shadow-sm cursor-ns-resize hover:scale-125 transition-transform"
-                        title="Drag to change height"
-                      />
-                      <div
-                        onPointerDown={(e) => handleTransformHandleDown(e, 'w')}
-                        className="pointer-events-auto absolute top-1/2 -left-1.5 -translate-y-1/2 w-2 h-4 bg-white rounded-full border border-[#38bdf8] shadow-sm cursor-ew-resize hover:scale-125 transition-transform"
-                        title="Drag to change width"
-                      />
-                      <div
-                        onPointerDown={(e) => handleTransformHandleDown(e, 'e')}
-                        className="pointer-events-auto absolute top-1/2 -right-1.5 -translate-y-1/2 w-2 h-4 bg-white rounded-full border border-[#38bdf8] shadow-sm cursor-ew-resize hover:scale-125 transition-transform"
-                        title="Drag to change width"
-                      />
-
-                      {/* Rotation & Group/Ungroup Controls Container right by the left selection line */}
-                      <div className="pointer-events-auto absolute top-1/2 -left-3 -translate-x-full -translate-y-1/2 flex items-center gap-1.5 z-40">
-                        {/* If single child inside a group is sub-selected: Provide "Select Group" button */}
-                        {isSubSelectedInGroup && activeGroupForSelection && (
-                          <button
-                            type="button"
-                            onPointerDown={(e) => e.stopPropagation()}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedLayerIds([...activeGroupForSelection]);
-                              setSelectedLayerId(activeGroupForSelection[0]);
-                            }}
-                            className="h-6 px-2.5 rounded-full border shadow-lg flex items-center gap-1 text-[10px] font-bold transition-all hover:scale-105 active:scale-95 whitespace-nowrap cursor-pointer select-none bg-cyan-500 hover:bg-cyan-400 text-slate-950 border-cyan-300 shadow-cyan-950/40"
-                            title="Click to select all parts in this group together"
-                          >
-                            <Layers className="w-3 h-3 flex-shrink-0" />
-                            <span>Select Group</span>
-                          </button>
-                        )}
-
-                        {/* Group / Ungroup Button */}
-                        {(isCurrentGroupSelected || isSubSelectedInGroup || (selectedLayerIds && selectedLayerIds.length > 1)) && (
-                          <button
-                            type="button"
-                            onPointerDown={(e) => e.stopPropagation()}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (isCurrentGroupSelected || isSubSelectedInGroup) {
-                                handleUngroupSelected();
-                              } else {
-                                handleGroupSelected();
-                              }
-                            }}
-                            className={`h-6 px-2.5 rounded-full border shadow-lg flex items-center gap-1 text-[10px] font-bold transition-all hover:scale-105 active:scale-95 whitespace-nowrap cursor-pointer select-none ${isCurrentGroupSelected || isSubSelectedInGroup
-                                ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 border-amber-300 shadow-amber-950/40'
-                                : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 border-cyan-300 shadow-cyan-950/40'
-                              }`}
-                            title={isCurrentGroupSelected || isSubSelectedInGroup ? "Click to ungroup parts so they become standalone" : "Click to group selected parts"}
-                          >
-                            {isCurrentGroupSelected || isSubSelectedInGroup ? (
-                              <>
-                                <Unlink2 className="w-3 h-3 flex-shrink-0" />
-                                <span>Ungroup</span>
-                              </>
-                            ) : (
-                              <>
-                                <Link2 className="w-3 h-3 flex-shrink-0" />
-                                <span>Group</span>
-                              </>
-                            )}
-                          </button>
-                        )}
-
-                        {/* Single Rotation Handle Button */}
+                        style={{
+                          position: 'absolute',
+                          left: 0,
+                          top: 0,
+                          transform: `translate(-50%, -50%) scale(var(--inv-zoom, ${1 / zoomLevel}))`,
+                          transformOrigin: 'center center',
+                          pointerEvents: 'none'
+                        }}
+                      >
                         <div
-                          onPointerDown={(e) => handleTransformHandleDown(e, 'rotate')}
-                          className="w-6 h-6 bg-white rounded-full border-2 border-[#38bdf8] shadow-lg flex items-center justify-center cursor-grab active:cursor-grabbing hover:scale-115 hover:border-cyan-300 transition-all text-[#0284c7] hover:text-cyan-500 flex-shrink-0"
-                          title="Drag to rotate smoothly (or click to rotate)"
-                        >
-                          <RotateCw className="w-3.5 h-3.5" />
+                          onPointerDown={(e) => handleTransformHandleDown(e, 'nw')}
+                          className="pointer-events-auto w-3.5 h-3.5 bg-white rounded-full border-2 border-[#38bdf8] shadow-md cursor-nwse-resize hover:scale-125 active:scale-95 transition-transform"
+                          title="Drag to scale proportionally"
+                        />
+                      </div>
+
+                      <div
+                        style={{
+                          position: 'absolute',
+                          right: 0,
+                          top: 0,
+                          transform: `translate(50%, -50%) scale(var(--inv-zoom, ${1 / zoomLevel}))`,
+                          transformOrigin: 'center center',
+                          pointerEvents: 'none'
+                        }}
+                      >
+                        <div
+                          onPointerDown={(e) => handleTransformHandleDown(e, 'ne')}
+                          className="pointer-events-auto w-3.5 h-3.5 bg-white rounded-full border-2 border-[#38bdf8] shadow-md cursor-nesw-resize hover:scale-125 active:scale-95 transition-transform"
+                          title="Drag to scale proportionally"
+                        />
+                      </div>
+
+                      <div
+                        style={{
+                          position: 'absolute',
+                          right: 0,
+                          bottom: 0,
+                          transform: `translate(50%, 50%) scale(var(--inv-zoom, ${1 / zoomLevel}))`,
+                          transformOrigin: 'center center',
+                          pointerEvents: 'none'
+                        }}
+                      >
+                        <div
+                          onPointerDown={(e) => handleTransformHandleDown(e, 'se')}
+                          className="pointer-events-auto w-3.5 h-3.5 bg-white rounded-full border-2 border-[#38bdf8] shadow-md cursor-nwse-resize hover:scale-125 active:scale-95 transition-transform"
+                          title="Drag to scale proportionally"
+                        />
+                      </div>
+
+                      <div
+                        style={{
+                          position: 'absolute',
+                          left: 0,
+                          bottom: 0,
+                          transform: `translate(-50%, 50%) scale(var(--inv-zoom, ${1 / zoomLevel}))`,
+                          transformOrigin: 'center center',
+                          pointerEvents: 'none'
+                        }}
+                      >
+                        <div
+                          onPointerDown={(e) => handleTransformHandleDown(e, 'sw')}
+                          className="pointer-events-auto w-3.5 h-3.5 bg-white rounded-full border-2 border-[#38bdf8] shadow-md cursor-nesw-resize hover:scale-125 active:scale-95 transition-transform"
+                          title="Drag to scale proportionally"
+                        />
+                      </div>
+
+                      {/* 4 Mid-Edge Stretch Pills/Bars (Counter-scaled to stay constant crisp 1x size) */}
+                      <div
+                        style={{
+                          position: 'absolute',
+                          left: '50%',
+                          top: 0,
+                          transform: `translate(-50%, -50%) scale(var(--inv-zoom, ${1 / zoomLevel}))`,
+                          transformOrigin: 'center center',
+                          pointerEvents: 'none'
+                        }}
+                      >
+                        <div
+                          onPointerDown={(e) => handleTransformHandleDown(e, 'n')}
+                          className="pointer-events-auto w-4 h-2 bg-white rounded-full border border-[#38bdf8] shadow-sm cursor-ns-resize hover:scale-125 active:scale-95 transition-transform"
+                          title="Drag to change height"
+                        />
+                      </div>
+
+                      <div
+                        style={{
+                          position: 'absolute',
+                          left: '50%',
+                          bottom: 0,
+                          transform: `translate(-50%, 50%) scale(var(--inv-zoom, ${1 / zoomLevel}))`,
+                          transformOrigin: 'center center',
+                          pointerEvents: 'none'
+                        }}
+                      >
+                        <div
+                          onPointerDown={(e) => handleTransformHandleDown(e, 's')}
+                          className="pointer-events-auto w-4 h-2 bg-white rounded-full border border-[#38bdf8] shadow-sm cursor-ns-resize hover:scale-125 active:scale-95 transition-transform"
+                          title="Drag to change height"
+                        />
+                      </div>
+
+                      <div
+                        style={{
+                          position: 'absolute',
+                          left: 0,
+                          top: '50%',
+                          transform: `translate(-50%, -50%) scale(var(--inv-zoom, ${1 / zoomLevel}))`,
+                          transformOrigin: 'center center',
+                          pointerEvents: 'none'
+                        }}
+                      >
+                        <div
+                          onPointerDown={(e) => handleTransformHandleDown(e, 'w')}
+                          className="pointer-events-auto w-2 h-4 bg-white rounded-full border border-[#38bdf8] shadow-sm cursor-ew-resize hover:scale-125 active:scale-95 transition-transform"
+                          title="Drag to change width"
+                        />
+                      </div>
+
+                      <div
+                        style={{
+                          position: 'absolute',
+                          right: 0,
+                          top: '50%',
+                          transform: `translate(50%, -50%) scale(var(--inv-zoom, ${1 / zoomLevel}))`,
+                          transformOrigin: 'center center',
+                          pointerEvents: 'none'
+                        }}
+                      >
+                        <div
+                          onPointerDown={(e) => handleTransformHandleDown(e, 'e')}
+                          className="pointer-events-auto w-2 h-4 bg-white rounded-full border border-[#38bdf8] shadow-sm cursor-ew-resize hover:scale-125 active:scale-95 transition-transform"
+                          title="Drag to change width"
+                        />
+                      </div>
+
+                      {/* Rotation & Group/Ungroup Controls Container right by the left selection line (Counter-scaled to stay constant crisp 1x size) */}
+                      <div
+                        style={{
+                          position: 'absolute',
+                          left: 0,
+                          top: '50%',
+                          transform: `translate(calc(-100% - 12px * var(--inv-zoom, ${1 / zoomLevel})), -50%) scale(var(--inv-zoom, ${1 / zoomLevel}))`,
+                          transformOrigin: 'right center',
+                          pointerEvents: 'none'
+                        }}
+                        className="z-40"
+                      >
+                        <div className="pointer-events-auto flex items-center gap-1.5 whitespace-nowrap">
+                          {/* If single child inside a group is sub-selected: Provide "Select Group" button */}
+                          {isSubSelectedInGroup && activeGroupForSelection && (
+                            <button
+                              type="button"
+                              onPointerDown={(e) => e.stopPropagation()}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedLayerIds([...activeGroupForSelection]);
+                                setSelectedLayerId(activeGroupForSelection[0]);
+                              }}
+                              className="h-6 px-2.5 rounded-full border shadow-lg flex items-center gap-1 text-[10px] font-bold transition-all hover:scale-105 active:scale-95 whitespace-nowrap cursor-pointer select-none bg-cyan-500 hover:bg-cyan-400 text-slate-950 border-cyan-300 shadow-cyan-950/40"
+                              title="Click to select all parts in this group together"
+                            >
+                              <Layers className="w-3 h-3 flex-shrink-0" />
+                              <span>Select Group</span>
+                            </button>
+                          )}
+
+                          {/* Group / Ungroup Button */}
+                          {(isCurrentGroupSelected || isSubSelectedInGroup || (selectedLayerIds && selectedLayerIds.length > 1)) && (
+                            <button
+                              type="button"
+                              onPointerDown={(e) => e.stopPropagation()}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (isCurrentGroupSelected || isSubSelectedInGroup) {
+                                  handleUngroupSelected();
+                                } else {
+                                  handleGroupSelected();
+                                }
+                              }}
+                              className={`h-6 px-2.5 rounded-full border shadow-lg flex items-center gap-1 text-[10px] font-bold transition-all hover:scale-105 active:scale-95 whitespace-nowrap cursor-pointer select-none ${isCurrentGroupSelected || isSubSelectedInGroup
+                                  ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 border-amber-300 shadow-amber-950/40'
+                                  : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 border-cyan-300 shadow-cyan-950/40'
+                                }`}
+                              title={isCurrentGroupSelected || isSubSelectedInGroup ? "Click to ungroup parts so they become standalone" : "Click to group selected parts"}
+                            >
+                              {isCurrentGroupSelected || isSubSelectedInGroup ? (
+                                <>
+                                  <Unlink2 className="w-3 h-3 flex-shrink-0" />
+                                  <span>Ungroup</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Link2 className="w-3 h-3 flex-shrink-0" />
+                                  <span>Group</span>
+                                </>
+                              )}
+                            </button>
+                          )}
+
+                          {/* Single Rotation Handle Button */}
+                          <div
+                            onPointerDown={(e) => handleTransformHandleDown(e, 'rotate')}
+                            className="w-6 h-6 bg-white rounded-full border-2 border-[#38bdf8] shadow-lg flex items-center justify-center cursor-grab active:cursor-grabbing hover:scale-115 hover:border-cyan-300 transition-all text-[#0284c7] hover:text-cyan-500 flex-shrink-0"
+                            title="Drag to rotate smoothly (or click to rotate)"
+                          >
+                            <RotateCw className="w-3.5 h-3.5" />
+                          </div>
                         </div>
                       </div>
                     </div>
                   )}
                 </div>
               </div>
+            </div>
 
               {/* Bottom Floating Bar on Canvas (Hidden on mobile UI per user request, visible on tablet/desktop) */}
               <div className="hidden sm:flex absolute bottom-2 inset-x-2 sm:bottom-4 sm:inset-x-6 items-center justify-between pointer-events-none gap-2">
@@ -8483,6 +10175,47 @@ export default function App() {
                     <Trash2 className="w-3.5 h-3.5" />
                     <span>Delete</span>
                   </button>
+                </div>
+              )}
+
+              {/* Gallery Card Safe Boundary Real-time Status Alert (ONLY active in Admin Gallery Edit Mode) */}
+              {isGalleryAdminMode && showCardSafeZone && !exportProgress && (
+                <div
+                  className="absolute bottom-4 inset-x-4 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 pointer-events-auto z-30 flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl border shadow-xl backdrop-blur-md transition-all duration-200"
+                  style={{
+                    backgroundColor: cardOverflowInfo.isOverflowing ? 'rgba(127, 29, 29, 0.94)' : 'rgba(15, 23, 42, 0.88)',
+                    borderColor: cardOverflowInfo.isOverflowing ? '#ef4444' : 'rgba(168, 85, 247, 0.4)'
+                  }}
+                >
+                  {cardOverflowInfo.isOverflowing ? (
+                    <>
+                      <span className="text-sm">⚠️</span>
+                      <span className="text-xs font-semibold text-rose-200">
+                        <strong>Card Border Warning:</strong> Element card border se bahar ho raha hai ({cardOverflowInfo.reasons.join(', ')})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          recordUndoRef.current?.();
+                          setAdjustments(prev => ({ ...prev, translateX: 0, translateY: 0, translateZ: 0, scale: 1 }));
+                          if (layerTransforms && Object.keys(layerTransforms).length > 0) {
+                            setLayerTransforms({});
+                          }
+                        }}
+                        className="ml-1 px-2.5 py-0.5 rounded-md bg-rose-600 hover:bg-rose-500 text-white text-[10px] font-bold shadow transition active:scale-95 cursor-pointer"
+                        title="Reset position and scale to center of card"
+                      >
+                        Auto-Center
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                      <span className="text-xs font-medium text-emerald-300">
+                        <strong>Card Safe Zone:</strong> Element gallery card ke safe bounds me hai
+                      </span>
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -10065,9 +11798,7 @@ export default function App() {
                               <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                                 <button
                                   onClick={() => {
-                                    setSelectedLayerIds([layerId]);
-                                    setSelectedLayerId(layerId);
-                                    handleDuplicateSelectedLayers();
+                                    handleDuplicateSelectedLayers([layerId]);
                                   }}
                                   title="Duplicate part (Ctrl + D)"
                                   className={`p-1 rounded hover:bg-cyan-500/20 text-cyan-400 hover:text-cyan-300 transition`}
@@ -10076,9 +11807,7 @@ export default function App() {
                                 </button>
                                 <button
                                   onClick={() => {
-                                    setSelectedLayerIds([layerId]);
-                                    setSelectedLayerId(layerId);
-                                    handleDeleteSelectedLayers();
+                                    handleDeleteSelectedLayers([layerId]);
                                   }}
                                   title="Delete part"
                                   className={`p-1 rounded hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition`}
@@ -12049,7 +13778,7 @@ export default function App() {
                                   </span>
                                 </span>
                                 <div className="flex items-center gap-1">
-                                  <span className="font-mono text-cyan-400 font-bold">{curX}px</span>
+                                  <span id="live-x-badge" className="font-mono text-cyan-400 font-bold">{curX}px</span>
                                   <button
                                     onClick={() => updateX(curX - 10)}
                                     className="text-[9px] px-1 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
@@ -12074,13 +13803,23 @@ export default function App() {
                                   )}
                                 </div>
                               </div>
-                              <input
-                                type="range"
+                              <FastTransformSlider
                                 min="-350"
                                 max="350"
                                 step="1"
                                 value={curX}
-                                onChange={(e) => updateX(Number(e.target.value))}
+                                onDragStart={startTransformDrag}
+                                onLiveChange={(val) => {
+                                  if (isTransformingSelected) {
+                                    applyLiveLayerTransform(activeSelectedIds, { x: val });
+                                  } else {
+                                    applyLiveStageTransform({ translateX: val });
+                                  }
+                                  const badge = document.getElementById('live-x-badge');
+                                  if (badge) badge.textContent = `${val}px`;
+                                }}
+                                onDragEnd={endTransformDrag}
+                                onChange={(val) => updateX(val)}
                                 className="theme-slider w-full accent-cyan-500"
                               />
                             </div>
@@ -12095,7 +13834,7 @@ export default function App() {
                                   </span>
                                 </span>
                                 <div className="flex items-center gap-1">
-                                  <span className="font-mono text-emerald-400 font-bold">{curY}px</span>
+                                  <span id="live-y-badge" className="font-mono text-emerald-400 font-bold">{curY}px</span>
                                   <button
                                     onClick={() => updateY(curY - 10)}
                                     className="text-[9px] px-1 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
@@ -12120,13 +13859,23 @@ export default function App() {
                                   )}
                                 </div>
                               </div>
-                              <input
-                                type="range"
+                              <FastTransformSlider
                                 min="-350"
                                 max="350"
                                 step="1"
                                 value={curY}
-                                onChange={(e) => updateY(Number(e.target.value))}
+                                onDragStart={startTransformDrag}
+                                onLiveChange={(val) => {
+                                  if (isTransformingSelected) {
+                                    applyLiveLayerTransform(activeSelectedIds, { y: val });
+                                  } else {
+                                    applyLiveStageTransform({ translateY: val });
+                                  }
+                                  const badge = document.getElementById('live-y-badge');
+                                  if (badge) badge.textContent = `${val}px`;
+                                }}
+                                onDragEnd={endTransformDrag}
+                                onChange={(val) => updateY(val)}
                                 className="theme-slider w-full accent-emerald-500"
                               />
                             </div>
@@ -12141,7 +13890,7 @@ export default function App() {
                                   </span>
                                 </span>
                                 <div className="flex items-center gap-1">
-                                  <span className="font-mono text-purple-400 font-bold">{curZ}px</span>
+                                  <span id="live-z-badge" className="font-mono text-purple-400 font-bold">{curZ}px</span>
                                   <button
                                     onClick={() => updateZ(curZ - 25)}
                                     className="text-[9px] px-1 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
@@ -12166,13 +13915,23 @@ export default function App() {
                                   )}
                                 </div>
                               </div>
-                              <input
-                                type="range"
+                              <FastTransformSlider
                                 min="-400"
                                 max="400"
                                 step="2"
                                 value={curZ}
-                                onChange={(e) => updateZ(Number(e.target.value))}
+                                onDragStart={startTransformDrag}
+                                onLiveChange={(val) => {
+                                  if (isTransformingSelected) {
+                                    applyLiveLayerTransform(activeSelectedIds, { z: val });
+                                  } else {
+                                    applyLiveStageTransform({ translateZ: val });
+                                  }
+                                  const badge = document.getElementById('live-z-badge');
+                                  if (badge) badge.textContent = `${val}px`;
+                                }}
+                                onDragEnd={endTransformDrag}
+                                onChange={(val) => updateZ(val)}
                                 className="theme-slider w-full accent-purple-500"
                               />
                               <p className="text-[10px] text-slate-400 mt-1">
@@ -12220,6 +13979,19 @@ export default function App() {
                           <Trackball3DPad
                             rotateX={curRx}
                             rotateY={curRy}
+                            onDragStart={startTransformDrag}
+                            onLiveChange={(rx, ry) => {
+                              if (isTransformingSelected) {
+                                applyLiveLayerTransform(activeSelectedIds, { rotateX: rx, rotateY: ry });
+                              } else {
+                                applyLiveStageTransform({ rotateX: rx, rotateY: ry });
+                              }
+                              const pitchBadge = document.getElementById('live-pitch-badge');
+                              if (pitchBadge) pitchBadge.textContent = `${rx}°`;
+                              const yawBadge = document.getElementById('live-yaw-badge');
+                              if (yawBadge) yawBadge.textContent = `${ry}°`;
+                            }}
+                            onDragEnd={endTransformDrag}
                             onChange={(newRx, newRy) => update3DRotation(newRx, newRy)}
                             onReset={() => update3DRotation(0, 0)}
                             appTheme={appTheme}
@@ -12264,7 +14036,7 @@ export default function App() {
                                 <span className="text-[10px] text-slate-500 font-normal">(Forward / Backward)</span>
                               </span>
                               <div className="flex items-center gap-1.5">
-                                <span className="text-cyan-500 font-mono font-semibold">{curRx}&deg;</span>
+                                <span id="live-pitch-badge" className="text-cyan-500 font-mono font-semibold">{curRx}&deg;</span>
                                 {curRx !== 0 && (
                                   <button
                                     onClick={() => update3DRotation(0, curRy)}
@@ -12282,13 +14054,23 @@ export default function App() {
                               >
                                 -5&deg;
                               </button>
-                              <input
-                                type="range"
+                              <FastTransformSlider
                                 min="-85"
                                 max="85"
                                 step="1"
                                 value={curRx}
-                                onChange={(e) => update3DRotation(Number(e.target.value), curRy)}
+                                onDragStart={startTransformDrag}
+                                onLiveChange={(val) => {
+                                  if (isTransformingSelected) {
+                                    applyLiveLayerTransform(activeSelectedIds, { rotateX: val });
+                                  } else {
+                                    applyLiveStageTransform({ rotateX: val });
+                                  }
+                                  const badge = document.getElementById('live-pitch-badge');
+                                  if (badge) badge.textContent = `${val}°`;
+                                }}
+                                onDragEnd={endTransformDrag}
+                                onChange={(val) => update3DRotation(val, curRy)}
                                 className="theme-slider w-full flex-1"
                               />
                               <button
@@ -12308,7 +14090,7 @@ export default function App() {
                                 <span className="text-[10px] text-slate-500 font-normal">(Left / Right Angle)</span>
                               </span>
                               <div className="flex items-center gap-1.5">
-                                <span className="text-cyan-500 font-mono font-semibold">{curRy}&deg;</span>
+                                <span id="live-yaw-badge" className="text-cyan-500 font-mono font-semibold">{curRy}&deg;</span>
                                 {curRy !== 0 && (
                                   <button
                                     onClick={() => update3DRotation(curRx, 0)}
@@ -12326,13 +14108,23 @@ export default function App() {
                               >
                                 -5&deg;
                               </button>
-                              <input
-                                type="range"
+                              <FastTransformSlider
                                 min="-85"
                                 max="85"
                                 step="1"
                                 value={curRy}
-                                onChange={(e) => update3DRotation(curRx, Number(e.target.value))}
+                                onDragStart={startTransformDrag}
+                                onLiveChange={(val) => {
+                                  if (isTransformingSelected) {
+                                    applyLiveLayerTransform(activeSelectedIds, { rotateY: val });
+                                  } else {
+                                    applyLiveStageTransform({ rotateY: val });
+                                  }
+                                  const badge = document.getElementById('live-yaw-badge');
+                                  if (badge) badge.textContent = `${val}°`;
+                                }}
+                                onDragEnd={endTransformDrag}
+                                onChange={(val) => update3DRotation(curRx, val)}
                                 className="theme-slider w-full flex-1"
                               />
                               <button
@@ -12352,7 +14144,7 @@ export default function App() {
                                 <span>360&deg; Spin &amp; Angle {isTransformingSelected ? '(Selected Part)' : '(Whole Icon)'}</span>
                               </span>
                               <div className="flex items-center gap-1">
-                                <span className="text-cyan-400 font-mono font-bold">{curRot}&deg;</span>
+                                <span id="live-rot-badge" className="text-cyan-400 font-mono font-bold">{curRot}&deg;</span>
                                 <button
                                   onClick={() => updateRotation(curRot - 15)}
                                   className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono"
@@ -12378,13 +14170,23 @@ export default function App() {
                               </div>
                             </div>
 
-                            <input
-                              type="range"
+                            <FastTransformSlider
                               min="-180"
                               max="180"
                               step="1"
                               value={curRot}
-                              onChange={(e) => updateRotation(Number(e.target.value))}
+                              onDragStart={startTransformDrag}
+                              onLiveChange={(val) => {
+                                if (isTransformingSelected) {
+                                  applyLiveLayerTransform(activeSelectedIds, { rotate: val });
+                                } else {
+                                  applyLiveStageTransform({ rotation: val });
+                                }
+                                const badge = document.getElementById('live-rot-badge');
+                                if (badge) badge.textContent = `${val}°`;
+                              }}
+                              onDragEnd={endTransformDrag}
+                              onChange={(val) => updateRotation(val)}
                               className="theme-slider w-full accent-cyan-500"
                             />
 
@@ -12979,11 +14781,18 @@ export default function App() {
                       <label className={`block text-[11px] font-semibold mb-2 uppercase ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                         Target Format
                       </label>
-                      <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
-                        {['png', 'svg', 'webp', 'jpeg', 'gif'].map((fmt) => (
+                      <div className="grid grid-cols-6 gap-1 sm:gap-1.5">
+                        {['png', 'svg', 'ico', 'webp', 'jpeg', 'gif'].map((fmt) => (
                           <button
                             key={fmt}
-                            onClick={() => setExportFormat(fmt)}
+                            onClick={() => {
+                              setExportFormat(fmt);
+                              if (fmt === 'ico') {
+                                setExportSize(256);
+                              } else if (exportSize < 128) {
+                                setExportSize(512);
+                              }
+                            }}
                             className={`py-2 rounded-xl uppercase text-xs font-bold transition border text-center ${exportFormat === fmt
                               ? 'bg-blue-600 text-white border-blue-500 shadow-md'
                               : appTheme === 'dark'
@@ -12991,7 +14800,7 @@ export default function App() {
                                 : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
                               }`}
                           >
-                            {fmt}
+                            .{fmt}
                           </button>
                         ))}
                       </div>
@@ -13123,12 +14932,32 @@ export default function App() {
                     {/* Resolution buttons */}
                     <div>
                       <label className={`block text-[11px] font-semibold mb-2 uppercase ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
-                        Export Resolution ({exportSize >= 1024 ? `${exportSize / 1024}K Ultra HD` : `${exportSize}px Standard`})
+                        Export Resolution ({exportFormat === 'ico' ? `${exportSize}px High-Definition Icon` : (exportSize >= 1024 ? `${exportSize / 1024}K Ultra HD` : `${exportSize}px Standard`)})
                       </label>
                       <div className="grid grid-cols-4 gap-2">
-                        {[128, 256, 512, 1024, 2048, 4096, 8192].map((sz) => {
+                        {(exportFormat === 'ico'
+                          ? [
+                              { sz: 256, label: '256px (Standard HD)', span: true },
+                              { sz: 512, label: '★ 512px (Ultra-HD)', span: true },
+                              { sz: 128, label: '128px (Large)' },
+                              { sz: 64, label: '64px (Hi-DPI)' },
+                              { sz: 32, label: '32px (Tab)' },
+                              { sz: 16, label: '16px (Favicon)' }
+                            ]
+                          : [
+                              { sz: 128 },
+                              { sz: 256 },
+                              { sz: 512 },
+                              { sz: 1024 },
+                              { sz: 2048 },
+                              { sz: 4096 },
+                              { sz: 8192 }
+                            ]
+                        ).map((item) => {
+                          const sz = item.sz;
                           const isMobile = !isDesktopScreen;
                           const is8K = sz === 8192;
+                          const isSelected = exportSize === sz;
                           return (
                             <button
                               key={sz}
@@ -13141,14 +14970,14 @@ export default function App() {
                                 }
                                 setExportSize(sz);
                               }}
-                              className={`py-2 rounded-xl text-xs font-semibold transition border text-center ${exportSize === sz
+                              className={`py-2 rounded-xl text-xs font-semibold transition border text-center ${isSelected
                                 ? 'bg-blue-600 text-white border-blue-500 shadow-md ring-2 ring-blue-500/40'
                                 : appTheme === 'dark'
                                   ? 'bg-slate-900 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-white'
                                   : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
-                                }`}
+                                } ${item.span ? 'col-span-2 bg-gradient-to-r from-blue-900/30 to-cyan-900/30 border-cyan-700/50' : ''}`}
                             >
-                              {sz >= 1024 ? (is8K && isMobile ? '8K (PC)' : `${sz / 1024}K`) : `${sz}px`}
+                              {item.label || (sz >= 1024 ? (is8K && isMobile ? '8K (PC)' : `${sz / 1024}K`) : `${sz}px`)}
                             </button>
                           );
                         })}
@@ -13258,7 +15087,7 @@ export default function App() {
                       className="w-full bg-emerald-600 hover:bg-emerald-500 py-3.5 rounded-2xl font-semibold text-sm transition flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 disabled:opacity-50 text-white"
                     >
                       <Download className="w-4 h-4" />
-                      {downloading ? 'Rendering & Exporting...' : `Download .${exportFormat.toUpperCase()} (${exportSize >= 1024 ? `${exportSize / 1024}K` : exportSize + 'px'})`}
+                      {downloading ? 'Rendering & Exporting...' : exportFormat === 'ico' ? `Download .ICO (${exportSize}px High-Res Bundle)` : `Download .${exportFormat.toUpperCase()} (${exportSize >= 1024 ? `${exportSize / 1024}K` : exportSize + 'px'})`}
                     </button>
 
                     {/* Expandable Advanced Export Settings Section */}
@@ -13406,6 +15235,7 @@ export default function App() {
                               <span className="font-mono font-bold text-emerald-400">
                                 {(() => {
                                   if (exportFormat === 'svg') return '~3 - 8 KB (Pure Vector)';
+                                  if (exportFormat === 'ico') return '~15 - 45 KB (Multi-Res .ICO)';
                                   const baseK = (exportSize * exportSize) / 1000;
                                   let factor = 0.32;
                                   if (exportFormat === 'webp') factor = 0.12 * (exportQuality / 100);
@@ -13595,7 +15425,7 @@ export default function App() {
 
               {/* Bottom Fixed Export Bar (Always accessible on Desktop) */}
               {studioTab !== 'export' && (
-                <div className={`hidden lg:flex p-4 border-t items-center justify-between gap-3 ${appTheme === 'dark' ? 'border-slate-800 bg-[#0b0f19]' : 'border-slate-200 bg-slate-50 shadow-inner'
+                <div className={`hidden lg:flex p-4 border-t items-center justify-between gap-3 ${appTheme === 'dark' ? 'border-[#22242c] bg-[#18191f]' : 'border-slate-200 bg-slate-50 shadow-inner'
                   }`}>
                   <div className={`text-xs ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
                     <span className={`font-semibold ${appTheme === 'dark' ? 'text-slate-200' : 'text-slate-900'}`}>.{exportFormat.toUpperCase()}</span> &bull; {exportSize >= 1024 ? `${exportSize / 1024}K` : `${exportSize}px`}
@@ -13616,7 +15446,7 @@ export default function App() {
             <aside
               aria-label="Studio Tools Dock"
               className={`w-14 sm:w-16 h-full flex flex-col justify-between py-2 border-l flex-shrink-0 z-30 select-none transition-colors duration-200 ${
-                appTheme === 'dark' ? 'bg-[#080d19] border-slate-800' : 'bg-slate-50 border-slate-200'
+                appTheme === 'dark' ? 'bg-[#18191f] border-[#22242c]' : 'bg-slate-50 border-slate-200'
               }`}
             >
               <div className="flex-1 overflow-y-auto no-scrollbar flex flex-col items-center gap-1 sm:gap-1.5 px-1 sm:px-1.5 py-0.5">
@@ -13633,7 +15463,7 @@ export default function App() {
                         isActive
                           ? 'bg-gradient-to-b from-blue-600 to-cyan-600 text-white shadow-lg shadow-cyan-500/25 ring-1 ring-cyan-300/40'
                           : appTheme === 'dark'
-                            ? 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/70'
+                            ? 'text-slate-400 hover:text-slate-100 hover:bg-[#22242c]'
                             : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
                       }`}
                     >
@@ -13665,13 +15495,13 @@ export default function App() {
         >
           <div
             className={`w-full max-w-lg rounded-2xl sm:rounded-3xl border shadow-2xl p-4 sm:p-7 relative transition-all duration-200 max-h-[90vh] overflow-y-auto ${appTheme === 'dark'
-              ? 'bg-[#0f172a] border-slate-800 text-slate-100'
+              ? 'bg-[#18191f] border-[#22242c] text-slate-100'
               : 'bg-white border-slate-200 text-slate-900 shadow-2xl'
               }`}
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className={`flex items-center justify-between pb-3.5 sm:pb-4 border-b mb-4 sm:mb-5 ${appTheme === 'dark' ? 'border-slate-800' : 'border-slate-100'
+            <div className={`flex items-center justify-between pb-3.5 sm:pb-4 border-b mb-4 sm:mb-5 ${appTheme === 'dark' ? 'border-[#22242c]' : 'border-slate-100'
               }`}>
               <div className="flex items-center gap-2.5 sm:gap-3">
                 <img
@@ -13787,8 +15617,8 @@ export default function App() {
                   }`}>
                   <Download className="w-3.5 h-3.5 text-cyan-400" /> Default Export Format
                 </h3>
-                <div className="grid grid-cols-5 gap-1.5">
-                  {['png', 'svg', 'jpeg', 'webp', 'pdf'].map(fmt => (
+                <div className="grid grid-cols-6 gap-1.5">
+                  {['png', 'svg', 'ico', 'webp', 'jpeg', 'gif'].map(fmt => (
                     <button
                       key={fmt}
                       onClick={() => {
@@ -14093,10 +15923,11 @@ export default function App() {
                     }`}
                 >
                   <div
-                    className="w-20 h-20 sm:w-24 sm:h-24 flex items-center justify-center p-2 mb-2 [&>svg]:w-full [&>svg]:h-full transition-transform group-hover:scale-105 pointer-events-none"
+                    data-gallery-preview="true"
+                    className="gallery-card-preview w-20 h-20 sm:w-24 sm:h-24 flex items-center justify-center p-2 mb-2 [&>svg]:w-full [&>svg]:h-full [&>svg]:overflow-visible overflow-visible transition-transform group-hover:scale-105 pointer-events-none"
                     dangerouslySetInnerHTML={{
                       __html: scopeSvgIds(
-                        item.originalSvgCode || item.svgCode,
+                        normalizeForeignObjectSvg(item.originalSvgCode || item.svgCode),
                         `modal_${String(item.id).replace(/[^a-zA-Z0-9_-]/g, '_')}_`
                       )
                     }}
@@ -14396,9 +16227,117 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Native Mobile Bottom Navigation Bar (Visible only on mobile/tablet < 768px) */}
+      <nav 
+        aria-label="Mobile Navigation"
+        className={`md:hidden fixed bottom-0 left-0 right-0 z-40 border-t backdrop-blur-xl px-3 py-1.5 flex items-center justify-around shadow-[0_-10px_25px_-5px_rgba(0,0,0,0.3)] ${
+          appTheme === 'dark'
+            ? 'bg-[#121316]/95 border-[#1f2128] text-slate-400'
+            : 'bg-white/95 border-slate-200 text-slate-600 shadow-lg'
+        }`}
+      >
+        {/* 1. Gallery */}
+        <button
+          type="button"
+          onClick={() => setActiveTab('browse')}
+          className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all cursor-pointer active:scale-95 ${
+            activeTab === 'browse'
+              ? 'text-blue-500 font-bold'
+              : 'hover:text-slate-200'
+          }`}
+        >
+          <LayoutGrid className={`w-5 h-5 ${activeTab === 'browse' ? 'stroke-[2.5]' : ''}`} />
+          <span className="text-[10px] mt-0.5">Gallery</span>
+        </button>
+
+        {/* 2. Blog */}
+        <button
+          type="button"
+          onClick={() => setActiveTab('blog')}
+          className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all cursor-pointer active:scale-95 relative ${
+            activeTab === 'blog'
+              ? 'text-blue-500 font-bold'
+              : 'hover:text-slate-200'
+          }`}
+        >
+          <BookOpen className={`w-5 h-5 ${activeTab === 'blog' ? 'stroke-[2.5]' : ''}`} />
+          <span className="text-[10px] mt-0.5">Blog</span>
+          <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 absolute top-1 right-1.5 animate-pulse" />
+        </button>
+
+        {/* 3. Central Prominent Upload Floating Button (Sleek and compact for mobile) */}
+        <button
+          type="button"
+          onClick={() => setActiveTab('admin')}
+          className="flex flex-col items-center justify-center -mt-3.5 cursor-pointer group active:scale-95"
+          title="Upload Element"
+        >
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-500 text-white flex items-center justify-center shadow-md shadow-blue-600/30 group-active:scale-95 transition-transform border-2 border-[#121316]">
+            <UploadCloud className="w-4.5 h-4.5 stroke-[2.2]" />
+          </div>
+          <span className="text-[9px] font-bold mt-0.5 text-blue-400">Upload</span>
+        </button>
+
+        {/* 4. License */}
+        <button
+          type="button"
+          onClick={() => setActiveTab('license')}
+          className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all cursor-pointer active:scale-95 ${
+            activeTab === 'license'
+              ? 'text-emerald-500 font-bold'
+              : 'hover:text-slate-200'
+          }`}
+        >
+          <ShieldCheck className={`w-5 h-5 ${activeTab === 'license' ? 'stroke-[2.5]' : ''}`} />
+          <span className="text-[10px] mt-0.5">License</span>
+        </button>
+
+        {/* 5. Settings */}
+        <button
+          type="button"
+          onClick={() => setIsSettingsOpen(true)}
+          className="flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all cursor-pointer active:scale-95 hover:text-slate-200"
+        >
+          <Settings className="w-5 h-5" />
+          <span className="text-[10px] mt-0.5">Settings</span>
+        </button>
+      </nav>
+
+      {/* High-Converting Asset Detail Showcase Modal */}
+      {detailModalAsset && (
+        <AssetDetailModal
+          key={detailModalAsset.id}
+          isOpen={Boolean(detailModalAsset)}
+          asset={detailModalAsset}
+          allAssets={elements}
+          onClose={() => setDetailModalAsset(null)}
+          onOpenInStudio={(item, initialTab) => {
+            setDetailModalAsset(null);
+            handleOpenAsset(item, initialTab || 'colors');
+          }}
+          isFavorite={detailModalAsset ? favorites.includes(detailModalAsset.id) : false}
+          onToggleFavorite={toggleFavorite}
+          appTheme={appTheme}
+          onToggleTheme={() => setAppTheme(prev => prev === 'dark' ? 'light' : 'dark')}
+        />
+      )}
+
+
+
+      {/* Supabase User Auth Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        appTheme={appTheme}
+        onAuthSuccess={(user) => {
+          setAuthUser(user);
+        }}
+      />
     </div>
   );
 }
+
 
 /**
  * ColorWheelPopover Component
