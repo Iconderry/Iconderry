@@ -181,7 +181,7 @@ export default function PrivacyView({ appTheme = 'dark', onOpenStudio, onOpenTer
                 </div>
                 <div>
                   <div className="text-xs font-bold text-white">Developer &amp; Legal Support</div>
-                  <div className="text-xs text-cyan-400 font-mono">support@iconderry.com</div>
+                  <div className="text-xs text-cyan-400 font-mono">iconderrysupport@gmail.com</div>
                 </div>
               </div>
               <button

@@ -1511,39 +1511,45 @@ export default function App() {
 
   const [activeTab, setActiveTab] = useState(() => {
     try {
-      const hash = window.location.hash.replace(/^#/, '').toLowerCase();
-      if (['privacy', 'terms', 'about', 'community', 'blog', 'license', 'settings'].includes(hash)) {
-        return hash;
+      const path = (window.location.pathname || '').replace(/^\/+/, '').toLowerCase();
+      const hash = (window.location.hash || '').replace(/^#+/, '').toLowerCase();
+      const clean = path || hash;
+      if (['privacy', 'terms', 'about', 'community', 'blog', 'license', 'settings'].includes(clean)) {
+        return clean;
       }
     } catch (_) {}
     return 'browse';
   });
 
-  // Listen to browser hash changes for seamless back/forward navigation
+  // Listen to browser navigation changes (popstate for clean URLs, hashchange for backward compatibility)
   useEffect(() => {
-    const handleHash = () => {
+    const handleRoute = () => {
       try {
-        const hash = window.location.hash.replace(/^#/, '').toLowerCase();
-        if (['privacy', 'terms', 'about', 'community', 'blog', 'license', 'settings', 'browse'].includes(hash)) {
-          setActiveTab(hash);
-        } else if (!hash) {
+        const path = (window.location.pathname || '').replace(/^\/+/, '').toLowerCase();
+        const hash = (window.location.hash || '').replace(/^#+/, '').toLowerCase();
+        const clean = path || hash;
+        if (['privacy', 'terms', 'about', 'community', 'blog', 'license', 'settings', 'browse'].includes(clean)) {
+          setActiveTab(clean === 'browse' ? 'browse' : clean);
+        } else if (!clean) {
           setActiveTab('browse');
         }
       } catch (_) {}
     };
-    window.addEventListener('hashchange', handleHash);
-    return () => window.removeEventListener('hashchange', handleHash);
+    window.addEventListener('popstate', handleRoute);
+    window.addEventListener('hashchange', handleRoute);
+    return () => {
+      window.removeEventListener('popstate', handleRoute);
+      window.removeEventListener('hashchange', handleRoute);
+    };
   }, []);
 
   const navigateToTab = (tab) => {
     setActiveTab(tab);
     try {
       if (tab === 'browse') {
-        if (window.location.hash) {
-          history.pushState(null, '', window.location.pathname);
-        }
+        window.history.pushState(null, '', '/');
       } else {
-        window.location.hash = tab;
+        window.history.pushState(null, '', `/${tab}`);
       }
     } catch (_) {}
     window.scrollTo({ top: 0, behavior: 'smooth' });

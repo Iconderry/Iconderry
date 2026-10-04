@@ -59,19 +59,77 @@
       border-radius: 12px;
       text-decoration: none;
     }
+    .nav-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 28px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #fff;
+      font-weight: 800;
+      font-size: 18px;
+      text-decoration: none;
+    }
+    .brand-icon {
+      width: 28px;
+      height: 28px;
+      background: linear-gradient(135deg, #06b6d4, #3b82f6);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 900;
+    }
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 13px;
+    }
+    .nav-links a {
+      color: var(--muted);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover, .nav-links a.active {
+      color: var(--primary);
+    }
   </style>
 </head>
 <body>
   <div class="container">
+    <nav class="nav-bar">
+      <a href="/" class="brand">
+        <div class="brand-icon">I</div>
+        <span>Iconderry</span>
+      </a>
+      <div class="nav-links">
+        <a href="/">Studio</a>
+        <a href="/privacy">Privacy</a>
+        <a href="/terms">Terms</a>
+        <a href="/about">About</a>
+        <a href="/contact" class="active">Contact</a>
+      </div>
+    </nav>
     <div class="badge">Support &amp; Community</div>
     <h1>Contact &amp; Support</h1>
     <p class="subtext">Have a question, feature request, or need custom icons for your company? Reach out directly.</p>
 
     <div class="card">
       <h2>Developer &amp; Team Inquiries</h2>
-      <p>Email: <a href="mailto:support@iconderry.com">support@iconderry.com</a></p>
-      <p>Bug Reports &amp; Feature Requests: <a href="mailto:support@iconderry.com?subject=Iconderry%20Feature%20Request">support@iconderry.com</a></p>
-      <p>Commercial &amp; Enterprise Licensing: <a href="mailto:legal@iconderry.com">legal@iconderry.com</a></p>
+      <p>Email: <a href="mailto:iconderrysupport@gmail.com">iconderrysupport@gmail.com</a></p>
+      <p>Bug Reports &amp; Feature Requests: <a href="mailto:iconderrysupport@gmail.com?subject=Iconderry%20Feature%20Request">iconderrysupport@gmail.com</a></p>
+      <p>Commercial &amp; Enterprise Licensing: <a href="mailto:iconderrysupport@gmail.com?subject=Iconderry%20Licensing">iconderrysupport@gmail.com</a></p>
       <br>
       <a href="/" class="btn">Launch Iconderry Studio</a>
     </div>

@@ -153,7 +153,7 @@ export default function TermsView({ appTheme = 'dark', onOpenStudio, onOpenPriva
               </div>
               <div>
                 <div className="text-xs font-bold text-white">Questions about our Terms?</div>
-                <div className="text-xs text-purple-400 font-mono">legal@iconderry.com</div>
+                <div className="text-xs text-purple-400 font-mono">iconderrysupport@gmail.com</div>
               </div>
             </div>
             <button

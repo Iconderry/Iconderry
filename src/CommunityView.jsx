@@ -19,7 +19,7 @@ const COMMUNITY_FAQ = [
   },
   {
     q: 'Can I contribute my own SVGs or suggest modifications?',
-    a: 'Absolutely! You can upload your own SVGs directly into Iconderry Studio for custom styling, or reach out to our team at support@iconderry.com to contribute to our official catalog.'
+    a: 'Absolutely! You can upload your own SVGs directly into Iconderry Studio for custom styling, or reach out to our team at iconderrysupport@gmail.com to contribute to our official catalog.'
   }
 ];
 
@@ -269,7 +269,7 @@ export default function CommunityView({ appTheme = 'dark', onOpenStudio }) {
                 </div>
                 <div className="text-xs">
                   <div className="text-slate-400">Direct Support</div>
-                  <div className="font-mono font-semibold text-cyan-400">support@iconderry.com</div>
+                  <div className="font-mono font-semibold text-cyan-400">iconderrysupport@gmail.com</div>
                 </div>
               </div>
             </div>

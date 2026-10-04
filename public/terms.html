@@ -69,10 +69,68 @@
       border-radius: 10px;
       text-decoration: none;
     }
+    .nav-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 28px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #fff;
+      font-weight: 800;
+      font-size: 18px;
+      text-decoration: none;
+    }
+    .brand-icon {
+      width: 28px;
+      height: 28px;
+      background: linear-gradient(135deg, #a855f7, #6366f1);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 900;
+    }
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 13px;
+    }
+    .nav-links a {
+      color: var(--muted);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover, .nav-links a.active {
+      color: var(--primary);
+    }
   </style>
 </head>
 <body>
   <div class="container">
+    <nav class="nav-bar">
+      <a href="/" class="brand">
+        <div class="brand-icon">I</div>
+        <span>Iconderry</span>
+      </a>
+      <div class="nav-links">
+        <a href="/">Studio</a>
+        <a href="/privacy">Privacy</a>
+        <a href="/terms" class="active">Terms</a>
+        <a href="/about">About</a>
+        <a href="/contact">Contact</a>
+      </div>
+    </nav>
     <div class="badge">Legal Agreement</div>
     <h1>Terms of Service</h1>
     <p class="subtext">Effective Date: October 2026 • Iconderry</p>
@@ -103,7 +161,7 @@
 
     <div class="card">
       <h2>4. Contact</h2>
-      <p>For legal inquiries, contact: <a href="mailto:legal@iconderry.com">legal@iconderry.com</a></p>
+      <p>For legal &amp; support inquiries, contact: <a href="mailto:iconderrysupport@gmail.com">iconderrysupport@gmail.com</a></p>
       <br>
       <a href="/" class="btn">Launch Iconderry App</a>
     </div>
