@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Download, PlusCircle, LayoutGrid, Search, Trash2, CheckCircle2,
   Zap, UploadCloud, Sliders, Palette, RotateCw,
   FlipHorizontal, FlipVertical, RefreshCw, Sparkles, Sun, Droplet,
-  Paintbrush, Undo2, Redo2, Layers, Check, ArrowLeft, X, ChevronDown, ChevronUp,
+  Paintbrush, Undo2, Redo2, Layers, Check, ArrowLeft, X, ChevronDown, ChevronUp, ChevronRight,
   Settings, Moon, RotateCcw, SlidersHorizontal, HardDrive, Monitor,
   ZoomIn, ZoomOut, Maximize2, Link2, Unlink2, Wand2, Scan,
   Heart, Shapes, MessageSquarePlus, Shield, FileText, Info,
@@ -12,7 +13,8 @@ import {
   Crosshair, AlignCenter, AlignLeft, AlignRight, Bold, Italic, Type, Square, Highlighter, Eraser, PenTool,
   HelpCircle, Smartphone, MousePointer, Keyboard,
   FolderPlus, Folder, Tag, Edit2, FileUp, Grid2X2, Grid3X3, ArrowUpDown, Filter,
-  Save, ClipboardPaste, Loader2, BookOpen, ShieldCheck, User, LogOut
+  Save, ClipboardPaste, Loader2, BookOpen, ShieldCheck, User, LogOut, Package,
+  Lock, Unlock, KeyRound, Eye, EyeOff
 } from 'lucide-react';
 import { INITIAL_ELEMENTS } from './initialData';
 import { downloadAsset } from './converter';
@@ -24,9 +26,12 @@ import { GOOGLE_FONTS_LIST, TEXT_PRESETS, SHAPES_PRESETS, smoothFreehandPath, in
 import { saveElementsToDB, loadElementsFromDB } from './idbStorage';
 import BlogView from './BlogView';
 import LicenseView from './LicenseView';
+import SettingsView from './SettingsView';
 import { isCssOrHtmlContent, convertCssToSvg, normalizeForeignObjectSvg } from './cssToSvgConverter';
 import AssetDetailModal from './AssetDetailModal';
 import AuthModal from './AuthModal';
+import EditAssetDetailsModal from './components/EditAssetDetailsModal';
+import { App as CapApp } from '@capacitor/app';
 
 
 export const GRADIENT_PRESETS = [
@@ -1399,6 +1404,13 @@ export const safeSetLocalStorage = (key, value) => {
   }
 };
 
+const ModalPortal = ({ children, isMobile }) => {
+  if (isMobile && typeof document !== 'undefined') {
+    return createPortal(children, document.body);
+  }
+  return children;
+};
+
 export default function App() {
   const [elements, setElements] = useState(() => {
     let saved = null;
@@ -1449,27 +1461,28 @@ export default function App() {
   // Instant load from IndexedDB on startup/refresh (holds all elements with full SVGs, bypassing 5MB localStorage limit)
   useEffect(() => {
     loadElementsFromDB().then((cached) => {
+      const initialMap = new Map(INITIAL_ELEMENTS.map(el => [el.id, el]));
       if (Array.isArray(cached) && cached.length > 0) {
         setElements(prev => {
           const cachedIds = new Set(cached.map(c => c.id));
-          const normalizedCached = cached.map(item => ({
-            ...item,
-            svgCode: normalizeForeignObjectSvg(item.svgCode),
-            originalSvgCode: normalizeForeignObjectSvg(item.originalSvgCode || item.svgCode)
-          }));
+          const normalizedCached = cached.map(item => {
+            const initialItem = initialMap.get(item.id);
+            const sourceSvg = item.svgCode || item.originalSvgCode || (initialItem ? initialItem.svgCode : '');
+            const clean = normalizeForeignObjectSvg(sourceSvg);
+            return {
+              ...(initialItem || {}),
+              ...item,
+              svgCode: clean,
+              originalSvgCode: clean
+            };
+          });
           const newFromInitial = INITIAL_ELEMENTS
             .filter(item => !cachedIds.has(item.id))
             .map(el => ({ ...el, originalSvgCode: el.svgCode, downloads: el.downloads || 0 }));
 
-          if (newFromInitial.length > 0) {
-            const merged = [...normalizedCached, ...newFromInitial];
-            saveElementsToDB(merged);
-            return merged;
-          }
-          if (cached.length > prev.length) {
-            return normalizedCached;
-          }
-          return prev;
+          const merged = newFromInitial.length > 0 ? [...normalizedCached, ...newFromInitial] : normalizedCached;
+          saveElementsToDB(merged);
+          return merged;
         });
       } else {
         saveElementsToDB(INITIAL_ELEMENTS);
@@ -1477,10 +1490,34 @@ export default function App() {
     });
   }, []);
 
+  const isNativeApp = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    // Check official Capacitor native platform helper
+    if (window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function') {
+      if (window.Capacitor.isNativePlatform()) return true;
+    }
+    return Boolean(
+      window.IS_NATIVE_CAPACITOR ||
+      document.documentElement.classList.contains('is-native-capacitor') ||
+      window.AndroidNativeDownloader ||
+      window.location.protocol === 'capacitor:' ||
+      (/wv/i.test(navigator.userAgent) && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent))
+    );
+  }, []);
+
   const [activeTab, setActiveTab] = useState('browse');
   const [selectedAsset, setSelectedAsset] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [isGalleryLoading, setIsGalleryLoading] = useState(true);
+
+  // Safety fallback for gallery skeleton loader (smooth zero-flicker experience)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsGalleryLoading(false);
+    }, 450);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Dynamic Category System & Custom Categories State
   const [customCategories, setCustomCategories] = useState(() => {
@@ -1488,7 +1525,7 @@ export default function App() {
     if (saved) {
       try { return JSON.parse(saved); } catch (e) { }
     }
-    return ['UI Icons', 'Brand Logos', 'Silhouettes', 'Badges & Stickers', '3D Elements', 'Illustrations', 'Awards'];
+    return ['UI Icons', 'Brand Logos', 'Silhouettes', 'Badges & Stickers', '3D Elements', 'Illustrations', 'Awards', 'Cyber & Tech', 'Creative Tools'];
   });
 
   useEffect(() => {
@@ -1502,6 +1539,41 @@ export default function App() {
   const [isAddingNewCat, setIsAddingNewCat] = useState(false);
   const [newCatInput, setNewCatInput] = useState('');
   const [detailModalAsset, setDetailModalAsset] = useState(null);
+
+  // Protected Master Admin Section State (.env backed)
+  const [isAdminPanelUnlocked, setIsAdminPanelUnlocked] = useState(() => {
+    try {
+      return sessionStorage.getItem('iconderry_admin_unlocked') === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
+  const [adminPasswordInput, setAdminPasswordInput] = useState('');
+  const [adminPasswordError, setAdminPasswordError] = useState('');
+  const [showAdminPassword, setShowAdminPassword] = useState(false);
+
+  const handleUnlockAdminPanel = (e) => {
+    if (e) e.preventDefault();
+    const envPassword = (import.meta.env.VITE_ADMIN_PASSWORD || '@MOHDshahim').trim();
+    if (adminPasswordInput.trim() === envPassword) {
+      setIsAdminPanelUnlocked(true);
+      try {
+        sessionStorage.setItem('iconderry_admin_unlocked', 'true');
+      } catch (err) {}
+      setAdminPasswordError('');
+      setAdminPasswordInput('');
+    } else {
+      setAdminPasswordError('Incorrect password! Please enter the correct master password.');
+    }
+  };
+
+  const handleLockAdminPanel = () => {
+    setIsAdminPanelUnlocked(false);
+    try {
+      sessionStorage.removeItem('iconderry_admin_unlocked');
+    } catch (err) {}
+    setAdminSection('upload');
+  };
 
   // Supabase User Auth State
   const [authUser, setAuthUser] = useState(null);
@@ -1573,6 +1645,7 @@ export default function App() {
   const [svgInput, setSvgInput] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
   const [formError, setFormError] = useState('');
+  const [detectedShapeNotice, setDetectedShapeNotice] = useState('');
   const [isPublishing, setIsPublishing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef(null);
@@ -1586,22 +1659,48 @@ export default function App() {
   const [isSavingGalleryDeletions, setIsSavingGalleryDeletions] = useState(false);
   const [galleryAdminToast, setGalleryAdminToast] = useState('');
 
-  // App Theming & Settings Panel
+  // Admin Item Metadata Edit Modal State (Title, Description, Category, Tags, Pack)
+  const [editingModalAsset, setEditingModalAsset] = useState(null);
+  const [editAssetTitle, setEditAssetTitle] = useState('');
+  const [editAssetDescription, setEditAssetDescription] = useState('');
+  const [editAssetCategory, setEditAssetCategory] = useState('');
+  const [editAssetTags, setEditAssetTags] = useState('');
+  const [editAssetPack, setEditAssetPack] = useState('');
+  const [isSavingAssetDetails, setIsSavingAssetDetails] = useState(false);
+  const [editAssetError, setEditAssetError] = useState('');
+  const [editAssetSuccess, setEditAssetSuccess] = useState('');
+
+  // App Theming & Settings Panel - Default is Light mode
   const [appTheme, setAppTheme] = useState(() => {
-    return localStorage.getItem('iconderry_theme') || 'dark';
+    try {
+      const saved = localStorage.getItem('iconderry_theme_v2');
+      if (saved === 'dark' || saved === 'light') return saved;
+      return 'light';
+    } catch (_) {
+      return 'light';
+    }
   });
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsToast, setSettingsToast] = useState('');
+  const [backToast, setBackToast] = useState('');
+  const lastBackPressRef = useRef(0);
+  const backStateRef = useRef({});
 
   // Sync theme changes to html class & localStorage
   useEffect(() => {
-    localStorage.setItem('iconderry_theme', appTheme);
+    try {
+      localStorage.setItem('iconderry_theme_v2', appTheme);
+      localStorage.setItem('iconderry_theme', appTheme);
+    } catch (_) {}
+    const metaThemeColor = document.querySelector('meta[name="theme-color"]');
     if (appTheme === 'light') {
       document.documentElement.classList.remove('dark');
       document.documentElement.classList.add('light');
+      if (metaThemeColor) metaThemeColor.setAttribute('content', '#ffffff');
     } else {
       document.documentElement.classList.remove('light');
       document.documentElement.classList.add('dark');
+      if (metaThemeColor) metaThemeColor.setAttribute('content', '#121316');
     }
   }, [appTheme]);
 
@@ -1614,7 +1713,13 @@ export default function App() {
   const [downloading, setDownloading] = useState(false);
   const [exportProgress, setExportProgress] = useState(null);
   const cancelExportRef = useRef(false);
-  const [previewBg, setPreviewBg] = useState(() => localStorage.getItem('iconderry_default_bg') || 'dark');
+  const [previewBg, setPreviewBg] = useState(() => {
+    try {
+      return localStorage.getItem('iconderry_default_bg_v2') || 'light';
+    } catch (_) {
+      return 'light';
+    }
+  });
   const [zoomLevel, setZoomLevel] = useState(1);
   const zoomLevelRef = useRef(zoomLevel);
   zoomLevelRef.current = zoomLevel;
@@ -3025,7 +3130,16 @@ export default function App() {
 
   // Insert another element/object from the library into current canvas as editable multipart layers
   const handleInsertElementFromLibrary = (assetToAdd) => {
-    if (!assetToAdd || !assetToAdd.svgCode || !selectedAsset) return;
+    if (!assetToAdd || !assetToAdd.svgCode) return;
+
+    // If currently on an empty studio canvas, directly load this picked element as the main asset
+    if (selectedAsset?.isEmptyCanvas) {
+      setIsAddElementModalOpen(false);
+      handleOpenAsset(assetToAdd, 'colors');
+      return;
+    }
+
+    if (!selectedAsset) return;
     recordUndo();
 
     try {
@@ -3333,15 +3447,18 @@ export default function App() {
   // Mobile Canvas vs Tools Vertical Resizer Pointer Handler
   const handleStartResizeMobileCanvas = (e) => {
     e.preventDefault();
+    e.stopPropagation();
     setIsResizingMobileCanvas(true);
 
-    const startY = e.clientY ?? (e.touches && e.touches[0]?.clientY) ?? 0;
+    const startY = e.clientY ?? (e.touches && e.touches[0]?.clientY) ?? (e.nativeEvent?.touches && e.nativeEvent.touches[0]?.clientY) ?? 0;
     const startHeight = mobileCanvasHeight;
     const windowH = window.innerHeight || 800;
     let rafMobileResizeId = null;
 
     const onPointerMove = (moveEvt) => {
+      if (moveEvt.cancelable) moveEvt.preventDefault();
       const clientY = moveEvt.clientY ?? (moveEvt.touches && moveEvt.touches[0]?.clientY) ?? 0;
+      if (!clientY) return;
       const deltaY = clientY - startY;
       const deltaVh = (deltaY / windowH) * 100;
       const newHeightVh = Math.round(Math.min(75, Math.max(18, startHeight + deltaVh)));
@@ -6050,33 +6167,133 @@ export default function App() {
     return combined;
   }, [customCategories, elements]);
 
+  // Dynamic Icon Packs collection (supports current Stickman and future packs automatically)
+  const availablePacks = useMemo(() => {
+    const fromElements = elements.map(item => item.pack).filter(Boolean);
+    const defaultPacks = ['Stickman'];
+    return Array.from(new Set([...defaultPacks, ...fromElements]));
+  }, [elements]);
+
   const categories = useMemo(() => {
-    return ['All', 'Favorites', ...allAvailableCategories];
-  }, [allAvailableCategories]);
+    const packSet = new Set(availablePacks.map(p => p.toLowerCase()));
+    const regularCats = allAvailableCategories.filter(cat => !packSet.has(cat.toLowerCase()));
+    return ['All', 'Favorites', ...regularCats];
+  }, [allAvailableCategories, availablePacks]);
 
   const filteredElements = useMemo(() => {
-    let list = elements.filter(el => {
-      const q = searchTerm.trim().toLowerCase();
-      const matchesSearch = !q ||
-        el.title.toLowerCase().includes(q) ||
-        el.category?.toLowerCase().includes(q) ||
-        (el.tags && el.tags.toLowerCase().includes(q)) ||
-        (el.assetType && el.assetType.toLowerCase().includes(q));
-      const matchesCategory = selectedCategory === 'All'
-        ? true
-        : selectedCategory === 'Favorites'
-          ? favorites.includes(el.id)
-          : el.category === selectedCategory;
-      return matchesSearch && matchesCategory;
+    const q = searchTerm.trim().toLowerCase();
+
+    // 1. If searching, or if viewing Favorites, or if viewing a specific pack or specific category:
+    if (selectedCategory !== 'All' || q) {
+      let list = elements.filter(el => {
+        const matchesSearch = !q ||
+          el.title.toLowerCase().includes(q) ||
+          el.category?.toLowerCase().includes(q) ||
+          el.pack?.toLowerCase().includes(q) ||
+          (el.tags && el.tags.toLowerCase().includes(q)) ||
+          (el.assetType && el.assetType.toLowerCase().includes(q));
+        const matchesCategory = selectedCategory === 'All'
+          ? true
+          : selectedCategory === 'Favorites'
+            ? favorites.includes(el.id)
+            : (el.category === selectedCategory || el.pack === selectedCategory);
+        return matchesSearch && matchesCategory;
+      });
+
+      if (sortBy === 'popular') {
+        list = [...list].sort((a, b) => (b.downloads || 0) - (a.downloads || 0));
+      } else if (sortBy === 'name') {
+        list = [...list].sort((a, b) => a.title.localeCompare(b.title));
+      }
+      return list;
+    }
+
+    // 2. Special 'All' category view without active search:
+    // Separate non-pack elements and pack elements
+    const packLowerMap = new Map();
+    availablePacks.forEach(p => packLowerMap.set(p.toLowerCase(), p));
+
+    const nonPackElements = [];
+    const packElementsMap = {};
+    availablePacks.forEach(p => { packElementsMap[p] = []; });
+
+    elements.forEach(el => {
+      const packKey = (el.pack && packLowerMap.get(el.pack.toLowerCase())) ||
+                      (el.category && packLowerMap.get(el.category.toLowerCase()));
+      if (packKey && packElementsMap[packKey]) {
+        packElementsMap[packKey].push(el);
+      } else {
+        nonPackElements.push(el);
+      }
+    });
+
+    let combined = [...nonPackElements];
+
+    // For each pack, pick exactly 5 distinct sample items and 1 Highlighted Full Pack Card
+    availablePacks.forEach((packName) => {
+      const packItems = packElementsMap[packName] || [];
+      if (packItems.length === 0) return;
+
+      // Select 5 varied items from the pack
+      const sampleCount = Math.min(5, packItems.length);
+      const step = Math.max(1, Math.floor(packItems.length / sampleCount));
+      const sampleItems = [];
+      const usedIds = new Set();
+      for (let i = 0; i < sampleCount; i++) {
+        const idx = Math.min(packItems.length - 1, (i * step + 1) % packItems.length);
+        const item = packItems[idx];
+        if (item && !usedIds.has(item.id)) {
+          sampleItems.push(item);
+          usedIds.add(item.id);
+        }
+      }
+      for (let i = 0; i < packItems.length && sampleItems.length < sampleCount; i++) {
+        if (!usedIds.has(packItems[i].id)) {
+          sampleItems.push(packItems[i]);
+          usedIds.add(packItems[i].id);
+        }
+      }
+
+      // Create the prominent Highlighted Pack Card
+      const packCard = {
+        id: `pack_showcase_${packName}`,
+        isPackCard: true,
+        packName: packName,
+        title: `${packName} Pack`,
+        totalCount: packItems.length,
+        previewItems: packItems.slice(0, 4),
+        category: packName,
+        tags: `pack, ${packName}, curated, full pack, bundle`,
+        downloads: packItems.reduce((acc, curr) => acc + (curr.downloads || 0), 0)
+      };
+
+      // Place the Highlighted Pack Card at index 6 (prominent 2nd row on desktop, 4th row on mobile)
+      const packCardIndex = Math.min(combined.length, 6);
+      combined.splice(packCardIndex, 0, packCard);
+
+      // Distribute the 5 sample items randomly / evenly across the general feed
+      sampleItems.forEach((item, sIdx) => {
+        const insertPos = Math.min(combined.length, 3 + sIdx * 8);
+        combined.splice(insertPos, 0, item);
+      });
     });
 
     if (sortBy === 'popular') {
-      list = [...list].sort((a, b) => (b.downloads || 0) - (a.downloads || 0));
+      combined = [...combined].sort((a, b) => {
+        if (a.isPackCard) return -1;
+        if (b.isPackCard) return 1;
+        return (b.downloads || 0) - (a.downloads || 0);
+      });
     } else if (sortBy === 'name') {
-      list = [...list].sort((a, b) => a.title.localeCompare(b.title));
+      combined = [...combined].sort((a, b) => {
+        if (a.isPackCard) return -1;
+        if (b.isPackCard) return 1;
+        return a.title.localeCompare(b.title);
+      });
     }
-    return list;
-  }, [elements, searchTerm, selectedCategory, favorites, sortBy]);
+
+    return combined;
+  }, [elements, searchTerm, selectedCategory, favorites, sortBy, availablePacks]);
 
   // Gallery Pagination: Load 50 images initially, load more on button click
   const [visibleCount, setVisibleCount] = useState(50);
@@ -6090,6 +6307,133 @@ export default function App() {
   const displayedElements = useMemo(() => {
     return filteredElements.slice(0, visibleCount);
   }, [filteredElements, visibleCount]);
+
+  // Mobile Pull-to-Refresh: Pull down cards at the top to reload the page
+  const [pullDistance, setPullDistance] = useState(0);
+  const [isPullRefreshing, setIsPullRefreshing] = useState(false);
+  const pullTouchStartXRef = useRef(0);
+  const pullTouchStartYRef = useRef(0);
+  const canPullRefreshRef = useRef(false);
+  const isPullingRef = useRef(false);
+
+  useEffect(() => {
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    if (!isTouchDevice) return;
+
+    const handleTouchStart = (e) => {
+      const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
+      if (scrollY <= 8 && !isPullRefreshing && !detailModalAsset) {
+        pullTouchStartXRef.current = e.touches[0].clientX;
+        pullTouchStartYRef.current = e.touches[0].clientY;
+        canPullRefreshRef.current = true;
+        isPullingRef.current = false;
+      } else {
+        canPullRefreshRef.current = false;
+      }
+    };
+
+    const handleTouchMove = (e) => {
+      if (!canPullRefreshRef.current || isPullRefreshing) return;
+      const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
+      if (scrollY > 8) {
+        canPullRefreshRef.current = false;
+        isPullingRef.current = false;
+        setPullDistance(0);
+        return;
+      }
+      const touch = e.touches[0];
+      const deltaX = touch.clientX - pullTouchStartXRef.current;
+      const deltaY = touch.clientY - pullTouchStartYRef.current;
+
+      // Ignore if user is swiping horizontally (like scrolling categories)
+      if (Math.abs(deltaX) > Math.abs(deltaY) && !isPullingRef.current) {
+        canPullRefreshRef.current = false;
+        return;
+      }
+
+      if (deltaY > 10) {
+        isPullingRef.current = true;
+        const distance = Math.min((deltaY - 10) * 0.42, 60);
+        setPullDistance(distance);
+      } else if (deltaY <= 0) {
+        setPullDistance(0);
+        isPullingRef.current = false;
+      }
+    };
+
+    const handleRefreshItemsOnly = async () => {
+      setIsPullRefreshing(true);
+      setPullDistance(46);
+      isPullingRef.current = false;
+      
+      try {
+        // 1. Reload items freshly from IndexedDB / INITIAL_ELEMENTS
+        const cached = await loadElementsFromDB();
+        const initialMap = new Map(INITIAL_ELEMENTS.map(el => [el.id, el]));
+        if (Array.isArray(cached) && cached.length > 0) {
+          const cachedIds = new Set(cached.map(c => c.id));
+          const normalizedCached = cached.map(item => {
+            const initialItem = initialMap.get(item.id);
+            const sourceSvg = item.svgCode || item.originalSvgCode || (initialItem ? initialItem.svgCode : '');
+            const clean = normalizeForeignObjectSvg(sourceSvg);
+            return {
+              ...(initialItem || {}),
+              ...item,
+              svgCode: clean,
+              originalSvgCode: clean
+            };
+          });
+          const newFromInitial = INITIAL_ELEMENTS
+            .filter(item => !cachedIds.has(item.id))
+            .map(el => ({ ...el, originalSvgCode: el.svgCode, downloads: el.downloads || 0 }));
+
+          const merged = newFromInitial.length > 0 ? [...normalizedCached, ...newFromInitial] : normalizedCached;
+          setElements(merged);
+          await saveElementsToDB(merged);
+        } else {
+          const fresh = INITIAL_ELEMENTS.map(el => ({ ...el, originalSvgCode: el.svgCode, downloads: el.downloads || 0 }));
+          setElements(fresh);
+          await saveElementsToDB(fresh);
+        }
+
+        // 2. Brief skeleton shimmer on gallery items for tactile visual feedback without page reload
+        setIsGalleryLoading(true);
+        setTimeout(() => {
+          setIsGalleryLoading(false);
+        }, 320);
+
+      } catch (err) {
+        console.error('Error refreshing items:', err);
+      } finally {
+        setTimeout(() => {
+          setIsPullRefreshing(false);
+          setPullDistance(0);
+          isPullingRef.current = false;
+        }, 500);
+      }
+    };
+
+    const handleTouchEnd = () => {
+      if (!canPullRefreshRef.current || isPullRefreshing) return;
+      canPullRefreshRef.current = false;
+      if (isPullingRef.current && pullDistance >= 38) {
+        handleRefreshItemsOnly();
+      } else {
+        setPullDistance(0);
+        isPullingRef.current = false;
+      }
+    };
+
+    window.addEventListener('touchstart', handleTouchStart, { passive: true });
+    window.addEventListener('touchmove', handleTouchMove, { passive: true });
+    window.addEventListener('touchend', handleTouchEnd, { passive: true });
+
+    return () => {
+      window.removeEventListener('touchstart', handleTouchStart);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [pullDistance, isPullRefreshing, detailModalAsset]);
 
 
 
@@ -6179,6 +6523,65 @@ export default function App() {
     });
     setActiveStyleMode('original');
     setSelectedAsset(null);
+  };
+
+  const handleOpenEmptyStudio = () => {
+    setSelectedAsset({
+      id: 'empty_studio_canvas',
+      title: 'Blank Canvas',
+      category: 'Studio',
+      svgCode: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512"></svg>',
+      originalSvgCode: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512"></svg>',
+      isEmptyCanvas: true
+    });
+    setActiveStyleMode('original');
+    setLayerTransforms({});
+    setLayerStyles({});
+    setDeletedLayerIds([]);
+    setDuplicatedLayers([]);
+    setLayerGroups({});
+    setLayerOrder([]);
+    setCustomCanvasObjects([]);
+    setAdjustments({
+      ...DEFAULT_ADJUSTMENTS,
+      colorReplacements: {}
+    });
+    setSelectedLayerId(null);
+    setSelectedLayerIds([]);
+    setTransformBox(null);
+    setIconWidth(512);
+    setIconHeight(512);
+    setLockAspectRatio(true);
+    setAspectRatio(1);
+    setStrokeMultiplier(1);
+    setStrokeColorMode('auto');
+    setCustomStrokeColor('#38bdf8');
+    setBgShape('none');
+    setBgShapeColor('#1e293b');
+    setActiveSelectedColor(null);
+    setIsLayersListExpanded(false);
+    setStudioTab('colors');
+    setIsStudioPanelOpen(false);
+    targetZoomRef.current = 1;
+    currentZoomRef.current = 1;
+    targetPanRef.current = { x: 0, y: 0 };
+    canvasPanRef.current = { x: 0, y: 0 };
+    if (animFrameIdRef.current) {
+      cancelAnimationFrame(animFrameIdRef.current);
+      animFrameIdRef.current = null;
+    }
+    setZoomLevel(1);
+    setCanvasPan({ x: 0, y: 0 });
+    if (canvasViewportRef.current) {
+      canvasViewportRef.current.style.transform = 'translate3d(0px, 0px, 0px) scale(1)';
+      canvasViewportRef.current.style.setProperty('--stage-zoom', '1');
+      canvasViewportRef.current.style.setProperty('--inv-zoom', '1');
+      canvasViewportRef.current.style.willChange = 'auto';
+    }
+    const badge = document.getElementById('live-zoom-badge');
+    if (badge) badge.textContent = '100%';
+    setUndoStack([]);
+    setRedoStack([]);
   };
 
   // Keyboard shortcut listener for Ctrl+Z (Undo) and Ctrl+Y / Ctrl+Shift+Z (Redo)
@@ -6726,7 +7129,7 @@ export default function App() {
     }
 
     setIsBulkPublishing(false);
-    setFormSuccess(`Successfully uploaded ${successCount} of ${bulkFiles.length} elements to Supabase Cloud!`);
+    setFormSuccess(`Successfully uploaded ${successCount} of ${bulkFiles.length} icons to library!`);
     if (successCount === bulkFiles.length) {
       setTimeout(() => {
         setBulkFiles([]);
@@ -6781,11 +7184,16 @@ export default function App() {
               .map(d => ({ ...d, originalSvgCode: d.svgCode }));
             const combined = [...mapped, ...defaultNonDuplicates];
             saveElementsToDB(combined);
+            try {
+              localStorage.setItem('iconderry_assets', JSON.stringify(combined.slice(0, 150)));
+            } catch (_) {}
             return combined;
           });
         }
       } catch (err) {
         console.error('Supabase sync notice:', err);
+      } finally {
+        setIsGalleryLoading(false);
       }
     }
 
@@ -6889,7 +7297,7 @@ export default function App() {
 
         if (error) {
           console.error('Supabase insert error:', error);
-          setFormError(`Failed to upload to Supabase: ${error.message || 'Error occurred'}`);
+          setFormError(`Upload failed: ${error.message || 'Error occurred'}`);
           setIsPublishing(false);
           return;
         }
@@ -6907,8 +7315,8 @@ export default function App() {
       setTitle('');
       setSvgInput('');
       setTags('');
-      setFormSuccess('SVG published successfully to Supabase Cloud! It is now accessible to all users.');
-      setTimeout(() => setFormSuccess(''), 5000);
+      setFormSuccess('Vector icon uploaded successfully to library!');
+      setTimeout(() => setFormSuccess(''), 4000);
     } catch (err) {
       console.error('Publish error:', err);
       setFormError('Upload error: ' + (err.message || String(err)));
@@ -7054,6 +7462,142 @@ export default function App() {
     }
   };
 
+  // Admin Item Metadata Edit Handlers (Title, Description, Category, Tags, Pack)
+  const handleOpenEditAssetModal = (item) => {
+    if (!item) return;
+    setEditingModalAsset(item);
+    setEditAssetTitle(item.title || '');
+    setEditAssetDescription(item.description || '');
+    setEditAssetCategory(item.category || 'General');
+    const tagsStr = Array.isArray(item.tags)
+      ? item.tags.join(', ')
+      : typeof item.tags === 'string'
+      ? item.tags
+      : '';
+    setEditAssetTags(tagsStr);
+    setEditAssetPack(item.pack || '');
+    setEditAssetError('');
+    setEditAssetSuccess('');
+  };
+
+  const handleCloseEditAssetModal = () => {
+    if (isSavingAssetDetails) return;
+    setEditingModalAsset(null);
+    setEditAssetError('');
+    setEditAssetSuccess('');
+  };
+
+  const handleSaveAssetDetails = async (e) => {
+    if (e) e.preventDefault();
+    if (!editingModalAsset) return;
+    if (!editAssetTitle.trim()) {
+      setEditAssetError('Title / Name is required!');
+      return;
+    }
+
+    setIsSavingAssetDetails(true);
+    setEditAssetError('');
+    setEditAssetSuccess('');
+
+    const targetId = editingModalAsset.id;
+    const finalTitle = editAssetTitle.trim();
+    const finalDescription = editAssetDescription.trim();
+    const finalCategory = editAssetCategory.trim() || 'General';
+    const finalTags = editAssetTags.trim();
+    const finalPack = editAssetPack.trim();
+
+    try {
+      // 1. Update in-memory state & persistent IndexedDB
+      setElements(prev => {
+        const next = prev.map(el => {
+          if (el.id === targetId) {
+            return {
+              ...el,
+              title: finalTitle,
+              description: finalDescription,
+              category: finalCategory,
+              tags: finalTags,
+              pack: finalPack
+            };
+          }
+          return el;
+        });
+        saveElementsToDB(next);
+        return next;
+      });
+
+      // 2. Add to categories if custom category is new
+      if (finalCategory && !categories.includes(finalCategory) && !customCategories.includes(finalCategory)) {
+        setCustomCategories(prev => [...prev, finalCategory]);
+      }
+
+      // 3. Update selectedAsset in Studio if matching
+      setSelectedAsset(prev => {
+        if (prev && prev.id === targetId) {
+          return {
+            ...prev,
+            title: finalTitle,
+            description: finalDescription,
+            category: finalCategory,
+            tags: finalTags,
+            pack: finalPack
+          };
+        }
+        return prev;
+      });
+
+      // 4. Update detailModalAsset if matching
+      setDetailModalAsset(prev => {
+        if (prev && prev.id === targetId) {
+          return {
+            ...prev,
+            title: finalTitle,
+            description: finalDescription,
+            category: finalCategory,
+            tags: finalTags,
+            pack: finalPack
+          };
+        }
+        return prev;
+      });
+
+      // 5. Update in Supabase if connected
+      if (supabase) {
+        try {
+          const { error } = await supabase
+            .from('icons')
+            .update({
+              title: finalTitle,
+              description: finalDescription,
+              category: finalCategory,
+              tags: finalTags
+            })
+            .eq('id', targetId);
+
+          if (error) {
+            console.warn('Supabase metadata update note:', error);
+          }
+        } catch (sErr) {
+          console.error('Supabase update error:', sErr);
+        }
+      }
+
+      setEditAssetSuccess('Item details saved successfully!');
+      setGalleryAdminToast(`"${finalTitle}" updated in gallery & storage!`);
+      setTimeout(() => setGalleryAdminToast(''), 4500);
+
+      setTimeout(() => {
+        setEditingModalAsset(null);
+        setIsSavingAssetDetails(false);
+      }, 600);
+
+    } catch (err) {
+      console.error('Failed to update asset details:', err);
+      setEditAssetError('Failed to save details: ' + (err.message || String(err)));
+      setIsSavingAssetDetails(false);
+    }
+  };
+
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this element?')) {
       setElements(prev => prev.filter(el => el.id !== id));
@@ -7074,6 +7618,121 @@ export default function App() {
     setDownloading(false);
     setExportProgress(null);
   };
+
+  // Keep state ref fresh for Android hardware back button handler
+  backStateRef.current = {
+    exportProgress,
+    isExportDropdownOpen,
+    isAdvancedExportOpen,
+    isAddElementModalOpen,
+    isHelpModalOpen,
+    isSettingsOpen,
+    isAuthModalOpen,
+    isUserMenuOpen,
+    selectedAsset,
+    detailModalAsset,
+    activeTab
+  };
+
+  // Android Mobile Hardware & Gesture Back Button Handling (Capacitor & Web History)
+  useEffect(() => {
+    let backListener = null;
+
+    const handleBackPress = () => {
+      const s = backStateRef.current;
+
+      // 1. Cancel active export progress modal
+      if (s.exportProgress) {
+        handleCancelExport();
+        return true;
+      }
+      // 2. Close export dropdowns
+      if (s.isExportDropdownOpen) {
+        setIsExportDropdownOpen(false);
+        return true;
+      }
+      if (s.isAdvancedExportOpen) {
+        setIsAdvancedExportOpen(false);
+        return true;
+      }
+      // 3. Close add element / help modal
+      if (s.isAddElementModalOpen) {
+        setIsAddElementModalOpen(false);
+        return true;
+      }
+      if (s.isHelpModalOpen) {
+        setIsHelpModalOpen(false);
+        return true;
+      }
+      // 4. Close settings modal
+      if (s.isSettingsOpen) {
+        setIsSettingsOpen(false);
+        return true;
+      }
+      // 5. Close auth modal & user menu
+      if (s.isAuthModalOpen) {
+        setIsAuthModalOpen(false);
+        return true;
+      }
+      if (s.isUserMenuOpen) {
+        setIsUserMenuOpen(false);
+        return true;
+      }
+      // 6. User is inside Studio -> Close Studio and return to previous page/gallery!
+      if (s.selectedAsset) {
+        handleCloseStudio();
+        return true;
+      }
+      // 7. Icon detail showcase modal is open -> Close detail modal
+      if (s.detailModalAsset) {
+        setDetailModalAsset(null);
+        return true;
+      }
+      // 8. Other main tabs (blog, license, admin) -> Return to browse gallery
+      if (s.activeTab && s.activeTab !== 'browse') {
+        setActiveTab('browse');
+        return true;
+      }
+
+      return false; // Nothing open, at root gallery
+    };
+
+    // Register Capacitor Native Android Back Button Listener
+    try {
+      CapApp.addListener('backButton', () => {
+        const handled = handleBackPress();
+        if (!handled) {
+          const now = Date.now();
+          if (now - lastBackPressRef.current < 2000) {
+            CapApp.exitApp();
+          } else {
+            lastBackPressRef.current = now;
+            setBackToast('Press back again to exit');
+            setTimeout(() => setBackToast(''), 2000);
+          }
+        }
+      }).then(listener => {
+        backListener = listener;
+      }).catch(err => {
+        console.debug('Capacitor backButton not available:', err);
+      });
+    } catch (e) {
+      console.debug('CapApp listener error:', e);
+    }
+
+    // Support browser popstate for mobile browser / PWA navigation
+    const handlePopState = () => {
+      handleBackPress();
+    };
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      if (backListener && typeof backListener.remove === 'function') {
+        backListener.remove();
+      }
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, []);
 
   const handleDownload = async () => {
     if (!selectedAsset) return;
@@ -7470,12 +8129,12 @@ export default function App() {
   };
 
   return (
-    <div className={`min-h-screen flex flex-col font-sans transition-colors duration-200 selection:bg-blue-500 selection:text-white ${appTheme === 'dark' ? 'bg-[#121316] text-slate-100' : 'bg-slate-50 text-slate-900'
+    <div className={`min-h-screen flex flex-col font-sans transition-colors duration-200 selection:bg-blue-500 selection:text-white w-full max-w-full overflow-x-clip ${appTheme === 'dark' ? 'bg-[#121316] text-slate-100' : 'bg-slate-50 text-slate-900'
       }`}>
       {/* Top Bar */}
-      <header className={`app-header-main border-b sticky top-0 z-40 px-3 sm:px-6 py-3 sm:py-4 backdrop-blur transition-colors ${appTheme === 'dark' ? 'border-[#1f2128] bg-[#121316]/95' : 'border-slate-200 bg-white/90 shadow-sm'
+      <header className={`app-header-main border-b sticky top-0 z-40 px-3 sm:px-6 py-3 sm:py-4 backdrop-blur transition-colors w-full max-w-full overflow-hidden ${appTheme === 'dark' ? 'border-[#1f2128] bg-[#121316]/95' : 'border-slate-200 bg-white/90 shadow-sm'
         }`}>
-        <div className="max-w-[1780px] w-full mx-auto flex items-center justify-between">
+        <div className="max-w-[1780px] w-full mx-auto flex items-center justify-between min-w-0">
           <div className="flex items-center gap-2.5 sm:gap-3">
             <div
               onClick={() => setActiveTab('browse')}
@@ -7554,13 +8213,16 @@ export default function App() {
               </button>
             </div>
 
-            {/* Settings Panel Button (Desktop only: on mobile, accessible via bottom nav) */}
+            {/* Settings Panel Button (Full Page View) */}
             <button
-              onClick={() => setIsSettingsOpen(true)}
-              className={`hidden md:flex items-center gap-1.5 px-2.5 sm:px-3.5 py-2 rounded-xl text-xs font-semibold border transition ${appTheme === 'dark'
-                ? 'bg-[#18191f] border-[#22242c] text-slate-300 hover:text-white hover:border-[#38bdf8]/40'
-                : 'bg-white border-slate-200 text-slate-700 hover:text-slate-900 hover:border-slate-300 shadow-sm'
-                }`}
+              onClick={() => setActiveTab('settings')}
+              className={`hidden md:flex items-center gap-1.5 px-2.5 sm:px-3.5 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                activeTab === 'settings'
+                  ? 'bg-blue-600 text-white border-blue-500 shadow-md shadow-blue-600/30'
+                  : appTheme === 'dark'
+                    ? 'bg-[#18191f] border-[#22242c] text-slate-300 hover:text-white hover:border-[#38bdf8]/40'
+                    : 'bg-white border-slate-200 text-slate-700 hover:text-slate-900 hover:border-slate-300 shadow-sm'
+              }`}
               title="Open Settings"
             >
               <Settings className="w-4 h-4 text-cyan-400" />
@@ -7667,61 +8329,27 @@ export default function App() {
 
 
       {/* Main Page Area */}
-      <main className="flex-1 p-3 sm:p-6 lg:px-8 max-w-[1780px] w-full mx-auto pb-24 md:pb-8">
+      <main className="flex-1 p-2.5 sm:p-6 lg:px-8 max-w-[1780px] w-full max-w-full mx-auto pb-24 md:pb-8 min-w-0 overflow-x-clip">
         {activeTab === 'admin' ? (
           /* Admin Management Panel */
           <div className={`max-w-4xl mx-auto border rounded-2xl sm:rounded-3xl p-4 sm:p-8 shadow-xl transition ${appTheme === 'dark' ? 'bg-[#18191f] border-[#22242c] text-slate-100' : 'bg-white border-slate-200 text-slate-900 shadow-xl'
             }`}>
-            {/* Top Admin Sub-Navigation */}
-            <div className="flex items-center justify-between flex-wrap gap-3 mb-6 pb-4 border-b border-[#22242c]">
-              <div className="flex items-center gap-1.5 p-1 rounded-2xl border bg-[#121316] border-[#22242c]">
+            {/* Top Header - Back Button when managing categories */}
+            {adminSection === 'categories' && (
+              <div className="flex items-center justify-between gap-3 mb-6 pb-4 border-b border-[#22242c]">
                 <button
                   type="button"
                   onClick={() => setAdminSection('upload')}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition ${adminSection === 'upload'
-                      ? 'bg-blue-600 text-white font-bold shadow-md'
-                      : 'text-slate-400 hover:text-white'
-                    }`}
+                  className="px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-200 transition cursor-pointer active:scale-95"
                 >
-                  <UploadCloud className="w-4 h-4" />
-                  <span>Upload Elements</span>
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>Back to Upload</span>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setAdminSection('categories')}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition ${adminSection === 'categories'
-                      ? 'bg-blue-600 text-white font-bold shadow-md'
-                      : 'text-slate-400 hover:text-white'
-                    }`}
-                >
-                  <Folder className="w-4 h-4" />
-                  <span>Manage Categories</span>
-                  <span className="px-1.5 py-0.2 rounded-md text-[10px] bg-slate-800 text-cyan-400 font-bold">
-                    {allAvailableCategories.length}
-                  </span>
-                </button>
-              </div>
-
-              <div className="flex items-center gap-2.5 flex-wrap">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsGalleryAdminMode(true);
-                    setActiveTab('browse');
-                  }}
-                  className="px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 transition bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-md shadow-purple-600/25 active:scale-95 border border-purple-400/30"
-                  title="Gallery me kisi bhi element ko edit karke permanent default banane ke liye enter karein"
-                >
-                  <Palette className="w-4 h-4 text-purple-200" />
-                  <span>Edit Gallery Defaults</span>
-                </button>
-
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[11px] font-semibold">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  <span className="hidden sm:inline">Supabase Cloud Connected</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-cyan-400">Categories Manager (Unlocked)</span>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Notification Messages */}
             {formSuccess && (
@@ -7748,15 +8376,13 @@ export default function App() {
             {adminSection === 'upload' ? (
               <div>
                 {/* Upload Mode Switcher: Single vs Bulk */}
-                <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
+                <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
                   <div>
-                    <h2 className="text-lg sm:text-xl font-bold">
-                      {uploadMode === 'single' ? 'Upload Single Element' : 'Bulk Upload Vector Elements'}
-                    </h2>
-                    <p className={`text-xs sm:text-sm ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                    <h2 className="text-lg sm:text-xl font-bold tracking-tight">Upload Icon</h2>
+                    <p className={`text-xs ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
                       {uploadMode === 'single'
-                        ? 'Upload an SVG with smart categorization & real-time preview.'
-                        : 'Upload multiple SVG files at once and assign common categories & tags.'}
+                        ? 'Add a single vector icon with live preview'
+                        : 'Upload multiple SVG files at once'}
                     </p>
                   </div>
 
@@ -7764,21 +8390,23 @@ export default function App() {
                     <button
                       type="button"
                       onClick={() => setUploadMode('single')}
-                      className={`px-3 py-1.5 rounded-lg font-semibold transition ${uploadMode === 'single' ? 'bg-cyan-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-white'
-                        }`}
+                      className={`px-3 py-1.5 rounded-lg font-semibold transition cursor-pointer ${
+                        uploadMode === 'single' ? 'bg-cyan-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-white'
+                      }`}
                     >
-                      Single SVG
+                      Single Icon
                     </button>
                     <button
                       type="button"
                       onClick={() => setUploadMode('bulk')}
-                      className={`px-3 py-1.5 rounded-lg font-semibold flex items-center gap-1.5 transition ${uploadMode === 'bulk' ? 'bg-cyan-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-white'
-                        }`}
+                      className={`px-3 py-1.5 rounded-lg font-semibold flex items-center gap-1.5 transition cursor-pointer ${
+                        uploadMode === 'bulk' ? 'bg-cyan-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-white'
+                      }`}
                     >
                       <FileUp className="w-3.5 h-3.5" />
                       <span>Bulk Upload</span>
                       {bulkFiles.length > 0 && (
-                        <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-900 text-cyan-300">
+                        <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-900 text-cyan-300 font-bold">
                           {bulkFiles.length}
                         </span>
                       )}
@@ -7796,12 +8424,13 @@ export default function App() {
                         onDragLeave={() => setIsDragging(false)}
                         onDrop={handleDrop}
                         onClick={() => fileInputRef.current?.click()}
-                        className={`border-2 border-dashed rounded-2xl p-4 sm:p-5 text-center cursor-pointer transition flex flex-col items-center justify-center gap-1.5 ${isDragging
+                        className={`border-2 border-dashed rounded-2xl p-4 sm:p-5 text-center cursor-pointer transition flex flex-col items-center justify-center gap-1.5 ${
+                          isDragging
                             ? 'border-cyan-500 bg-cyan-500/10'
                             : appTheme === 'dark'
-                              ? 'border-slate-700 hover:border-slate-600 bg-[#0b0f19]/50'
-                              : 'border-slate-300 hover:border-slate-400 bg-slate-50'
-                          }`}
+                              ? 'border-slate-800 hover:border-slate-700 bg-slate-900/40'
+                              : 'border-slate-200 hover:border-slate-300 bg-slate-50'
+                        }`}
                       >
                         <input
                           type="file"
@@ -7810,14 +8439,14 @@ export default function App() {
                           onChange={(e) => e.target.files?.[0] && handleFileProcess(e.target.files[0])}
                           className="hidden"
                         />
-                        <div className={`p-2.5 rounded-full ${appTheme === 'dark' ? 'bg-slate-800 text-cyan-400' : 'bg-slate-200 text-cyan-600'}`}>
+                        <div className={`p-2.5 rounded-2xl ${appTheme === 'dark' ? 'bg-cyan-500/10 text-cyan-400' : 'bg-blue-50 text-blue-600'}`}>
                           <UploadCloud className="w-5 h-5" />
                         </div>
-                        <p className={`text-xs sm:text-sm font-medium ${appTheme === 'dark' ? 'text-slate-200' : 'text-slate-700'}`}>
-                          Drag &amp; drop <span className="text-cyan-500 font-semibold">.svg</span> file or browse
+                        <p className={`text-xs sm:text-sm font-bold ${appTheme === 'dark' ? 'text-slate-200' : 'text-slate-700'}`}>
+                          Choose <span className="text-cyan-400">.SVG</span> file or drag here
                         </p>
-                        <p className={`text-[10px] sm:text-xs ${appTheme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
-                          Auto-detects title, silhouettes &amp; category
+                        <p className={`text-[11px] ${appTheme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                          Tap to select from device
                         </p>
                       </div>
 
@@ -7826,40 +8455,41 @@ export default function App() {
                         onClick={handleClipboardPasteClick}
                         className={`border-2 border-dashed rounded-2xl p-4 sm:p-5 text-center cursor-pointer transition flex flex-col items-center justify-center gap-1.5 ${
                           appTheme === 'dark'
-                            ? 'border-indigo-500/40 hover:border-indigo-400 bg-indigo-950/20 hover:bg-indigo-950/35 text-indigo-300'
-                            : 'border-indigo-300 hover:border-indigo-400 bg-indigo-50/60 hover:bg-indigo-100/60 text-indigo-700'
+                            ? 'border-slate-800 hover:border-indigo-500/40 bg-slate-900/40 text-slate-300'
+                            : 'border-slate-200 hover:border-indigo-300 bg-slate-50 text-slate-700'
                         }`}
                       >
-                        <div className={`p-2.5 rounded-full ${appTheme === 'dark' ? 'bg-indigo-900/60 text-indigo-300' : 'bg-indigo-100 text-indigo-600'}`}>
+                        <div className={`p-2.5 rounded-2xl ${appTheme === 'dark' ? 'bg-indigo-500/10 text-indigo-400' : 'bg-indigo-50 text-indigo-600'}`}>
                           <ClipboardPaste className="w-5 h-5" />
                         </div>
-                        <p className="text-xs sm:text-sm font-bold flex items-center gap-1.5">
-                          <span>Smart Paste from Clipboard</span>
+                        <p className="text-xs sm:text-sm font-bold">
+                          Paste from Clipboard
                         </p>
-                        <p className={`text-[10px] sm:text-xs ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                          Paste raw SVG, HTML, or press <kbd className="px-1.5 py-0.5 rounded bg-black/40 text-cyan-300 font-mono text-[10px] font-bold">Ctrl + V</kbd> anywhere
+                        <p className={`text-[11px] ${appTheme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                          Paste copied SVG code
                         </p>
                       </div>
                     </div>
 
-                    <form onSubmit={handlePublishSvg} className="space-y-4 sm:space-y-5">
+                    <form onSubmit={handlePublishSvg} className="space-y-4">
                       <div>
                         <label className={`block text-xs font-semibold uppercase tracking-wider mb-1.5 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                          Element Title
+                          Icon Name
                         </label>
                         <input
                           type="text"
-                          placeholder="e.g. Eagle Silhouette, Glowing Neon Trophy (auto-named if empty)"
+                          placeholder="e.g. Star, Shopping Cart, User Profile"
                           value={title}
                           onChange={(e) => setTitle(e.target.value)}
-                          className={`w-full rounded-xl px-3.5 py-2.5 sm:py-3 text-sm focus:outline-none focus:border-blue-500 transition border ${appTheme === 'dark'
-                              ? 'bg-[#0b0f19] border-slate-700 text-slate-100 placeholder-slate-500'
+                          className={`w-full rounded-xl px-3.5 py-2.5 sm:py-3 text-sm focus:outline-none focus:border-cyan-400 transition border ${
+                            appTheme === 'dark'
+                              ? 'bg-[#0b0f19] border-slate-800 text-slate-100 placeholder-slate-500'
                               : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400'
-                            }`}
+                          }`}
                         />
                       </div>
 
-                      {/* Smart Category Picker */}
+                      {/* Category Picker */}
                       <div>
                         <div className="flex items-center justify-between mb-2">
                           <label className={`block text-xs font-semibold uppercase tracking-wider ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
@@ -7868,10 +8498,10 @@ export default function App() {
                           <button
                             type="button"
                             onClick={() => setIsAddingNewCat(!isAddingNewCat)}
-                            className="text-xs font-semibold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 transition"
+                            className="text-xs font-semibold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 transition cursor-pointer"
                           >
                             <FolderPlus className="w-3.5 h-3.5" />
-                            <span>{isAddingNewCat ? 'Close' : '+ Create New Category'}</span>
+                            <span>{isAddingNewCat ? 'Close' : '+ New Category'}</span>
                           </button>
                         </div>
 
@@ -7880,7 +8510,7 @@ export default function App() {
                           <div className="mb-3 p-3 rounded-xl border border-cyan-500/30 bg-cyan-950/20 flex items-center gap-2">
                             <input
                               type="text"
-                              placeholder="New category name (e.g. Silhouettes, Animal Vectors, Gaming)..."
+                              placeholder="New category name..."
                               value={newCatInput}
                               onChange={(e) => setNewCatInput(e.target.value)}
                               onKeyDown={(e) => {
@@ -7895,14 +8525,14 @@ export default function App() {
                             <button
                               type="button"
                               onClick={() => handleAddNewCategory(newCatInput, true, 'single')}
-                              className="px-3 py-1.5 rounded-lg bg-cyan-500 text-slate-950 text-xs font-bold hover:bg-cyan-400 transition"
+                              className="px-3 py-1.5 rounded-lg bg-cyan-500 text-slate-950 text-xs font-bold hover:bg-cyan-400 transition cursor-pointer"
                             >
                               Add
                             </button>
                             <button
                               type="button"
                               onClick={() => { setIsAddingNewCat(false); setNewCatInput(''); }}
-                              className="px-2 py-1.5 text-slate-400 hover:text-white text-xs"
+                              className="px-2 py-1.5 text-slate-400 hover:text-white text-xs cursor-pointer"
                             >
                               Cancel
                             </button>
@@ -7918,12 +8548,13 @@ export default function App() {
                                 key={catName}
                                 type="button"
                                 onClick={() => setCategory(catName)}
-                                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition border flex items-center gap-1.5 ${isSelected
+                                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition border flex items-center gap-1.5 cursor-pointer ${
+                                  isSelected
                                     ? 'bg-blue-600 text-white border-blue-500 shadow-md font-bold'
                                     : appTheme === 'dark'
                                       ? 'bg-slate-900/90 text-slate-300 border-slate-800 hover:border-slate-700 hover:text-white'
                                       : 'bg-slate-100 text-slate-700 border-slate-200 hover:border-slate-300'
-                                  }`}
+                                }`}
                               >
                                 <span>{catName}</span>
                                 {isSelected && <Check className="w-3 h-3 text-white" />}
@@ -7936,14 +8567,14 @@ export default function App() {
                       {/* Asset Style / Classification */}
                       <div>
                         <label className={`block text-xs font-semibold uppercase tracking-wider mb-2 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                          Asset Type / Style
+                          Style
                         </label>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                           {[
-                            { id: 'silhouette', label: 'Silhouette', desc: 'Flat solid vector shape' },
-                            { id: 'linear', label: 'UI Outline', desc: 'Stroked icon' },
-                            { id: 'filled', label: 'Color Filled', desc: 'Standard multi-color' },
-                            { id: '3d', label: '3D Artwork', desc: 'Gradient / Shaded layers' },
+                            { id: 'silhouette', label: 'Silhouette' },
+                            { id: 'linear', label: 'Outline' },
+                            { id: 'filled', label: 'Filled' },
+                            { id: '3d', label: '3D Style' },
                           ].map((item) => {
                             const isSelected = assetType === item.id;
                             return (
@@ -7951,13 +8582,15 @@ export default function App() {
                                 key={item.id}
                                 type="button"
                                 onClick={() => setAssetType(item.id)}
-                                className={`p-2.5 rounded-xl border text-left transition ${isSelected
-                                    ? 'bg-cyan-500/10 border-cyan-500 text-cyan-400 font-bold'
-                                    : appTheme === 'dark' ? 'bg-slate-900/60 border-slate-800 text-slate-400 hover:border-slate-700' : 'bg-slate-50 border-slate-200 text-slate-600'
-                                  }`}
+                                className={`py-2 px-3 rounded-xl border text-center font-bold text-xs transition cursor-pointer active:scale-95 ${
+                                  isSelected
+                                    ? 'bg-cyan-500/15 border-cyan-500 text-cyan-400 shadow-sm'
+                                    : appTheme === 'dark'
+                                      ? 'bg-slate-900/60 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-white'
+                                      : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300'
+                                }`}
                               >
-                                <div className="text-xs">{item.label}</div>
-                                <div className="text-[10px] opacity-75 font-normal">{item.desc}</div>
+                                {item.label}
                               </button>
                             );
                           })}
@@ -7967,25 +8600,26 @@ export default function App() {
                       {/* Tags */}
                       <div>
                         <label className={`block text-xs font-semibold uppercase tracking-wider mb-1.5 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                          Tags
+                          Tags (Optional)
                         </label>
                         <input
                           type="text"
-                          placeholder="silhouette, vector, icon, shadow, black"
+                          placeholder="e.g. interface, modern, logo"
                           value={tags}
                           onChange={(e) => setTags(e.target.value)}
-                          className={`w-full rounded-xl px-3.5 py-2.5 sm:py-3 text-sm focus:outline-none focus:border-blue-500 transition border ${appTheme === 'dark'
-                              ? 'bg-[#0b0f19] border-slate-700 text-slate-100 placeholder-slate-500'
+                          className={`w-full rounded-xl px-3.5 py-2.5 sm:py-3 text-sm focus:outline-none focus:border-cyan-400 transition border ${
+                            appTheme === 'dark'
+                              ? 'bg-[#0b0f19] border-slate-800 text-slate-100 placeholder-slate-500'
                               : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400'
-                            }`}
+                          }`}
                         />
                       </div>
 
-                      {/* Raw SVG or CSS Glassmorphism Code */}
+                      {/* Raw SVG Code */}
                       <div>
                         <div className="flex items-center justify-between mb-1.5 flex-wrap gap-2">
                           <label className={`block text-xs font-semibold uppercase tracking-wider ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                            Raw SVG Code or CSS Glassmorphism Snippet
+                            SVG Code
                           </label>
                           <div className="flex items-center gap-2">
                             <button
@@ -7995,34 +8629,33 @@ export default function App() {
                                 const converted = convertCssToSvg(sampleCss);
                                 if (converted.success) {
                                   setSvgInput(converted.svgCode);
-                                  setTitle('Frosted Glass CSS Card');
+                                  setTitle('Frosted Glass Card');
                                   setCategory('Productivity Glass');
-                                  setTags('css-art, glassmorphism, frosted, acrylic, modern-ui');
-                                  setFormSuccess('✨ Loaded Frosted Glass CSS sample and converted to SVG!');
-                                  setTimeout(() => setFormSuccess(''), 4000);
+                                  setTags('css-art, glassmorphism, frosted, acrylic');
+                                  setFormSuccess('✨ Loaded Glass CSS sample into SVG!');
+                                  setTimeout(() => setFormSuccess(''), 3000);
                                 }
                               }}
-                              className="text-xs font-semibold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 transition"
-                              title="Load a pre-configured Frosted Glass CSS code to test"
+                              className="text-xs font-semibold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 transition cursor-pointer"
+                              title="Load a sample CSS glass snippet"
                             >
                               <Sparkles className="w-3.5 h-3.5" />
-                              <span>Sample CSS Glass</span>
+                              <span>Sample Glass</span>
                             </button>
                             <button
                               type="button"
                               onClick={handleClipboardPasteClick}
-                              className="text-xs font-semibold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 transition"
-                              title="Paste from your system clipboard"
+                              className="text-xs font-semibold text-indigo-400 hover:text-indigo-300 flex items-center gap-1 transition cursor-pointer"
+                              title="Paste from clipboard"
                             >
                               <ClipboardPaste className="w-3.5 h-3.5" />
-                              <span>Paste Clipboard</span>
+                              <span>Paste</span>
                             </button>
                           </div>
                         </div>
                         <textarea
-                          required
-                          rows={4}
-                          placeholder="<svg viewBox='0 0 200 200' ...> OR paste raw CSS (e.g. .glass-card { background: ...; backdrop-filter: blur(20px); border: ...; })"
+                          rows={3}
+                          placeholder="<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' ...>"
                           value={svgInput}
                           onChange={(e) => {
                             const val = e.target.value;
@@ -8034,7 +8667,7 @@ export default function App() {
                                 if (!derived) {
                                   const detect = detectSvgDetails(extracted, '');
                                   const catBase = detect.category ? detect.category.replace(/s$/, '') : 'Vector';
-                                  derived = `${catBase} Artwork ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+                                  derived = `${catBase} Icon`;
                                 }
                                 setTitle(derived);
                               }
@@ -8047,10 +8680,6 @@ export default function App() {
                               }
                               if (detection.assetType) {
                                 setAssetType(detection.assetType);
-                              }
-                              if (detection.note) {
-                                setDetectedShapeNotice(detection.note);
-                                setTimeout(() => setDetectedShapeNotice(''), 4000);
                               }
                             } else {
                               setSvgInput(val);
@@ -8067,22 +8696,27 @@ export default function App() {
                               }
                             }
                           }}
-                          className={`w-full font-mono text-xs rounded-xl p-3.5 sm:p-4 focus:outline-none focus:border-blue-500 transition border ${appTheme === 'dark'
-                              ? 'bg-[#0b0f19] border-slate-700 text-slate-100 placeholder-slate-500'
+                          className={`w-full font-mono text-xs rounded-xl p-3 sm:p-3.5 focus:outline-none focus:border-cyan-400 transition border ${
+                            appTheme === 'dark'
+                              ? 'bg-[#0b0f19] border-slate-800 text-slate-100 placeholder-slate-600'
                               : 'bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400'
-                            }`}
+                          }`}
                         />
                       </div>
 
                       {svgInput.trim() && (
-                        <div className={`p-3 sm:p-4 rounded-xl border flex items-center gap-4 sm:gap-6 ${appTheme === 'dark' ? 'bg-[#0b0f19] border-slate-800' : 'bg-slate-50 border-slate-200'
-                          }`}>
-                          <div className={`w-20 h-20 sm:w-24 sm:h-24 rounded-lg flex items-center justify-center p-2 border flex-shrink-0 overflow-hidden [&>svg]:w-full [&>svg]:h-full [&>svg]:max-w-full [&>svg]:max-h-full [&>svg]:object-contain ${appTheme === 'dark' ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-inner'
-                            }`}
+                        <div className={`p-3 sm:p-4 rounded-xl border flex items-center gap-4 ${
+                          appTheme === 'dark' ? 'bg-[#0b0f19] border-slate-800' : 'bg-slate-50 border-slate-200'
+                        }`}>
+                          <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-xl flex items-center justify-center p-2 border flex-shrink-0 overflow-hidden [&>svg]:w-full [&>svg]:h-full [&>svg]:max-w-full [&>svg]:max-h-full [&>svg]:object-contain ${
+                            appTheme === 'dark' ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-inner'
+                          }`}
                             dangerouslySetInnerHTML={{ __html: extractSvgFromAnyContent(svgInput) || svgInput }} />
                           <div className="text-xs">
-                            <p className={`font-semibold ${appTheme === 'dark' ? 'text-slate-200' : 'text-slate-800'}`}>Live SVG Preview</p>
-                            <p className={appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}>Category: <span className="text-cyan-400 font-semibold">{category}</span> | Type: <span className="text-cyan-400 font-semibold">{assetType}</span></p>
+                            <p className={`font-bold ${appTheme === 'dark' ? 'text-slate-200' : 'text-slate-800'}`}>Live Preview</p>
+                            <p className={appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}>
+                              {category} &bull; <span className="text-cyan-400 font-semibold">{assetType}</span>
+                            </p>
                           </div>
                         </div>
                       )}
@@ -8090,15 +8724,18 @@ export default function App() {
                       <button
                         type="submit"
                         disabled={isPublishing}
-                        className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white py-3 sm:py-3.5 rounded-xl font-medium text-sm transition shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2 cursor-pointer"
+                        className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white py-3.5 rounded-2xl font-bold text-sm transition shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2 cursor-pointer active:scale-98"
                       >
                         {isPublishing ? (
                           <>
                             <RefreshCw className="w-4 h-4 animate-spin" />
-                            <span>Uploading to Supabase Cloud...</span>
+                            <span>Uploading...</span>
                           </>
                         ) : (
-                          <span>Publish to Supabase Cloud</span>
+                          <>
+                            <UploadCloud className="w-4 h-4" />
+                            <span>Upload Icon</span>
+                          </>
                         )}
                       </button>
                     </form>
@@ -8285,7 +8922,7 @@ export default function App() {
                         {isBulkPublishing && (
                           <div className="mt-4 p-3 rounded-xl border border-cyan-500/30 bg-cyan-950/20 space-y-1.5">
                             <div className="flex justify-between text-xs font-semibold text-cyan-300">
-                              <span>Uploading to Supabase Cloud...</span>
+                              <span>Uploading...</span>
                               <span>{bulkProgress.current} / {bulkProgress.total}</span>
                             </div>
                             <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
@@ -8301,15 +8938,18 @@ export default function App() {
                           type="button"
                           onClick={handlePublishBulkSvgs}
                           disabled={isBulkPublishing}
-                          className="mt-4 w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white py-3 rounded-xl font-medium text-sm transition shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2 cursor-pointer"
+                          className="mt-4 w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white py-3.5 rounded-2xl font-bold text-sm transition shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2 cursor-pointer active:scale-98"
                         >
                           {isBulkPublishing ? (
                             <>
                               <RefreshCw className="w-4 h-4 animate-spin" />
-                              <span>Uploading {bulkProgress.current}/{bulkProgress.total} items...</span>
+                              <span>Uploading {bulkProgress.current} / {bulkProgress.total}...</span>
                             </>
                           ) : (
-                            <span>Publish All {bulkFiles.length} Elements to Cloud</span>
+                            <>
+                              <UploadCloud className="w-4 h-4" />
+                              <span>Upload All {bulkFiles.length} Icons</span>
+                            </>
                           )}
                         </button>
                       </div>
@@ -8466,6 +9106,192 @@ export default function App() {
                 </div>
               </div>
             )}
+
+            {/* PROTECTED MASTER ADMIN PANEL AT THE BOTTOM */}
+            <div className={`mt-10 pt-8 border-t transition-all ${
+              appTheme === 'dark' ? 'border-[#22242c]' : 'border-slate-200'
+            }`}>
+              {!isAdminPanelUnlocked ? (
+                /* LOCKED STATE */
+                <div className={`p-5 sm:p-7 rounded-2xl sm:rounded-3xl border transition-all ${
+                  appTheme === 'dark' 
+                    ? 'bg-[#121316]/95 border-[#22242c] shadow-2xl' 
+                    : 'bg-slate-50 border-slate-200 shadow-md'
+                }`}>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5 pb-4 border-b border-slate-700/20">
+                    <div className="flex items-center gap-3.5">
+                      <div className={`p-2.5 sm:p-3 rounded-2xl ${
+                        appTheme === 'dark' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' : 'bg-purple-100 text-purple-700 border border-purple-200'
+                      }`}>
+                        <Lock className="w-5 h-5 sm:w-6 sm:h-6" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-base sm:text-lg font-bold">Admin Panel</h3>
+                          <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/25">
+                            Password Protected
+                          </span>
+                        </div>
+                        <p className={`text-xs mt-0.5 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                          Master password enter karein categories aur edit defaults controls unlock karne ke liye
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <form onSubmit={handleUnlockAdminPanel} className="space-y-3.5 max-w-md">
+                    <div>
+                      <label className={`block text-xs font-semibold mb-1.5 ${
+                        appTheme === 'dark' ? 'text-slate-300' : 'text-slate-700'
+                      }`}>
+                        Admin Master Password
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showAdminPassword ? "text" : "password"}
+                          value={adminPasswordInput}
+                          onChange={(e) => {
+                            setAdminPasswordInput(e.target.value);
+                            if (adminPasswordError) setAdminPasswordError('');
+                          }}
+                          placeholder="Enter admin password..."
+                          className={`w-full px-4 py-2.5 pr-11 rounded-xl text-xs sm:text-sm border outline-none transition ${
+                            appTheme === 'dark'
+                              ? 'bg-[#18191f] border-[#2b2d37] text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500/50'
+                              : 'bg-white border-slate-300 text-slate-900 focus:border-purple-600 focus:ring-1 focus:ring-purple-600/50'
+                          } ${adminPasswordError ? 'border-rose-500 ring-1 ring-rose-500' : ''}`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowAdminPassword(!showAdminPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition p-1 cursor-pointer"
+                          title={showAdminPassword ? "Hide password" : "Show password"}
+                        >
+                          {showAdminPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                      {adminPasswordError && (
+                        <p className="text-xs text-rose-400 mt-2 flex items-center gap-1.5 font-medium animate-fadeIn">
+                          <span>{adminPasswordError}</span>
+                        </p>
+                      )}
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="px-5 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-lg shadow-purple-600/30 transition cursor-pointer flex items-center gap-2 active:scale-95"
+                    >
+                      <KeyRound className="w-4 h-4" />
+                      <span>Unlock Admin Panel</span>
+                    </button>
+                  </form>
+                </div>
+              ) : (
+                /* UNLOCKED STATE */
+                <div className={`p-5 sm:p-7 rounded-2xl sm:rounded-3xl border transition-all ${
+                  appTheme === 'dark' 
+                    ? 'bg-gradient-to-b from-[#18152e] to-[#121316] border-purple-500/30 shadow-2xl' 
+                    : 'bg-purple-50/60 border-purple-200 shadow-md'
+                }`}>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-purple-500/20 mb-5">
+                    <div className="flex items-center gap-3.5">
+                      <div className="p-2.5 sm:p-3 rounded-2xl bg-purple-500/20 text-purple-300 border border-purple-500/35 shadow-inner">
+                        <Unlock className="w-5 h-5 sm:w-6 sm:h-6 text-purple-300" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-base sm:text-lg font-bold">Admin Panel</h3>
+                          <span className="text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                            Unlocked
+                          </span>
+                        </div>
+                        <p className={`text-xs mt-0.5 ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-600'}`}>
+                          Admin controls unlocked. Categories aur defaults edit options active hain.
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleLockAdminPanel}
+                      className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/60 transition cursor-pointer flex items-center gap-1.5 self-start sm:self-auto active:scale-95"
+                      title="Lock Admin Panel"
+                    >
+                      <Lock className="w-3.5 h-3.5" />
+                      <span>Lock Panel</span>
+                    </button>
+                  </div>
+
+                  {/* UNLOCKED ADMIN ACTIONS */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* ACTION 1: Edit Gallery Defaults */}
+                    <div className={`p-4 sm:p-5 rounded-2xl border flex flex-col justify-between transition ${
+                      appTheme === 'dark' ? 'bg-[#18191f]/90 border-[#2b2d37]' : 'bg-white border-slate-200 shadow-sm'
+                    }`}>
+                      <div>
+                        <div className="flex items-center gap-2.5 mb-2">
+                          <div className="p-2 rounded-xl bg-purple-500/15 text-purple-400 border border-purple-500/30">
+                            <Palette className="w-4 h-4" />
+                          </div>
+                          <h4 className="text-xs sm:text-sm font-bold">Edit Gallery Defaults</h4>
+                        </div>
+                        <p className={`text-xs mb-4 leading-relaxed ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                          Gallery ke kisi bhi icon ko live edit karke permanently default library me update karein.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsGalleryAdminMode(true);
+                          setActiveTab('browse');
+                        }}
+                        className="w-full py-2.5 px-4 rounded-xl text-xs font-bold bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-md shadow-purple-600/30 transition cursor-pointer flex items-center justify-center gap-2 active:scale-95"
+                      >
+                        <Palette className="w-4 h-4" />
+                        <span>Open Gallery Defaults Editor</span>
+                      </button>
+                    </div>
+
+                    {/* ACTION 2: Manage Categories */}
+                    <div className={`p-4 sm:p-5 rounded-2xl border flex flex-col justify-between transition ${
+                      appTheme === 'dark' ? 'bg-[#18191f]/90 border-[#2b2d37]' : 'bg-white border-slate-200 shadow-sm'
+                    }`}>
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2.5">
+                            <div className="p-2 rounded-xl bg-cyan-500/15 text-cyan-400 border border-cyan-500/30">
+                              <Folder className="w-4 h-4" />
+                            </div>
+                            <h4 className="text-xs sm:text-sm font-bold">Manage Categories</h4>
+                          </div>
+                          <span className="px-2 py-0.5 rounded-md text-[10px] bg-slate-800 text-cyan-400 font-bold border border-slate-700">
+                            {allAvailableCategories.length} Categories
+                          </span>
+                        </div>
+                        <p className={`text-xs mb-4 leading-relaxed ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                          Custom categories add, rename ya delete karein jisse gallery filter dynamically update ho sake.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAdminSection(adminSection === 'categories' ? 'upload' : 'categories');
+                        }}
+                        className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold border transition cursor-pointer flex items-center justify-center gap-2 active:scale-95 ${
+                          adminSection === 'categories'
+                            ? 'bg-blue-600 text-white border-blue-500 shadow-md'
+                            : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+                        }`}
+                      >
+                        <Folder className="w-4 h-4" />
+                        <span>{adminSection === 'categories' ? 'Close Categories' : 'Open Categories Manager'}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         ) : activeTab === 'blog' ? (
           <BlogView
@@ -8476,6 +9302,22 @@ export default function App() {
           <LicenseView
             appTheme={appTheme}
             onOpenStudio={() => setActiveTab('browse')}
+          />
+        ) : activeTab === 'settings' ? (
+          <SettingsView
+            appTheme={appTheme}
+            setAppTheme={setAppTheme}
+            exportFormat={exportFormat}
+            setExportFormat={setExportFormat}
+            exportSize={exportSize}
+            setExportSize={setExportSize}
+            elements={elements}
+            setElements={setElements}
+            onBack={() => setActiveTab('browse')}
+            onOpenLicense={() => setActiveTab('license')}
+            onOpenStudio={() => {
+              handleOpenEmptyStudio();
+            }}
           />
         ) : (
           /* Browse Gallery with Left Sidebar Categories/Filters */
@@ -8498,7 +9340,7 @@ export default function App() {
                       )}
                     </div>
                     <p className="text-xs text-purple-200/90 mt-0.5">
-                      Cards ke top-right me <strong className="text-rose-400">Trash</strong> dabakar delete mark karein, fir <strong className="text-emerald-400">"Save Changes"</strong> dabakar Supabase se permanently delete karein.
+                      Cards ke top-right me <strong className="text-purple-300">Pencil (Edit)</strong> dabakar Name, Title, Description, Category aur Tags badlein. <strong className="text-rose-400">Trash</strong> dabakar delete mark karein.
                     </p>
                     {galleryAdminToast && (
                       <p className="text-xs text-emerald-400 font-semibold mt-1 flex items-center gap-1.5 animate-fadeIn">
@@ -8510,7 +9352,7 @@ export default function App() {
                 </div>
 
                 <div className="flex items-center gap-2.5 flex-wrap">
-                  {/* Save Changes Button (Deletes marked items from Supabase & local state) */}
+                  {/* Save Changes Button (Deletes marked items from local state & cloud) */}
                   <button
                     type="button"
                     onClick={handleSaveGalleryDeletions}
@@ -8520,12 +9362,12 @@ export default function App() {
                         ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-600/30 ring-2 ring-rose-400/50 cursor-pointer active:scale-95'
                         : 'bg-slate-800/80 text-slate-500 border border-slate-700/50 cursor-not-allowed'
                     }`}
-                    title={pendingDeletedIds.length > 0 ? "Save and permanently delete marked items from Supabase" : "Mark cards using the trash icon to delete"}
+                    title={pendingDeletedIds.length > 0 ? "Save and permanently delete marked items" : "Mark cards using the trash icon to delete"}
                   >
                     {isSavingGalleryDeletions ? (
                       <>
                         <Loader2 className="w-4 h-4 animate-spin text-white" />
-                        <span>Deleting from Supabase...</span>
+                        <span>Deleting...</span>
                       </>
                     ) : (
                       <>
@@ -8570,14 +9412,19 @@ export default function App() {
               </div>
             )}
 
-            <div className="flex flex-col md:flex-row items-start justify-center gap-5 lg:gap-6 w-full mx-auto">
-            {/* Left Sidebar: Filters & Categories (Desktop only: on mobile, horizontal pill bar is used) */}
+            <div className="flex flex-col md:flex-row items-start justify-center gap-5 lg:gap-6 w-full max-w-full mx-auto min-w-0">
+            {/* Left Sidebar: Filters & Categories (Desktop sticky sidebar follows scroll alongside gallery items) */}
             <aside 
-              className="hidden md:block w-full md:w-56 lg:w-60 flex-shrink-0 md:sticky md:top-20 overscroll-contain"
+              className="hidden md:block w-full md:w-56 lg:w-60 flex-shrink-0 md:sticky md:top-[84px] md:self-start z-20 overscroll-contain"
               onWheel={(e) => {
                 if (filtersScrollRef.current) {
-                  filtersScrollRef.current.scrollTop += e.deltaY;
-                  e.stopPropagation();
+                  const el = filtersScrollRef.current;
+                  const canScrollUp = el.scrollTop > 0;
+                  const canScrollDown = el.scrollTop + el.clientHeight < el.scrollHeight;
+                  if ((e.deltaY > 0 && canScrollDown) || (e.deltaY < 0 && canScrollUp)) {
+                    el.scrollTop += e.deltaY;
+                    e.stopPropagation();
+                  }
                 }
               }}
             >
@@ -8638,9 +9485,14 @@ export default function App() {
                   onMouseUp={handleFiltersMouseUp}
                   onMouseLeave={handleFiltersMouseUp}
                   onWheel={(e) => {
-                    e.stopPropagation();
+                    const el = e.currentTarget;
+                    const canScrollUp = el.scrollTop > 0;
+                    const canScrollDown = el.scrollTop + el.clientHeight < el.scrollHeight;
+                    if ((e.deltaY > 0 && canScrollDown) || (e.deltaY < 0 && canScrollUp)) {
+                      e.stopPropagation();
+                    }
                   }}
-                  className={`${mobileFilterOpen ? 'flex' : 'hidden'} md:flex flex-col gap-1.5 mt-3 max-h-[60vh] md:max-h-[calc(100vh-220px)] overflow-y-auto overscroll-contain pr-1 scrollbar-thin cursor-grab active:cursor-grabbing select-none`}
+                  className={`${mobileFilterOpen ? 'flex' : 'hidden'} md:flex flex-col gap-1.5 mt-3 max-h-[60vh] md:max-h-[calc(100vh-190px)] overflow-y-auto overscroll-contain pr-1 scrollbar-thin cursor-grab active:cursor-grabbing select-none`}
                 >
                   {categories.map((cat) => {
                     const isFavCat = cat === 'Favorites';
@@ -8714,6 +9566,67 @@ export default function App() {
                       </button>
                     );
                   })}
+
+                  {/* Dedicated Icon Packs Section */}
+                  <div className="pt-3 mt-2 border-t border-slate-200 dark:border-slate-800/80">
+                    <div className="flex items-center justify-between px-1 mb-2">
+                      <div className="flex items-center gap-1.5">
+                        <Package className="w-3.5 h-3.5 text-purple-400" />
+                        <h4 className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                          Packs ({availablePacks.length})
+                        </h4>
+                      </div>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold bg-purple-500/10 text-purple-400 border border-purple-500/20 uppercase tracking-wider">
+                        Curated
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      {availablePacks.map((packName) => {
+                        const isSelected = selectedCategory === packName;
+                        const count = elements.filter(e => e.pack === packName || e.category === packName).length;
+                        return (
+                          <button
+                            key={packName}
+                            type="button"
+                            onClick={() => {
+                              if (hasDraggedFiltersRef.current) return;
+                              setSelectedCategory(packName);
+                              setMobileFilterOpen(false);
+                            }}
+                            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs sm:text-sm font-semibold border transition-all duration-150 group text-left ${
+                              isSelected
+                                ? 'bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 border-purple-500 text-white shadow-md shadow-purple-600/30'
+                                : appTheme === 'dark'
+                                  ? 'text-slate-300 border-transparent hover:text-white hover:bg-slate-800/80'
+                                  : 'text-slate-700 border-transparent hover:text-slate-900 hover:bg-slate-100'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <span className={`p-1 rounded-lg ${
+                                isSelected
+                                  ? 'bg-white/20 text-white'
+                                  : appTheme === 'dark' ? 'bg-purple-500/10 text-purple-400 group-hover:bg-purple-500/20' : 'bg-purple-50 text-purple-600'
+                              } transition-colors`}>
+                                {packName === 'Stickman' ? <User className="w-3.5 h-3.5" /> : <Package className="w-3.5 h-3.5" />}
+                              </span>
+                              <span className="truncate">{packName}</span>
+                            </div>
+
+                            <span className={`text-[10px] sm:text-[11px] min-w-[22px] text-center px-1.5 py-0.5 rounded-full font-bold ml-2 flex-shrink-0 tabular-nums transition-colors ${
+                              isSelected
+                                ? 'bg-white/20 text-white'
+                                : appTheme === 'dark'
+                                  ? 'bg-purple-500/15 text-purple-300 border border-purple-500/20'
+                                  : 'bg-purple-50 text-purple-700 border border-purple-200'
+                            }`}>
+                              {count}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               </div>
             </aside>
@@ -8721,7 +9634,7 @@ export default function App() {
             {/* Right Main Content Area: Search Bar + Asset Grid (compact 1180px max-width for narrower cards) */}
             <div className="flex-1 min-w-0 w-full max-w-[1180px] space-y-4 sm:space-y-5">
               {/* Mobile Only: Horizontal Swipeable Category Bar */}
-              <div className="md:hidden flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 hide-scrollbar touch-pan-x whitespace-nowrap">
+              <div className="md:hidden flex items-center gap-2 overflow-x-auto pb-1 mx-0 px-0.5 hide-scrollbar touch-pan-x whitespace-nowrap w-full max-w-full">
                 {categories.map((cat) => {
                   const isFavCat = cat === 'Favorites';
                   const isSelected = selectedCategory === cat;
@@ -8757,10 +9670,42 @@ export default function App() {
                     </button>
                   );
                 })}
+
+                {/* Mobile Packs Pills */}
+                {availablePacks.map((packName) => {
+                  const isSelected = selectedCategory === packName;
+                  const count = elements.filter(e => e.pack === packName || e.category === packName).length;
+                  return (
+                    <button
+                      key={`mob-pack-${packName}`}
+                      type="button"
+                      onClick={() => setSelectedCategory(packName)}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold shrink-0 border transition-all cursor-pointer active:scale-95 ${
+                        isSelected
+                          ? 'bg-gradient-to-r from-purple-600 to-indigo-600 border-purple-500 text-white shadow-md shadow-purple-600/30'
+                          : appTheme === 'dark'
+                            ? 'bg-purple-950/40 border-purple-800/40 text-purple-300 active:bg-purple-900/60'
+                            : 'bg-purple-50 border-purple-200 text-purple-700 active:bg-purple-100 shadow-sm'
+                      }`}
+                    >
+                      <Package className="w-3 h-3 text-purple-400" />
+                      <span>{packName}</span>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                        isSelected
+                          ? 'bg-white/25 text-white'
+                          : appTheme === 'dark' ? 'bg-purple-900/60 text-purple-200' : 'bg-purple-100 text-purple-800'
+                      }`}>
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
 
               {/* Search Bar & Active Stats */}
-              <div className={`p-3 sm:p-4 rounded-2xl border transition shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 ${
+              <div
+                data-gallery-grid-anchor="true"
+                className={`p-3 sm:p-4 rounded-2xl border transition shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 w-full max-w-full min-w-0 ${
                 appTheme === 'dark' ? 'bg-[#18191f] border-[#22242c]' : 'bg-white border-slate-200 shadow-sm'
               }`}>
                 {/* Search Input */}
@@ -8788,32 +9733,197 @@ export default function App() {
                   )}
                 </div>
 
-                {/* Active Category & Results Count Badge */}
-                <div className="flex items-center justify-between sm:justify-end gap-2 flex-shrink-0 text-xs">
+                {/* Active Category / Pack & Results Count Badge */}
+                <div className="flex items-center justify-between sm:justify-end gap-2 flex-wrap text-xs w-full sm:w-auto min-w-0">
                   <span className={`px-3 py-1.5 rounded-xl font-medium border ${
                     appTheme === 'dark'
                       ? 'bg-[#121316] border-[#22242c] text-slate-400'
                       : 'bg-slate-100 border-slate-200 text-slate-600'
                   }`}>
-                    Category: <strong className={appTheme === 'dark' ? 'text-slate-200' : 'text-slate-800'}>{selectedCategory}</strong>
+                    {availablePacks.includes(selectedCategory) ? 'Pack: ' : 'Category: '}
+                    <strong className={appTheme === 'dark' ? 'text-slate-200' : 'text-slate-800'}>{selectedCategory}</strong>
                   </span>
                   <span className={`px-2.5 py-1.5 rounded-xl font-bold ${
                     appTheme === 'dark' ? 'bg-[#0e2736] text-[#38bdf8] border border-cyan-800/40' : 'bg-blue-50 text-blue-600 border border-blue-100'
                   }`}>
-                    {filteredElements.length > 50 && visibleCount < filteredElements.length
+                    {isGalleryLoading ? (
+                      <span className="inline-flex items-center gap-1.5 animate-pulse text-[11px]">
+                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
+                        Syncing assets...
+                      </span>
+                    ) : filteredElements.length > 50 && visibleCount < filteredElements.length
                       ? `Showing ${displayedElements.length} of ${filteredElements.length} elements`
                       : `${filteredElements.length} ${filteredElements.length === 1 ? 'element' : 'elements'}`}
                   </span>
                 </div>
               </div>
 
+              {/* Mobile Pull-to-Refresh: Small round animation right below search bar */}
+              <div
+                className={`md:hidden flex items-center justify-center transition-all duration-300 ease-out overflow-hidden w-full ${
+                  pullDistance > 0 || isPullRefreshing
+                    ? 'opacity-100 py-1.5'
+                    : 'h-0 opacity-0 py-0 pointer-events-none'
+                }`}
+                style={{
+                  height: isPullRefreshing ? '46px' : `${Math.min(pullDistance, 48)}px`,
+                }}
+              >
+                <div
+                  className={`w-9 h-9 rounded-full flex items-center justify-center shadow-lg border transition-all duration-150 ${
+                    appTheme === 'dark'
+                      ? 'bg-[#1e2029] border-[#2f3242] text-cyan-400 shadow-black/60'
+                      : 'bg-white border-slate-200 text-blue-600 shadow-slate-300'
+                  } ${isPullRefreshing ? (appTheme === 'dark' ? 'ring-2 ring-cyan-500/50 scale-100' : 'ring-2 ring-blue-500/40 scale-100') : 'scale-95'}`}
+                  style={{
+                    transform: isPullRefreshing
+                      ? 'scale(1)'
+                      : `rotate(${pullDistance * 6}deg) scale(${Math.min(1, 0.65 + pullDistance / 100)})`,
+                  }}
+                >
+                  <RefreshCw
+                    className={`w-4 h-4 ${
+                      isPullRefreshing
+                        ? (appTheme === 'dark' ? 'animate-spin text-cyan-400' : 'animate-spin text-blue-600')
+                        : (appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500')
+                    }`}
+                  />
+                </div>
+              </div>
+
               {/* Asset Grid: Exactly 2 columns on mobile, 3 on tablet, 4-5 on desktop */}
-              <div className="gallery-grid-responsive min-h-[580px]">
-                {displayedElements.map((item) => {
-                  const isFav = favorites.includes(item.id);
-                  const isMarkedForDelete = pendingDeletedIds.includes(item.id);
-                  return (
+              <div className="gallery-grid-responsive grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-3.5 items-start content-start min-h-[580px] w-full max-w-full min-w-0">
+
+                {isGalleryLoading ? (
+                  // Smooth Glass Skeleton Cards (15 placeholders for immediate zero-shift rendering)
+                  Array.from({ length: 15 }).map((_, idx) => (
                     <div
+                      key={`skeleton-card-${idx}`}
+                      className={`border rounded-xl p-2 sm:p-3 flex flex-col items-center relative w-full min-w-0 skeleton-shimmer isolate [contain:paint_layout] transition-all duration-300 ${
+                        appTheme === 'dark'
+                          ? 'bg-[#18191f] border-[#22242c]'
+                          : 'bg-white border-slate-200'
+                      }`}
+                    >
+                      {/* Top mini placeholder */}
+                      <div className="w-full flex justify-between items-center mb-2 px-0.5">
+                        <div className={`w-3.5 h-3.5 rounded-md ${appTheme === 'dark' ? 'bg-slate-800/60' : 'bg-slate-100'}`} />
+                        <div className={`w-8 h-2.5 rounded-full ${appTheme === 'dark' ? 'bg-slate-800/50' : 'bg-slate-100'}`} />
+                      </div>
+
+                      {/* Graphic Artboard Center Placeholder */}
+                      <div className={`w-full h-20 sm:h-28 rounded-lg flex items-center justify-center relative overflow-hidden mb-1 ${
+                        appTheme === 'dark'
+                          ? 'bg-[#14151a]'
+                          : 'bg-slate-50'
+                      }`}>
+                        <div className={`w-12 h-12 sm:w-16 sm:h-16 rounded-2xl ${
+                          appTheme === 'dark' ? 'bg-[#22242f]/80' : 'bg-slate-200/90'
+                        }`} />
+                      </div>
+
+                      {/* Title Bar Placeholder */}
+                      <div className={`h-3 w-3/4 rounded-full mt-2 sm:mt-2.5 ${
+                        appTheme === 'dark' ? 'bg-slate-700/60' : 'bg-slate-200'
+                      }`} />
+
+                      {/* Category / Download Bar Placeholder */}
+                      <div className={`h-2.5 w-1/2 rounded-full mt-1.5 ${
+                        appTheme === 'dark' ? 'bg-slate-800/80' : 'bg-slate-100'
+                      }`} />
+                    </div>
+                  ))
+                ) : (
+                  displayedElements.map((item) => {
+                    // Highlighted Curated Pack Showcase Card
+                    if (item.isPackCard) {
+                      return (
+                        <div
+                          key={item.id}
+                          onClick={() => {
+                            setSelectedCategory(item.packName);
+                            try {
+                              const anchorEl = document.querySelector('[data-gallery-grid-anchor]');
+                              if (anchorEl) {
+                                anchorEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                              } else {
+                                window.scrollTo({ top: 380, behavior: 'smooth' });
+                              }
+                            } catch (_) {
+                              window.scrollTo({ top: 380, behavior: 'smooth' });
+                            }
+                          }}
+                          className={`group gallery-card-item border-2 rounded-2xl p-2.5 sm:p-3 flex flex-col justify-between items-center cursor-pointer transition-all duration-300 ease-out md:hover:-translate-y-2 md:hover:scale-[1.02] md:active:scale-95 touch-manipulation transform-gpu will-change-transform isolate [backface-visibility:hidden] [transform:translateZ(0)] [contain:paint_layout] relative w-full min-w-0 overflow-hidden shadow-lg ${
+                            appTheme === 'dark'
+                              ? 'bg-gradient-to-br from-[#1d1336] via-[#161726] to-[#0e1628] border-purple-500/70 md:hover:border-purple-400 ring-1 ring-purple-500/30 md:hover:shadow-[0_16px_36px_-6px_rgba(168,85,247,0.45),0_0_24px_rgba(168,85,247,0.3)]'
+                              : 'bg-gradient-to-br from-purple-50 via-indigo-50/60 to-blue-50 border-purple-400 md:hover:border-purple-600 ring-1 ring-purple-300/50 md:hover:shadow-[0_16px_32px_-6px_rgba(147,51,234,0.25)]'
+                          }`}
+                          title={`Click to explore full ${item.packName} Pack (${item.totalCount} icons)`}
+                        >
+                          {/* Ambient glow effects */}
+                          <div className="absolute -top-10 -right-10 w-28 h-28 bg-purple-500/20 rounded-full blur-2xl pointer-events-none md:group-hover:scale-125 transition-transform duration-500" />
+                          <div className="absolute -bottom-8 -left-8 w-24 h-24 bg-cyan-500/15 rounded-full blur-xl pointer-events-none md:group-hover:scale-125 transition-transform duration-500" />
+
+                          {/* Top Badges */}
+                          <div className="w-full flex items-center justify-between mb-1.5 z-10">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-extrabold uppercase tracking-wider bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-sm shadow-purple-600/30">
+                              <Sparkles className="w-2.5 h-2.5 text-amber-300 animate-pulse" />
+                              Full Pack
+                            </span>
+                            <span className={`text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
+                              appTheme === 'dark' ? 'bg-purple-950/80 text-purple-300 border border-purple-800/60' : 'bg-purple-100 text-purple-700 border border-purple-200'
+                            }`}>
+                              {item.totalCount} icons
+                            </span>
+                          </div>
+
+                          {/* 2x2 Mini Preview Mosaic Artboard */}
+                          <div className={`w-full h-20 sm:h-28 rounded-xl p-1 sm:p-1.5 mb-1.5 grid grid-cols-2 gap-1 items-center justify-center relative overflow-hidden transition-colors ${
+                            appTheme === 'dark' ? 'bg-[#0b0c13]/90 border border-purple-500/25 md:group-hover:border-purple-500/50' : 'bg-white/95 border border-purple-200/90 shadow-inner'
+                          }`}>
+                            {(item.previewItems || []).slice(0, 4).map((prevItem, pIdx) => (
+                              <div
+                                key={`pack-prev-${item.packName}-${pIdx}`}
+                                className={`w-full h-full flex items-center justify-center p-0.5 rounded-lg transition-transform md:group-hover:scale-105 duration-200 overflow-hidden ${
+                                  appTheme === 'dark' ? 'bg-slate-900/50' : 'bg-slate-50'
+                                } [&>svg]:w-auto [&>svg]:h-full [&>svg]:max-w-full [&>svg]:max-h-full [&>svg]:block [&>svg]:mx-auto`}
+                                dangerouslySetInnerHTML={{
+                                  __html: scopeSvgIds(
+                                    normalizeForeignObjectSvg(prevItem.originalSvgCode || prevItem.svgCode),
+                                    `pack_thumb_${pIdx}_`
+                                  )
+                                }}
+                              />
+                            ))}
+                          </div>
+
+                          {/* Title & Info */}
+                          <div className="w-full text-center z-10 flex flex-col items-center">
+                            <h3 className={`font-bold text-[11px] sm:text-[13px] truncate w-full px-0.5 flex items-center justify-center gap-1 ${
+                              appTheme === 'dark' ? 'text-white' : 'text-slate-900'
+                            }`}>
+                              <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-indigo-300 bg-clip-text text-transparent font-extrabold">
+                                {item.title}
+                              </span>
+                            </h3>
+
+                            {/* Explore Full Pack Button Badge */}
+                            <div className="mt-1.5 w-full">
+                              <div className="w-full py-1 sm:py-1.5 px-2 rounded-lg sm:rounded-xl text-[10px] sm:text-[11px] font-bold bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 md:group-hover:from-purple-500 md:group-hover:to-blue-500 text-white shadow-md shadow-purple-600/30 flex items-center justify-center gap-1.5 transition-all">
+                                <Package className="w-3 h-3 text-purple-200" />
+                                <span>Open Full Pack</span>
+                                <ChevronRight className="w-3 h-3 md:group-hover:translate-x-0.5 transition-transform" />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    const isFav = favorites.includes(item.id);
+                    const isMarkedForDelete = pendingDeletedIds.includes(item.id);
+                    return (
+                      <div
                       key={item.id}
                       onClick={() => {
                         if (isMarkedForDelete) {
@@ -8826,12 +9936,12 @@ export default function App() {
                           setDetailModalAsset(item);
                         }
                       }}
-                      className={`group border rounded-xl p-2 sm:p-3 flex flex-col items-center cursor-pointer transition-transform transition-shadow duration-200 ease-out hover:-translate-y-2 active:scale-95 touch-manipulation transform-gpu will-change-transform isolate [backface-visibility:hidden] [transform:translateZ(0)] [contain:paint_layout] relative w-full min-w-0 ${
+                      className={`group gallery-card-item border rounded-xl p-2 sm:p-3 flex flex-col items-center cursor-pointer transition-transform transition-shadow duration-200 ease-out md:hover:-translate-y-2 md:active:scale-95 touch-manipulation transform-gpu will-change-transform isolate [backface-visibility:hidden] [transform:translateZ(0)] [contain:paint_layout] relative w-full min-w-0 ${
                         isMarkedForDelete
                           ? 'border-rose-500/90 bg-rose-950/30 opacity-75 ring-2 ring-rose-500/50 scale-[0.98]'
                           : appTheme === 'dark'
-                            ? 'bg-[#18191f] border-[#22242c] hover:border-[#38bdf8]/60 hover:bg-[#1e2029] shadow-sm hover:shadow-[0_16px_32px_-6px_rgba(0,0,0,0.7),0_8px_16px_-4px_rgba(0,0,0,0.5)]'
-                            : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-white shadow-sm hover:shadow-[0_16px_32px_-6px_rgba(0,0,0,0.14),0_8px_16px_-4px_rgba(0,0,0,0.08)]'
+                            ? 'bg-[#18191f] border-[#22242c] md:hover:border-[#38bdf8]/60 md:hover:bg-[#1e2029] shadow-sm md:hover:shadow-[0_16px_32px_-6px_rgba(0,0,0,0.7),0_8px_16px_-4px_rgba(0,0,0,0.5)]'
+                            : 'bg-white border-slate-200 md:hover:border-slate-300 md:hover:bg-white shadow-sm md:hover:shadow-[0_16px_32px_-6px_rgba(0,0,0,0.14),0_8px_16px_-4px_rgba(0,0,0,0.08)]'
                       }`}
                     >
                       {/* Favorite Toggle Button (top-left) */}
@@ -8850,27 +9960,43 @@ export default function App() {
                         <Heart className={`w-3.5 h-3.5 ${isFav ? 'fill-rose-500 text-rose-500' : ''}`} />
                       </button>
 
-                      {/* Delete Button (Shown ONLY when isGalleryAdminMode is true, positioned at top-right) */}
+                      {/* Admin Controls (Shown ONLY when isGalleryAdminMode is true, positioned at top-right) */}
                       {isGalleryAdminMode && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setPendingDeletedIds(prev =>
-                              prev.includes(item.id)
-                                ? prev.filter(x => x !== item.id)
-                                : [...prev, item.id]
-                            );
-                          }}
-                          title={isMarkedForDelete ? "Undo deletion" : "Mark for deletion"}
-                          className={`absolute top-1.5 right-1.5 p-1.5 rounded-lg transition-all duration-150 z-20 cursor-pointer shadow-md ${
-                            isMarkedForDelete
-                              ? 'bg-rose-600 text-white ring-2 ring-white/50 scale-110 opacity-100'
-                              : 'bg-rose-500/15 text-rose-400 border border-rose-500/40 hover:bg-rose-600 hover:text-white hover:scale-105'
-                          }`}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="absolute top-1.5 right-1.5 flex items-center gap-1 z-20">
+                          {/* Edit Details Button (Name, Description, Category, Tags) */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenEditAssetModal(item);
+                            }}
+                            title="Edit Name, Description, Category & Tags"
+                            className="p-1.5 rounded-lg transition-all duration-150 cursor-pointer shadow-md bg-purple-600 hover:bg-purple-500 text-white hover:scale-105 active:scale-95"
+                          >
+                            <Edit2 className="w-3.5 h-3.5 text-white" />
+                          </button>
+
+                          {/* Delete Button */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPendingDeletedIds(prev =>
+                                prev.includes(item.id)
+                                  ? prev.filter(x => x !== item.id)
+                                  : [...prev, item.id]
+                              );
+                            }}
+                            title={isMarkedForDelete ? "Undo deletion" : "Mark for deletion"}
+                            className={`p-1.5 rounded-lg transition-all duration-150 cursor-pointer shadow-md ${
+                              isMarkedForDelete
+                                ? 'bg-rose-600 text-white ring-2 ring-white/50 scale-110 opacity-100'
+                                : 'bg-rose-500/15 text-rose-400 border border-rose-500/40 hover:bg-rose-600 hover:text-white hover:scale-105'
+                            }`}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       )}
 
                       {/* Marked for Delete Visual Overlay Indicator */}
@@ -8906,7 +10032,8 @@ export default function App() {
                       </div>
                     </div>
                   );
-                })}
+                })
+              )}
 
               </div>
 
@@ -8961,9 +10088,10 @@ export default function App() {
       )}
       </main>
 
-      {/* Website Footer */}
-      <footer className={`border-t mt-12 py-10 transition-colors ${appTheme === 'dark' ? 'bg-[#121316] border-[#1f2128] text-slate-400' : 'bg-white border-slate-200 text-slate-600'
-        }`}>
+      {/* Website Footer (Hidden in APK app and on mobile view) */}
+      {!isNativeApp && isDesktopScreen && (
+        <footer className={`border-t mt-12 py-10 transition-colors ${appTheme === 'dark' ? 'bg-[#121316] border-[#1f2128] text-slate-400' : 'bg-white border-slate-200 text-slate-600'
+          }`}>
         <div className="max-w-[1780px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
             {/* Brand Col */}
@@ -9053,6 +10181,7 @@ export default function App() {
           </div>
         </div>
       </footer>
+      )}
 
       {/* Full-Screen Immersive Studio Workspace */}
       {selectedAsset && (
@@ -9147,16 +10276,18 @@ export default function App() {
               </button>
 
               {/* Favorite Toggle inside Studio (Desktop / Tablet) */}
-              <button
-                onClick={() => toggleFavorite(selectedAsset.id)}
-                title={favorites.includes(selectedAsset.id) ? "Saved to Favorites" : "Save to Favorites"}
-                className={`hidden sm:flex p-1.5 sm:p-2 rounded-xl border transition items-center justify-center ${favorites.includes(selectedAsset.id)
-                  ? 'bg-rose-500/20 border-rose-500/40 text-rose-500'
-                  : appTheme === 'dark' ? 'bg-slate-900 border-slate-800 text-slate-400 hover:text-rose-400' : 'bg-slate-100 border-slate-200 text-slate-500 hover:text-rose-500'
-                  }`}
-              >
-                <Heart className={`w-3.5 h-3.5 ${favorites.includes(selectedAsset.id) ? 'fill-rose-500 text-rose-500' : ''}`} />
-              </button>
+              {!selectedAsset?.isEmptyCanvas && (
+                <button
+                  onClick={() => toggleFavorite(selectedAsset.id)}
+                  title={favorites.includes(selectedAsset.id) ? "Saved to Favorites" : "Save to Favorites"}
+                  className={`hidden sm:flex p-1.5 sm:p-2 rounded-xl border transition items-center justify-center ${favorites.includes(selectedAsset.id)
+                    ? 'bg-rose-500/20 border-rose-500/40 text-rose-500'
+                    : appTheme === 'dark' ? 'bg-slate-900 border-slate-800 text-slate-400 hover:text-rose-400' : 'bg-slate-100 border-slate-200 text-slate-500 hover:text-rose-500'
+                    }`}
+                >
+                  <Heart className={`w-3.5 h-3.5 ${favorites.includes(selectedAsset.id) ? 'fill-rose-500 text-rose-500' : ''}`} />
+                </button>
+              )}
 
               {/* Reset All button */}
               <button
@@ -9172,7 +10303,7 @@ export default function App() {
               </button>
 
               {/* Save Default to Gallery (Admin Feature - Only visible in Gallery Admin Mode) */}
-              {isGalleryAdminMode && (
+              {!selectedAsset?.isEmptyCanvas && isGalleryAdminMode && (
                 <button
                   onClick={handleSaveDefaultToGallery}
                   disabled={isSavingGalleryDefault}
@@ -9200,14 +10331,19 @@ export default function App() {
               {/* Add Element from Library Button */}
               <button
                 onClick={() => setIsAddElementModalOpen(true)}
-                title="Add another element from library to this canvas"
-                className={`text-xs flex items-center gap-1 sm:gap-1.5 p-1.5 sm:px-3 sm:py-1.5 rounded-xl border font-semibold transition ${appTheme === 'dark'
-                  ? 'bg-cyan-500/15 border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/25 hover:border-cyan-400'
-                  : 'bg-blue-50 border-blue-200 text-blue-600 hover:bg-blue-100'
-                  }`}
+                title="Add element from gallery to canvas"
+                className={`text-xs flex items-center gap-1 sm:gap-1.5 p-1.5 sm:px-3 sm:py-1.5 rounded-xl border font-bold transition ${
+                  selectedAsset?.isEmptyCanvas
+                    ? 'bg-cyan-500 text-slate-950 border-cyan-400 shadow-md shadow-cyan-500/30'
+                    : appTheme === 'dark'
+                      ? 'bg-cyan-500/15 border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/25 hover:border-cyan-400'
+                      : 'bg-blue-50 border-blue-200 text-blue-600 hover:bg-blue-100'
+                }`}
               >
-                <PlusCircle className="w-3.5 h-3.5 text-cyan-400" />
-                <span className="hidden xs:inline">Add Element</span>
+                <PlusCircle className={`w-3.5 h-3.5 ${selectedAsset?.isEmptyCanvas ? 'text-slate-950 stroke-[2.5]' : 'text-cyan-400'}`} />
+                <span className="inline">
+                  {selectedAsset?.isEmptyCanvas ? 'Add from Gallery' : 'Add Element'}
+                </span>
               </button>
 
               {/* Export Button with Quality & Resolution Dropdown */}
@@ -9228,25 +10364,53 @@ export default function App() {
                 </button>
 
                 {isExportDropdownOpen && (
-                  <div className={`absolute right-0 top-full mt-2 w-72 sm:w-80 rounded-2xl shadow-2xl border p-3.5 z-50 animate-in fade-in zoom-in-95 duration-150 backdrop-blur-xl ${appTheme === 'dark'
-                    ? 'bg-[#0d1527]/98 border-slate-700/80 text-slate-100 shadow-black/80'
-                    : 'bg-white/98 border-slate-200 text-slate-900 shadow-slate-300'
-                    }`}>
-                    {/* Header */}
-                    <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-slate-700/30">
-                      <div>
-                        <h4 className="text-xs font-bold flex items-center gap-1.5">
-                          <Download className="w-3.5 h-3.5 text-emerald-400" />
-                          <span>Select Export Quality</span>
-                        </h4>
-                        <p className={`text-[10px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
-                          Choose resolution from 128px to 8K
-                        </p>
+                  <ModalPortal isMobile={!isDesktopScreen}>
+                    {!isDesktopScreen && (
+                      <div
+                        onClick={() => setIsExportDropdownOpen(false)}
+                        className="fixed inset-0 z-[99998] bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
+                      />
+                    )}
+                    <div className={
+                      !isDesktopScreen
+                        ? `fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100vw-32px)] max-w-sm max-h-[85vh] overflow-y-auto no-scrollbar rounded-3xl shadow-2xl border p-4 z-[99999] animate-in zoom-in-95 fade-in duration-200 backdrop-blur-2xl ${
+                            appTheme === 'dark'
+                              ? 'bg-[#0d1527] border-slate-700/80 text-slate-100 shadow-black/90'
+                              : 'bg-white border-slate-200 text-slate-900 shadow-slate-400'
+                          }`
+                        : `absolute right-0 top-full mt-2 w-72 sm:w-80 rounded-2xl shadow-2xl border p-3.5 z-50 animate-in fade-in zoom-in-95 duration-150 backdrop-blur-xl ${
+                            appTheme === 'dark'
+                              ? 'bg-[#0d1527]/98 border-slate-700/80 text-slate-100 shadow-black/80'
+                              : 'bg-white/98 border-slate-200 text-slate-900 shadow-slate-300'
+                          }`
+                    }>
+                      {/* Header */}
+                      <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-slate-700/30">
+                        <div>
+                          <h4 className="text-xs font-bold flex items-center gap-1.5">
+                            <Download className="w-3.5 h-3.5 text-emerald-400" />
+                            <span>Select Export Quality</span>
+                          </h4>
+                          <p className={`text-[10px] ${appTheme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                            Choose resolution from 128px to 8K
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                            {exportFormat === 'ico' ? (exportSize >= 256 ? 'Multi-Res Favicon' : `${exportSize}px ICO`) : (exportSize >= 1024 ? `${exportSize / 1024}K Ultra HD` : `${exportSize}px`)}
+                          </span>
+                          {!isDesktopScreen && (
+                            <button
+                              type="button"
+                              onClick={() => setIsExportDropdownOpen(false)}
+                              className="p-1 rounded-lg text-slate-400 hover:text-white"
+                              title="Close"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                        {exportFormat === 'ico' ? (exportSize >= 256 ? 'Multi-Res Favicon' : `${exportSize}px ICO`) : (exportSize >= 1024 ? `${exportSize / 1024}K Ultra HD` : `${exportSize}px`)}
-                      </span>
-                    </div>
 
                     {/* Format Selector Pills */}
                     <div className="mb-3">
@@ -9403,8 +10567,9 @@ export default function App() {
                       </span>
                     </button>
                   </div>
-                )}
-              </div>
+                </ModalPortal>
+              )}
+            </div>
 
               {/* Settings Button - always clearly visible */}
               <button
@@ -9442,7 +10607,16 @@ export default function App() {
                 if (justFinishedPanRef.current || isCtrlShiftDown) return;
                 setActiveSelectedColor(null);
               }}
-              className={`w-full flex-1 h-full min-w-0 relative flex flex-col items-center justify-center p-3 sm:p-6 select-none overflow-hidden transition-colors border-0 touch-none ${isPanning
+              style={
+                !isDesktopScreen && isStudioPanelOpen
+                  ? {
+                      height: `${mobileCanvasHeight}%`,
+                      flex: 'none',
+                      transition: isResizingMobileCanvas ? 'none' : 'height 200ms ease'
+                    }
+                  : undefined
+              }
+              className={`w-full ${!isDesktopScreen && isStudioPanelOpen ? 'min-h-[140px]' : 'flex-1 h-full'} min-w-0 relative flex flex-col items-center justify-center p-2 sm:p-6 select-none overflow-hidden transition-colors border-0 touch-none ${isPanning
                 ? 'cursor-grabbing select-none'
                 : isCtrlShiftDown
                   ? 'cursor-grab'
@@ -9731,13 +10905,35 @@ export default function App() {
                   }}
                   className="inline-flex items-center justify-center pointer-events-auto overflow-visible"
                 >
-                  {/* Floating SVG Icon or Background Badge Shape with Interactive Selection, Custom Dimensions & Smooth Zoom */}
-                  <div
-                    className={
-                      (!exportProgress && adjustments.is3DFloating && adjustments.animPreset !== 'none')
-                        ? getPresetAnimClass(adjustments.animPreset || 'float')
-                        : ''
-                    }
+                  {/* Empty Canvas Prompt / Add From Gallery Placeholder */}
+                  {selectedAsset?.isEmptyCanvas && (!customCanvasObjects || customCanvasObjects.length === 0) ? (
+                    <div className="flex flex-col items-center justify-center p-6 sm:p-8 text-center max-w-[280px] xs:max-w-xs sm:max-w-sm rounded-3xl border-2 border-dashed border-cyan-500/40 bg-slate-900/80 backdrop-blur-md shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+                      <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400 mb-3 sm:mb-4 shadow-lg shadow-cyan-500/15">
+                        <PlusCircle className="w-7 h-7 sm:w-8 sm:h-8" />
+                      </div>
+                      <h3 className="text-sm sm:text-base font-bold text-white mb-1">
+                        Canvas Khali Hai
+                      </h3>
+                      <p className="text-[11px] sm:text-xs text-slate-400 mb-4 sm:mb-5 leading-relaxed">
+                        Gallery se koi bhi item choose karein aur yahan live edit &amp; customize karein
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setIsAddElementModalOpen(true)}
+                        className="px-4 sm:px-5 py-2.5 rounded-xl font-bold text-xs bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white shadow-lg shadow-cyan-500/25 flex items-center gap-2 active:scale-95 transition cursor-pointer"
+                      >
+                        <LayoutGrid className="w-4 h-4" />
+                        <span>Add from Gallery</span>
+                      </button>
+                    </div>
+                  ) : (
+                    /* Floating SVG Icon or Background Badge Shape with Interactive Selection, Custom Dimensions & Smooth Zoom */
+                    <div
+                      className={
+                        (!exportProgress && adjustments.is3DFloating && adjustments.animPreset !== 'none')
+                          ? getPresetAnimClass(adjustments.animPreset || 'float')
+                          : ''
+                      }
                     style={{
                       '--anim-speed': `${adjustments.animSpeed || 2.2}s`,
                       '--anim-amp': `${adjustments.animHeight || 16}px`,
@@ -10089,6 +11285,7 @@ export default function App() {
                   )}
                 </div>
               </div>
+            )}
             </div>
 
               {/* Bottom Floating Bar on Canvas (Hidden on mobile UI per user request, visible on tablet/desktop) */}
@@ -10145,10 +11342,11 @@ export default function App() {
                   onPointerDown={(e) => e.stopPropagation()}
                   onTouchStart={(e) => e.stopPropagation()}
                   onClick={(e) => e.stopPropagation()}
-                  className="sm:hidden absolute bottom-3 left-1/2 -translate-x-1/2 z-40 pointer-events-auto flex items-center gap-2.5 p-1.5 px-3.5 bg-slate-900/95 backdrop-blur-md border border-cyan-500/50 rounded-2xl shadow-2xl animate-in slide-in-from-bottom-2 duration-150"
+                  className="sm:hidden absolute bottom-3 left-3 z-40 pointer-events-auto flex items-center gap-2 p-1.5 px-2 bg-slate-900/95 backdrop-blur-md border border-cyan-500/50 rounded-2xl shadow-2xl animate-in slide-in-from-bottom-2 duration-150"
                 >
                   <button
                     type="button"
+                    title="Duplicate Layer"
                     data-no-canvas-click="true"
                     onPointerDown={(e) => e.stopPropagation()}
                     onTouchStart={(e) => e.stopPropagation()}
@@ -10156,13 +11354,13 @@ export default function App() {
                       e.stopPropagation();
                       handleDuplicateSelectedLayers();
                     }}
-                    className="p-1.5 px-3 rounded-xl bg-cyan-500/20 active:bg-cyan-500/40 text-cyan-300 font-bold text-xs flex items-center gap-1.5 shadow-sm active:scale-95 transition-all"
+                    className="p-2 rounded-xl bg-cyan-500/20 active:bg-cyan-500/40 text-cyan-300 flex items-center justify-center shadow-sm active:scale-90 transition-all"
                   >
-                    <Copy className="w-3.5 h-3.5" />
-                    <span>Duplicate</span>
+                    <Copy className="w-4 h-4" />
                   </button>
                   <button
                     type="button"
+                    title="Delete Layer"
                     data-no-canvas-click="true"
                     onPointerDown={(e) => e.stopPropagation()}
                     onTouchStart={(e) => e.stopPropagation()}
@@ -10170,10 +11368,9 @@ export default function App() {
                       e.stopPropagation();
                       handleDeleteSelectedLayers();
                     }}
-                    className="p-1.5 px-3 rounded-xl bg-rose-500/20 active:bg-rose-500/40 text-rose-300 font-bold text-xs flex items-center gap-1.5 shadow-sm active:scale-95 transition-all"
+                    className="p-2 rounded-xl bg-rose-500/20 active:bg-rose-500/40 text-rose-300 flex items-center justify-center shadow-sm active:scale-90 transition-all"
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Delete</span>
+                    <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
               )}
@@ -10220,12 +11417,34 @@ export default function App() {
               )}
             </div>
 
-            {/* Mobile Backdrop when Slide-out Drawer is Open */}
+            {/* Draggable Divider Bar between Canvas and Settings (Mobile view only) */}
             {!isDesktopScreen && isStudioPanelOpen && (
               <div
-                onClick={() => setIsStudioPanelOpen(false)}
-                className="fixed inset-0 z-40 bg-black/60 backdrop-blur-[2px] transition-opacity animate-in fade-in duration-200"
-              />
+                onPointerDown={handleStartResizeMobileCanvas}
+                onTouchStart={handleStartResizeMobileCanvas}
+                onDoubleClick={() => {
+                  setMobileCanvasHeight(40);
+                  try { localStorage.setItem('iconderry_mobile_canvas_height', '40'); } catch { }
+                }}
+                className={`w-full py-1.5 flex items-center justify-center cursor-row-resize select-none relative z-30 touch-none flex-shrink-0 border-y transition-colors ${
+                  isResizingMobileCanvas
+                    ? 'bg-cyan-500/25 border-cyan-500/60'
+                    : appTheme === 'dark'
+                      ? 'bg-[#15171e] border-[#22242c] active:bg-cyan-500/20'
+                      : 'bg-slate-100 border-slate-300 active:bg-cyan-500/20'
+                }`}
+                title="Drag up/down to resize Canvas and Settings • Double-tap to reset (40%)"
+              >
+                <div
+                  className={`rounded-full transition-all ${
+                    isResizingMobileCanvas
+                      ? 'w-16 h-1.5 bg-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.7)]'
+                      : appTheme === 'dark'
+                        ? 'w-12 h-1 bg-slate-500'
+                        : 'w-12 h-1 bg-slate-400'
+                  }`}
+                />
+              </div>
             )}
 
             {/* Draggable Sidebar Resizer Handle (VS Code style - Desktop only, active when drawer is open) */}
@@ -10256,15 +11475,17 @@ export default function App() {
               </div>
             )}
 
-            {/* Invisible overlay while resizing to prevent mouse event loss */}
-            {isResizingSidebar && (
+            {/* Invisible overlay while resizing to prevent mouse/touch event loss */}
+            {(isResizingSidebar || isResizingMobileCanvas) && (
               <div
                 onPointerDown={(e) => e.preventDefault()}
-                className="fixed inset-0 z-50 cursor-col-resize select-none"
+                className={`fixed inset-0 z-50 select-none touch-none ${
+                  isResizingMobileCanvas ? 'cursor-row-resize' : 'cursor-col-resize'
+                }`}
               />
             )}
 
-            {/* Slide-out Studio Tools & Control Drawer (Desktop: in-flow sliding width, Mobile: right slide-over) */}
+            {/* Studio Tools & Control Panel (Desktop: in-flow sliding width, Mobile: in-flow bottom container) */}
             <div
               style={
                 isDesktopScreen
@@ -10283,10 +11504,10 @@ export default function App() {
                         ? 'opacity-100 translate-x-0'
                         : 'opacity-0 translate-x-8 pointer-events-none border-transparent'
                     }`
-                  : `fixed inset-y-0 right-14 sm:right-16 z-50 w-[calc(100vw-56px)] sm:w-[420px] max-w-full border-l ${
+                  : `w-full flex-1 min-h-[140px] z-20 border-t ${
                       isStudioPanelOpen
-                        ? 'translate-x-0 opacity-100'
-                        : 'translate-x-full opacity-0 pointer-events-none'
+                        ? 'flex opacity-100'
+                        : 'hidden opacity-0 pointer-events-none'
                     }`
               } ${
                 appTheme === 'dark' ? 'bg-[#0d1424] border-slate-800 text-slate-100' : 'bg-white border-slate-200 text-slate-900'
@@ -15442,14 +16663,14 @@ export default function App() {
               )}
             </div>
 
-            {/* Right-Edge Vertical Tab Navigation Dock (Colors ... Export vertically aligned) */}
+            {/* Studio Tools Dock (Desktop: Right vertical dock; Mobile: Bottom horizontal dock) */}
             <aside
               aria-label="Studio Tools Dock"
-              className={`w-14 sm:w-16 h-full flex flex-col justify-between py-2 border-l flex-shrink-0 z-30 select-none transition-colors duration-200 ${
+              className={`w-full lg:w-14 lg:sm:w-16 h-14 lg:h-full flex flex-row lg:flex-col justify-between items-center py-1 lg:py-2 px-1 lg:px-0 border-t lg:border-t-0 lg:border-l flex-shrink-0 z-30 select-none transition-colors duration-200 ${
                 appTheme === 'dark' ? 'bg-[#18191f] border-[#22242c]' : 'bg-slate-50 border-slate-200'
               }`}
             >
-              <div className="flex-1 overflow-y-auto no-scrollbar flex flex-col items-center gap-1 sm:gap-1.5 px-1 sm:px-1.5 py-0.5">
+              <div className="w-full h-full flex flex-row lg:flex-col items-center gap-1 sm:gap-1.5 px-1.5 lg:px-1.5 py-0.5 overflow-x-auto lg:overflow-y-auto no-scrollbar">
                 {STUDIO_TABS.map((tab) => {
                   const Icon = tab.icon;
                   const isActive = isStudioPanelOpen && studioTab === tab.id;
@@ -15459,7 +16680,7 @@ export default function App() {
                       type="button"
                       onClick={() => handleStudioTabClick(tab.id)}
                       title={`${tab.label}${isActive ? ' (Click to close panel)' : ' (Click to open panel)'}`}
-                      className={`w-full py-2 px-1 rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-150 group relative cursor-pointer active:scale-95 ${
+                      className={`h-full lg:h-auto min-w-[58px] lg:min-w-0 lg:w-full py-1 lg:py-2 px-2 lg:px-1 rounded-xl flex flex-col items-center justify-center gap-0.5 sm:gap-1 transition-all duration-150 group relative cursor-pointer active:scale-95 flex-shrink-0 ${
                         isActive
                           ? 'bg-gradient-to-b from-blue-600 to-cyan-600 text-white shadow-lg shadow-cyan-500/25 ring-1 ring-cyan-300/40'
                           : appTheme === 'dark'
@@ -15467,9 +16688,13 @@ export default function App() {
                             : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'
                       }`}
                     >
-                      {/* Active indicator bar on left edge */}
+                      {/* Active indicator bar on left edge for desktop */}
                       {isActive && (
-                        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-white rounded-r-full shadow-sm" />
+                        <span className="hidden lg:block absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-white rounded-r-full shadow-sm" />
+                      )}
+                      {/* Active indicator bar on top edge for mobile */}
+                      {isActive && (
+                        <span className="lg:hidden absolute top-0 left-1/2 -translate-x-1/2 h-1 w-6 bg-white rounded-b-full shadow-sm" />
                       )}
 
                       <Icon className={`w-4 h-4 sm:w-4.5 sm:h-4.5 transition-transform group-hover:scale-110 ${isActive ? 'text-white' : ''}`} />
@@ -16251,25 +17476,34 @@ export default function App() {
           <span className="text-[10px] mt-0.5">Gallery</span>
         </button>
 
-        {/* 2. Blog */}
+        {/* 2. Studio (Swapped with Blog as requested) */}
         <button
           type="button"
-          onClick={() => setActiveTab('blog')}
-          className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all cursor-pointer active:scale-95 relative ${
-            activeTab === 'blog'
-              ? 'text-blue-500 font-bold'
-              : 'hover:text-slate-200'
+          onClick={() => {
+            if (selectedAsset) {
+              // Studio already open
+            } else {
+              handleOpenEmptyStudio();
+            }
+          }}
+          className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all cursor-pointer active:scale-95 ${
+            selectedAsset
+              ? 'text-cyan-400 font-bold'
+              : 'hover:text-slate-200 text-slate-400'
           }`}
+          title="Open Studio"
         >
-          <BookOpen className={`w-5 h-5 ${activeTab === 'blog' ? 'stroke-[2.5]' : ''}`} />
-          <span className="text-[10px] mt-0.5">Blog</span>
-          <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 absolute top-1 right-1.5 animate-pulse" />
+          <Palette className={`w-5 h-5 ${selectedAsset ? 'stroke-[2.5] text-cyan-400' : ''}`} />
+          <span className="text-[10px] mt-0.5">Studio</span>
         </button>
 
         {/* 3. Central Prominent Upload Floating Button (Sleek and compact for mobile) */}
         <button
           type="button"
-          onClick={() => setActiveTab('admin')}
+          onClick={() => {
+            if (selectedAsset) handleCloseStudio();
+            setActiveTab('admin');
+          }}
           className="flex flex-col items-center justify-center -mt-3.5 cursor-pointer group active:scale-95"
           title="Upload Element"
         >
@@ -16279,27 +17513,40 @@ export default function App() {
           <span className="text-[9px] font-bold mt-0.5 text-blue-400">Upload</span>
         </button>
 
-        {/* 4. License */}
+        {/* 4. Blog (Swapped with Studio as requested) */}
         <button
           type="button"
-          onClick={() => setActiveTab('license')}
-          className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all cursor-pointer active:scale-95 ${
-            activeTab === 'license'
-              ? 'text-emerald-500 font-bold'
-              : 'hover:text-slate-200'
+          onClick={() => {
+            if (selectedAsset) handleCloseStudio();
+            setActiveTab('blog');
+          }}
+          className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all cursor-pointer active:scale-95 relative ${
+            !selectedAsset && activeTab === 'blog'
+              ? 'text-blue-500 font-bold'
+              : 'hover:text-slate-200 text-slate-400'
           }`}
+          title="Open Blog"
         >
-          <ShieldCheck className={`w-5 h-5 ${activeTab === 'license' ? 'stroke-[2.5]' : ''}`} />
-          <span className="text-[10px] mt-0.5">License</span>
+          <BookOpen className={`w-5 h-5 ${!selectedAsset && activeTab === 'blog' ? 'stroke-[2.5] text-blue-500' : ''}`} />
+          <span className="text-[10px] mt-0.5">Blog</span>
+          <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 absolute top-1 right-1.5 animate-pulse" />
         </button>
 
-        {/* 5. Settings */}
+        {/* 5. Settings (Full Page View) */}
         <button
           type="button"
-          onClick={() => setIsSettingsOpen(true)}
-          className="flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all cursor-pointer active:scale-95 hover:text-slate-200"
+          onClick={() => {
+            if (selectedAsset) handleCloseStudio();
+            setActiveTab('settings');
+          }}
+          className={`flex flex-col items-center justify-center py-1 px-2 rounded-xl transition-all cursor-pointer active:scale-95 ${
+            !selectedAsset && activeTab === 'settings'
+              ? 'text-blue-500 font-bold'
+              : 'hover:text-slate-200 text-slate-400'
+          }`}
+          title="Open Settings"
         >
-          <Settings className="w-5 h-5" />
+          <Settings className={`w-5 h-5 ${!selectedAsset && activeTab === 'settings' ? 'stroke-[2.5] text-blue-500' : ''}`} />
           <span className="text-[10px] mt-0.5">Settings</span>
         </button>
       </nav>
@@ -16323,6 +17570,30 @@ export default function App() {
         />
       )}
 
+      {/* Gallery Admin Edit Asset Details Modal */}
+      {editingModalAsset && (
+        <EditAssetDetailsModal
+          isOpen={Boolean(editingModalAsset)}
+          asset={editingModalAsset}
+          title={editAssetTitle}
+          setTitle={setEditAssetTitle}
+          description={editAssetDescription}
+          setDescription={setEditAssetDescription}
+          category={editAssetCategory}
+          setCategory={setEditAssetCategory}
+          tags={editAssetTags}
+          setTags={setEditAssetTags}
+          pack={editAssetPack}
+          setPack={setEditAssetPack}
+          isSaving={isSavingAssetDetails}
+          error={editAssetError}
+          success={editAssetSuccess}
+          onClose={handleCloseEditAssetModal}
+          onSave={handleSaveAssetDetails}
+          appTheme={appTheme}
+        />
+      )}
+
 
 
       {/* Supabase User Auth Modal */}
@@ -16334,6 +17605,13 @@ export default function App() {
           setAuthUser(user);
         }}
       />
+
+      {/* Mobile Double-Back Exit Toast */}
+      {backToast && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[999999] px-4 py-2 rounded-full bg-slate-900/95 border border-slate-700/80 backdrop-blur-md text-white text-xs font-medium shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-200 pointer-events-none flex items-center gap-2">
+          <span>{backToast}</span>
+        </div>
+      )}
     </div>
   );
 }

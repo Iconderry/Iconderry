@@ -38,8 +38,14 @@ subprojects {
                 }
             }
         }
+        if (project.extensions.findByName("kotlin") != null) {
+            project.kotlin {
+                jvmToolchain(17)
+            }
+        }
     }
 }
+
 
 task clean(type: Delete) {
     delete rootProject.buildDir

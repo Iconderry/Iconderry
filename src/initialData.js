@@ -1,6 +1,8 @@
-import { YOUTUBE_MOTION_ELEMENTS } from './motionGraphicsData';
-import { COMPOSITE_SCENE_ELEMENTS } from './compositeScenesData';
-import { FROSTED_GLASS_ELEMENTS } from './frostedGlassData';
+import { YOUTUBE_MOTION_ELEMENTS } from './motionGraphicsData.js';
+import { COMPOSITE_SCENE_ELEMENTS } from './compositeScenesData.js';
+import { FROSTED_GLASS_ELEMENTS } from './frostedGlassData.js';
+import { STICKMAN_ELEMENTS } from './stickmanData.js';
+import { SVG_ASSET_ITEMS } from './svgAssetItemsData.js';
 
 export const CORE_INITIAL_ELEMENTS = [
   {
@@ -758,5 +760,7 @@ export const INITIAL_ELEMENTS = [
   ...CORE_INITIAL_ELEMENTS,
   ...YOUTUBE_MOTION_ELEMENTS,
   ...COMPOSITE_SCENE_ELEMENTS,
-  ...FROSTED_GLASS_ELEMENTS
+  ...FROSTED_GLASS_ELEMENTS,
+  ...STICKMAN_ELEMENTS,
+  ...SVG_ASSET_ITEMS
 ];

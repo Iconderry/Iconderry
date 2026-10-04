@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { BLOG_POSTS, BLOG_CATEGORIES } from './blogData';
 
-export default function BlogView({ appTheme = 'dark', onOpenStudio, onSelectCategory }) {
+export default function BlogView({ appTheme = 'light', onOpenStudio, onSelectCategory }) {
   const [selectedPostId, setSelectedPostId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -198,6 +198,32 @@ export default function BlogView({ appTheme = 'dark', onOpenStudio, onSelectCate
         return;
       }
 
+      // Markdown Images: ![alt](url)
+      const imageMatch = line.trim().match(/^!\[(.*?)\]\((https?:\/\/.*?)\)$/);
+      if (imageMatch) {
+        const altText = imageMatch[1];
+        const imgUrl = imageMatch[2];
+        elements.push(
+          <figure key={`img-${idx}`} className="my-7 rounded-2xl overflow-hidden border border-slate-700/60 bg-slate-900/60 shadow-xl">
+            <img
+              src={imgUrl}
+              alt={altText}
+              loading="lazy"
+              className="w-full max-h-[460px] object-cover hover:scale-[1.01] transition-transform duration-300"
+            />
+            {altText && (
+              <figcaption className={`p-3 text-center text-xs border-t flex items-center justify-center gap-1.5 font-medium ${
+                appTheme === 'dark' ? 'text-slate-400 border-slate-800 bg-slate-950/70' : 'text-slate-600 border-slate-200 bg-slate-100'
+              }`}>
+                <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                <span>{altText}</span>
+              </figcaption>
+            )}
+          </figure>
+        );
+        return;
+      }
+
       // Horizontal dividers
       if (line.trim() === '---') {
         elements.push(<hr key={idx} className="my-8 border-t border-slate-800" />);
@@ -344,6 +370,18 @@ export default function BlogView({ appTheme = 'dark', onOpenStudio, onSelectCate
             </div>
           </div>
 
+          {/* Featured Article Banner Image */}
+          {activePost.coverImage && (
+            <div className="mb-10 rounded-3xl overflow-hidden border border-slate-700/60 shadow-2xl relative max-h-[460px] bg-slate-950 group">
+              <img
+                src={activePost.coverImage}
+                alt={activePost.title}
+                className="w-full h-full object-cover max-h-[460px] group-hover:scale-[1.02] transition-transform duration-700"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#121316]/70 via-transparent to-transparent pointer-events-none" />
+            </div>
+          )}
+
           {/* Article Body Content */}
           <article className="prose prose-invert max-w-none mb-12">
             {renderArticleBody(activePost.content)}
@@ -484,24 +522,36 @@ export default function BlogView({ appTheme = 'dark', onOpenStudio, onSelectCate
                     : 'bg-white border-slate-200 hover:border-blue-400 hover:shadow-xl shadow-sm'
                 }`}
               >
-                {/* Decorative Gradient Banner */}
-                <div className={`h-40 sm:h-48 w-full bg-gradient-to-tr ${post.coverGradient} relative p-6 flex flex-col justify-between overflow-hidden`}>
-                  <div className="absolute inset-0 bg-black/20" />
-                  <div className="absolute -right-8 -bottom-8 w-36 h-36 rounded-full bg-white/10 blur-2xl group-hover:scale-125 transition-transform duration-500" />
-                  
+                {/* Visual Cover Banner with Real Image & Overlay */}
+                <div className="h-48 sm:h-56 w-full relative overflow-hidden bg-slate-950 flex flex-col justify-between p-5">
+                  {post.coverImage ? (
+                    <img
+                      src={post.coverImage}
+                      alt={post.title}
+                      loading="lazy"
+                      className="absolute inset-0 w-full h-full object-cover object-center group-hover:scale-108 group-hover:brightness-110 transition-all duration-700 ease-out"
+                    />
+                  ) : (
+                    <div className={`absolute inset-0 bg-gradient-to-tr ${post.coverGradient}`} />
+                  )}
+                  {/* High contrast gradient backdrop */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/50" />
+
+                  {/* Top Category Badge & Read Time */}
                   <div className="relative z-10 flex items-center justify-between">
-                    <span className="px-3 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wider bg-[#0e2736]/90 text-[#38bdf8] backdrop-blur-md border border-cyan-700/50 shadow-sm">
+                    <span className="px-3 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wider bg-black/60 text-[#38bdf8] backdrop-blur-md border border-cyan-500/40 shadow-sm">
                       {post.category}
                     </span>
-                    <span className="flex items-center gap-1 text-xs font-bold text-white/90 bg-black/40 px-2.5 py-1 rounded-full backdrop-blur-sm">
-                      <Clock className="w-3.5 h-3.5" /> {post.readTime}
+                    <span className="flex items-center gap-1 text-xs font-bold text-white/95 bg-black/60 px-2.5 py-1 rounded-full backdrop-blur-md border border-white/10 shadow-sm">
+                      <Clock className="w-3.5 h-3.5 text-cyan-400" /> {post.readTime}
                     </span>
                   </div>
 
+                  {/* Bottom published date */}
                   <div className="relative z-10">
-                    <div className="text-white/80 text-xs font-semibold">
+                    <span className="text-white/90 text-xs font-semibold px-2.5 py-1 rounded-md bg-black/50 backdrop-blur-sm border border-white/10 inline-block">
                       {post.publishedAt}
-                    </div>
+                    </span>
                   </div>
                 </div>
 

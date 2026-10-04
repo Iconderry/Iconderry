@@ -3,7 +3,7 @@ import {
   X, Download, Wand2, Copy, Check, Heart, Share2,
   ExternalLink, Sparkles, ShieldCheck, Tag, ZoomIn, ZoomOut, RotateCcw,
   ArrowLeft, Layers, FileCode, CheckCircle2, ChevronRight, Eye,
-  Maximize2, Film, Play, ArrowUpRight, AlertCircle, Info, Sun, Moon
+  Maximize2, Film, Play, ArrowUpRight, AlertCircle, Info, Sun, Moon, Palette, Edit2
 } from 'lucide-react';
 
 import { downloadAsset } from './converter';
@@ -37,8 +37,10 @@ export default function AssetDetailModal({
   onOpenInStudio,
   isFavorite = false,
   onToggleFavorite,
-  appTheme = 'dark',
-  onToggleTheme
+  appTheme = 'light',
+  onToggleTheme,
+  isGalleryAdminMode = false,
+  onEditDetails
 }) {
 
   const [format, setFormat] = useState('png');
@@ -48,7 +50,13 @@ export default function AssetDetailModal({
   const [showGifModal, setShowGifModal] = useState(false);
   const [transparencyNotice, setTransparencyNotice] = useState('');
 
-  const [bgPreview, setBgPreview] = useState('dark'); // 'dark' | 'light' | 'grid' | 'ambient'
+  const [bgPreview, setBgPreview] = useState(() => (appTheme === 'dark' ? 'dark' : 'light')); // 'dark' | 'light' | 'grid' | 'ambient'
+
+  // Sync background preview if theme changes
+  useEffect(() => {
+    setBgPreview(appTheme === 'dark' ? 'dark' : 'light');
+  }, [appTheme]);
+
   const [zoom, setZoom] = useState(1);
   const [isCopied, setIsCopied] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -380,36 +388,47 @@ export default function AssetDetailModal({
   return (
     <div 
       ref={pageScrollRef}
-      className={`fixed inset-0 z-[100] w-full h-full min-h-screen overflow-y-auto flex flex-col transition-all duration-200 animate-in fade-in ${
+      className={`fixed inset-0 z-[100] w-full max-w-full h-full min-h-screen overflow-y-auto overflow-x-hidden flex flex-col transition-all duration-200 animate-in fade-in ${
         isDark
           ? 'bg-[#101217] text-slate-100'
           : 'bg-[#f8fafc] text-slate-900'
       }`}
     >
-      {/* Top Full-Width Sticky Navigation Bar */}
-      <header className={`sticky top-0 z-40 w-full border-b backdrop-blur-xl transition-colors ${
-        isDark ? 'border-slate-800/80 bg-[#161822]/95 shadow-[0_4px_20px_rgba(0,0,0,0.4)]' : 'border-slate-200/90 bg-white/95 shadow-sm'
+      {/* Top Full-Width Sticky Navigation Bar (Native Status Bar Safe Spaced) */}
+      <header className={`app-detail-header sticky top-0 z-50 w-full border-b transition-colors ${
+        isDark ? 'border-slate-800 bg-[#101217] shadow-[0_4px_20px_rgba(0,0,0,0.5)]' : 'border-slate-200 bg-[#f8fafc] shadow-sm'
       }`}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-2.5 sm:py-3 flex items-center justify-between">
           {/* Left: Back to Gallery / Previous Asset Button & Breadcrumb */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            {/* Back button visible on desktop; on mobile, hardware back button or X closes modal cleanly */}
             <button
               type="button"
               onClick={handleBack}
-              className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs sm:text-sm font-bold transition cursor-pointer active:scale-95 ${
+              className={`hidden sm:inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl border text-xs sm:text-sm font-bold transition cursor-pointer active:scale-95 flex-shrink-0 ${
                 isDark
                   ? 'border-slate-700/80 bg-slate-800/90 hover:bg-slate-700 text-slate-200 hover:text-white shadow-sm'
                   : 'border-slate-200 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900'
               }`}
               title={historyStack.length > 0 ? "Back to Previous Icon (Esc)" : "Return to Gallery (Esc)"}
             >
-              <ArrowLeft className="w-4 h-4" />
+              <ArrowLeft className="w-4 h-4 text-cyan-400" />
               <span>
                 {historyStack.length > 0
                   ? `Back to ${historyStack[historyStack.length - 1]?.title || 'Previous'}`
                   : 'Back to Gallery'}
               </span>
             </button>
+
+            {/* Mobile Asset Info Header (removes cramped back button on mobile) */}
+            <div className="sm:hidden flex items-center gap-1.5 min-w-0">
+              <span className={`text-xs font-bold truncate max-w-[140px] ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                {currentAsset.title}
+              </span>
+              <span className="text-[9px] text-cyan-400 font-semibold px-1.5 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/20 truncate">
+                {currentAsset.category}
+              </span>
+            </div>
 
             <div className="hidden sm:flex items-center gap-2 text-xs font-medium pl-3 border-l border-slate-700/40">
               <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>Gallery</span>
@@ -482,93 +501,110 @@ export default function AssetDetailModal({
         </div>
       </header>
 
-      {/* Main Page Body Container (with key for fresh entry animation and generous bottom padding) */}
+      {/* Main Page Body Container */}
       <div 
         key={currentAsset.id} 
-        className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8 pb-36 sm:pb-44 space-y-10 animate-in fade-in zoom-in-95 duration-200"
+        className="flex-1 max-w-7xl mx-auto w-full px-3 sm:px-6 lg:px-8 pt-0 sm:pt-6 pb-36 sm:pb-44 animate-in fade-in zoom-in-95 duration-200"
       >
-
-        
         {/* Main 2-Column Showcase */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-10 items-start">
             
-            {/* Left 7 Columns: Big Half-Screen Artwork Stage (Spacious High-Res Preview) */}
-            <div className="lg:col-span-7 flex flex-col items-center">
+            {/* Left 7 Columns: Big Half-Screen Artwork Stage (Scrolls naturally on mobile and PC) */}
+            <div className={`lg:col-span-7 flex flex-col items-center relative w-full transition-colors ${
+              isDark ? 'bg-[#101217]' : 'bg-[#f8fafc]'
+            } pt-1 pb-3 sm:mx-0 sm:px-0 border-b lg:border-b-0`}>
               <div 
                 ref={previewContainerRef}
-                className={`w-full aspect-square max-h-[580px] sm:max-h-[620px] rounded-3xl border flex items-center justify-center relative overflow-hidden transition-all shadow-inner ${
+                className={`w-full h-[240px] xs:h-[270px] sm:h-[340px] lg:h-auto lg:aspect-square lg:max-h-[580px] rounded-2xl sm:rounded-3xl border flex items-center justify-center relative overflow-hidden transition-all shadow-inner ${
                   bgPreview === 'dark' 
                     ? 'bg-[#0d1017] border-slate-800'
-                    : bgPreview === 'light'
-                      ? 'bg-slate-100 border-slate-300'
-                      : bgPreview === 'grid'
-                        ? isDark
-                          ? 'bg-[#0f121d] border-slate-800 [background-image:linear-gradient(to_right,#1f293d_1px,transparent_1px),linear-gradient(to_bottom,#1f293d_1px,transparent_1px)] [background-size:24px_24px]'
-                          : 'bg-slate-50 border-slate-300 [background-image:linear-gradient(to_right,#e2e8f0_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f0_1px,transparent_1px)] [background-size:24px_24px]'
-                        : 'bg-gradient-to-tr from-cyan-950/60 via-slate-950 to-purple-950/60 border-cyan-500/30'
+                    : 'bg-white border-slate-200 shadow-sm'
                 }`}
               >
-                {/* Ambient Soft Glow in Background if Glow active */}
-                {bgPreview === 'ambient' && (
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="w-56 h-56 bg-cyan-500/20 rounded-full blur-3xl animate-pulse" />
-                  </div>
-                )}
+                {/* Floating Action Buttons at Top Right of Preview */}
+                <div className="absolute top-3 right-3 sm:top-3.5 sm:right-3.5 z-20 flex items-center gap-2">
+                  {isGalleryAdminMode && onEditDetails && (
+                    <button
+                      type="button"
+                      onClick={() => onEditDetails(currentAsset)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white border border-purple-400/50 backdrop-blur-md text-xs font-bold shadow-lg shadow-purple-900/40 transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer"
+                      title="Edit Item Details (Title, Description, Category, Tags)"
+                    >
+                      <Edit2 className="w-3.5 h-3.5 text-purple-200" />
+                      <span>Edit Details</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => onOpenInStudio && onOpenInStudio(currentAsset, 'colors')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/80 hover:bg-blue-600 text-white border border-white/20 hover:border-blue-400 backdrop-blur-md text-xs font-bold shadow-lg shadow-black/40 transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer group"
+                    title="Customize & Edit in Studio"
+                  >
+                    <Palette className="w-3.5 h-3.5 text-cyan-400 group-hover:text-white transition-colors" />
+                    <span>Edit in Studio</span>
+                  </button>
+                </div>
 
                 {/* The Big SVG Artwork */}
                 <div 
-                  className="w-full h-full flex items-center justify-center p-6 sm:p-10 transition-transform duration-200 ease-out select-none [&>svg]:w-full [&>svg]:h-full [&>svg]:max-w-[380px] sm:[&>svg]:max-w-[440px] [&>svg]:max-h-[380px] sm:[&>svg]:max-h-[440px] [&>svg]:block [&>svg]:overflow-visible"
+                  className="w-full h-full flex items-center justify-center p-4 sm:p-8 lg:p-10 transition-transform duration-200 ease-out select-none [&>svg]:w-full [&>svg]:h-full [&>svg]:max-w-[170px] xs:[&>svg]:max-w-[200px] sm:[&>svg]:max-w-[280px] lg:[&>svg]:max-w-[380px] [&>svg]:max-h-[170px] xs:[&>svg]:max-h-[200px] sm:[&>svg]:max-h-[280px] lg:[&>svg]:max-h-[380px] [&>svg]:block [&>svg]:overflow-visible"
                   style={{ transform: `scale(${zoom})` }}
                   dangerouslySetInnerHTML={{ __html: cleanSvgCode }}
                 />
 
-                {/* Floating Preview Controls at Bottom Left */}
-                <div className="absolute bottom-3 left-3 flex items-center gap-1.5 p-1 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 text-xs">
-                  <button
-                    type="button"
-                    onClick={() => setBgPreview('dark')}
-                    className={`px-2.5 py-1 rounded-lg font-medium transition cursor-pointer ${bgPreview === 'dark' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
-                  >
-                    Dark
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setBgPreview('light')}
-                    className={`px-2.5 py-1 rounded-lg font-medium transition cursor-pointer ${bgPreview === 'light' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
-                  >
-                    Light
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setBgPreview('ambient')}
-                    className={`px-2.5 py-1 rounded-lg font-medium transition cursor-pointer ${bgPreview === 'ambient' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
-                  >
-                    Glow
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setBgPreview('grid')}
-                    className={`px-2.5 py-1 rounded-lg font-medium transition cursor-pointer ${bgPreview === 'grid' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
-                  >
-                    Grid
-                  </button>
-                </div>
+                {/* Combined Single Dark / Light Toggle at Bottom Left */}
+                <button
+                  type="button"
+                  onClick={() => setBgPreview(prev => prev === 'dark' ? 'light' : 'dark')}
+                  className={`absolute bottom-3 left-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl backdrop-blur-md text-xs font-semibold shadow-md transition-all cursor-pointer active:scale-95 select-none ${
+                    bgPreview === 'dark'
+                      ? 'bg-black/60 hover:bg-black/80 text-white border border-white/15'
+                      : 'bg-white/95 hover:bg-white text-slate-800 border border-slate-300 shadow-md'
+                  }`}
+                  title={bgPreview === 'dark' ? 'Switch to Light background' : 'Switch to Dark background'}
+                >
+                  {bgPreview === 'dark' ? (
+                    <>
+                      <Moon className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Dark</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sun className="w-3.5 h-3.5 text-amber-500" />
+                      <span>Light</span>
+                    </>
+                  )}
+                </button>
 
                 {/* Zoom controls at Bottom Right */}
-                <div className="absolute bottom-3 right-3 flex items-center gap-1 p-1 rounded-xl bg-black/60 backdrop-blur-md border border-white/10">
+                <div className={`absolute bottom-3 right-3 flex items-center gap-1 p-1 rounded-xl backdrop-blur-md ${
+                  bgPreview === 'dark'
+                    ? 'bg-black/60 border border-white/10'
+                    : 'bg-white/95 border border-slate-300 shadow-md'
+                }`}>
                   <button
                     type="button"
                     onClick={() => setZoom(prev => Math.max(0.7, prev - 0.2))}
-                    className="p-1 rounded-lg text-slate-300 hover:text-white hover:bg-white/10 cursor-pointer"
+                    className={`p-1 rounded-lg cursor-pointer ${
+                      bgPreview === 'dark'
+                        ? 'text-slate-300 hover:text-white hover:bg-white/10'
+                        : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
+                    }`}
                     title="Zoom Out"
                   >
                     <ZoomOut className="w-3.5 h-3.5" />
                   </button>
-                  <span className="text-[10px] font-mono text-slate-300 px-1">{Math.round(zoom * 100)}%</span>
+                  <span className={`text-[10px] font-mono px-1 ${
+                    bgPreview === 'dark' ? 'text-slate-300' : 'text-slate-800 font-bold'
+                  }`}>{Math.round(zoom * 100)}%</span>
                   <button
                     type="button"
                     onClick={() => setZoom(prev => Math.min(2.5, prev + 0.2))}
-                    className="p-1 rounded-lg text-slate-300 hover:text-white hover:bg-white/10 cursor-pointer"
+                    className={`p-1 rounded-lg cursor-pointer ${
+                      bgPreview === 'dark'
+                        ? 'text-slate-300 hover:text-white hover:bg-white/10'
+                        : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
+                    }`}
                     title="Zoom In"
                   >
                     <ZoomIn className="w-3.5 h-3.5" />
@@ -577,7 +613,11 @@ export default function AssetDetailModal({
                     <button
                       type="button"
                       onClick={() => setZoom(1)}
-                      className="p-1 rounded-lg text-cyan-400 hover:text-cyan-300 hover:bg-white/10 cursor-pointer"
+                      className={`p-1 rounded-lg cursor-pointer ${
+                        bgPreview === 'dark'
+                          ? 'text-cyan-400 hover:text-cyan-300 hover:bg-white/10'
+                          : 'text-blue-600 hover:text-blue-700 hover:bg-blue-50'
+                      }`}
                       title="Reset Zoom"
                     >
                       <RotateCcw className="w-3 h-3" />
@@ -621,7 +661,7 @@ export default function AssetDetailModal({
                 </h1>
                 
                 <p className={`text-xs leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                  Fully vector crafted asset. Choose your target format and resolution below for instant high-speed export.
+                  {currentAsset.description || 'Fully vector crafted asset. Choose your target format and resolution below for instant high-speed export.'}
                 </p>
               </div>
 
@@ -820,31 +860,31 @@ export default function AssetDetailModal({
               </div>
 
               {/* 5. SECONDARY STUDIO & COPY ACTIONS */}
-              <div className="grid grid-cols-2 gap-3 pt-1">
-                {/* Customize in Studio */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                {/* Customize in Studio - Flagship Gradient Action */}
                 <button
                   type="button"
                   onClick={() => onOpenInStudio && onOpenInStudio(currentAsset, 'colors')}
-                  className={`py-2.5 px-4 rounded-xl border font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition cursor-pointer ${
-                    isDark
-                      ? 'border-cyan-500/30 hover:border-cyan-400 bg-cyan-950/20 hover:bg-cyan-950/40 text-cyan-300'
-                      : 'border-blue-200 hover:border-blue-300 bg-blue-50 text-blue-700'
-                  }`}
+                  className="relative group overflow-hidden py-3 px-4 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all duration-200 cursor-pointer text-white bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 hover:from-blue-500 hover:via-indigo-500 hover:to-cyan-400 shadow-md hover:shadow-lg shadow-indigo-500/25 active:scale-[0.98] border border-white/20"
                 >
-                  <Wand2 className="w-4 h-4 text-cyan-400" />
-                  <span>Customize in Studio</span>
+                  <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 ease-out pointer-events-none" />
+                  <div className="p-1 rounded-lg bg-white/15 backdrop-blur-sm group-hover:rotate-12 transition-transform duration-300">
+                    <Wand2 className="w-4 h-4 text-cyan-200" />
+                  </div>
+                  <span className="tracking-wide">Customize in Studio</span>
+                  <Sparkles className="w-3.5 h-3.5 text-cyan-200 opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all" />
                 </button>
 
                 {/* Copy Raw SVG */}
                 <button
                   type="button"
                   onClick={handleCopySvg}
-                  className={`py-2.5 px-4 rounded-xl border font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition cursor-pointer ${
+                  className={`py-3 px-4 rounded-xl border font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-[0.98] ${
                     isCopied
-                      ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-400'
+                      ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-400 font-bold'
                       : isDark
-                        ? 'border-slate-800 hover:bg-slate-800 text-slate-300 hover:text-white'
-                        : 'border-slate-200 hover:bg-slate-100 text-slate-700'
+                        ? 'border-slate-800 hover:border-slate-700 bg-slate-900/60 hover:bg-slate-800 text-slate-300 hover:text-white'
+                        : 'border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 shadow-sm'
                   }`}
                 >
                   {isCopied ? (
@@ -862,11 +902,10 @@ export default function AssetDetailModal({
               </div>
 
             </div>
-          </div>
 
-          {/* Bottom Section: "More Like This" Related Assets (20 initial items + 20 on Load More) */}
-          {displayedRelatedAssets.length > 0 && (
-            <div className={`pt-10 border-t ${isDark ? 'border-slate-800/80' : 'border-slate-200'}`}>
+            {/* Bottom Section: "More Like This" Related Assets (20 initial items + 20 on Load More) */}
+            {displayedRelatedAssets.length > 0 && (
+              <div className={`lg:col-span-12 pt-8 sm:pt-10 border-t ${isDark ? 'border-slate-800/80' : 'border-slate-200'}`}>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6">
                 <div>
                   <h3 className="text-xl sm:text-2xl font-black tracking-tight flex items-center gap-2.5">
@@ -938,7 +977,7 @@ export default function AssetDetailModal({
               )}
             </div>
           )}
-
+        </div>
       </div>
 
 

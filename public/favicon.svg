@@ -1,34 +1,50 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
   <defs>
-    <linearGradient id="bgGrad" x1="0" y1="0" x2="200" y2="200" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#3b0764"/>
-      <stop offset="0.5" stop-color="#1e1b4b"/>
-      <stop offset="1" stop-color="#030712"/>
+    <!-- Background Squircle Gradient: Deep Indigo to Radiant Electric Violet -->
+    <linearGradient id="bgGrad" x1="20" y1="20" x2="180" y2="180" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#1e1b4b"/>
+      <stop offset="35%" stop-color="#4c1d95"/>
+      <stop offset="70%" stop-color="#7e22ce"/>
+      <stop offset="100%" stop-color="#a855f7"/>
     </linearGradient>
+
+    <!-- Translucent Frosted Glass Outer Cushion -->
     <linearGradient id="glassDiamondGrad" x1="40" y1="40" x2="160" y2="160" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#ffffff" stop-opacity="0.6"/>
-      <stop offset="0.3" stop-color="#c084fc" stop-opacity="0.25"/>
-      <stop offset="1" stop-color="#a855f7" stop-opacity="0.45"/>
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.75"/>
+      <stop offset="30%" stop-color="#e9d5ff" stop-opacity="0.35"/>
+      <stop offset="70%" stop-color="#c084fc" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#9333ea" stop-opacity="0.55"/>
     </linearGradient>
+
+    <!-- Rainbow Spectrum Core -->
     <linearGradient id="prismRainbow" x1="60" y1="60" x2="140" y2="140" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#4ade80"/>
-      <stop offset="0.3" stop-color="#facc15"/>
-      <stop offset="0.65" stop-color="#fb923c"/>
-      <stop offset="1" stop-color="#f43f5e"/>
+      <stop offset="0%" stop-color="#22c55e"/>
+      <stop offset="32%" stop-color="#facc15"/>
+      <stop offset="68%" stop-color="#fb923c"/>
+      <stop offset="100%" stop-color="#f43f5e"/>
     </linearGradient>
-    <filter id="glassGlow" x="-30%" y="-30%" width="160%" height="160%">
-      <feGaussianBlur stdDeviation="7" result="blur"/>
-      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+
+    <!-- Smooth Ambient Glass Glow -->
+    <filter id="glassGlow" x="-25%" y="-25%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="8" stdDeviation="6" flood-color="#000000" flood-opacity="0.35"/>
     </filter>
   </defs>
-  <!-- Background Squircle -->
-  <rect width="200" height="200" rx="46" fill="url(#bgGrad)"/>
+
+  <!-- Background Squircle with 22.5% golden-ratio radius (rx=45) -->
+  <rect width="200" height="200" rx="45" fill="url(#bgGrad)"/>
+  
+  <!-- Subtle High-End Rim Highlight -->
+  <rect x="1" y="1" width="198" height="198" rx="44" fill="none" stroke="#ffffff" stroke-width="1.5" stroke-opacity="0.16"/>
+
   <!-- Outer Glass Diamond Cushion -->
-  <rect x="36" y="36" width="128" height="128" rx="38" transform="rotate(45 100 100)" fill="url(#glassDiamondGrad)" stroke="#ffffff" stroke-width="2.5" stroke-opacity="0.8" filter="url(#glassGlow)"/>
-  <!-- Specular Top Reflection -->
-  <path d="M 64 64 C 84 44 116 44 136 64 C 110 75 90 75 64 64 Z" fill="#ffffff" fill-opacity="0.4"/>
+  <rect x="36" y="36" width="128" height="128" rx="34" transform="rotate(45 100 100)" fill="url(#glassDiamondGrad)" stroke="#ffffff" stroke-width="2.5" stroke-opacity="0.9" filter="url(#glassGlow)"/>
+
+  <!-- Specular Arc Reflection -->
+  <path d="M 64 64 C 84 42 116 42 136 64 C 114 74 86 74 64 64 Z" fill="#ffffff" fill-opacity="0.5"/>
+
   <!-- Inner Rainbow Spectrum Diamond Core -->
-  <rect x="58" y="58" width="84" height="84" rx="22" transform="rotate(45 100 100)" fill="url(#prismRainbow)"/>
+  <rect x="58" y="58" width="84" height="84" rx="14" transform="rotate(45 100 100)" fill="url(#prismRainbow)"/>
+
   <!-- Vector Coordinate Crosshair & Nodes -->
   <line x1="52" y1="100" x2="148" y2="100" stroke="#ffffff" stroke-width="5" stroke-linecap="round"/>
   <line x1="100" y1="52" x2="100" y2="148" stroke="#ffffff" stroke-width="5" stroke-linecap="round"/>

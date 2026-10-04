@@ -26,13 +26,37 @@ public class MainActivity extends BridgeActivity {
         super.onCreate(savedInstanceState);
         setupEdgeToEdgeTransparentStatusBar();
         setupNativeDownloader();
+        disableWebViewZoom();
     }
+
+    private void disableWebViewZoom() {
+        if (getBridge() != null && getBridge().getWebView() != null) {
+            final android.webkit.WebView webView = getBridge().getWebView();
+            webView.post(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        android.webkit.WebSettings settings = webView.getSettings();
+                        settings.setSupportZoom(false);
+                        settings.setBuiltInZoomControls(false);
+                        settings.setDisplayZoomControls(false);
+                        settings.setUseWideViewPort(false);
+                        settings.setLoadWithOverviewMode(false);
+                        settings.setTextZoom(100);
+                        webView.setHorizontalScrollBarEnabled(false);
+                    } catch (Exception ignored) {}
+                }
+            });
+        }
+    }
+
 
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
         if (hasFocus) {
             setupEdgeToEdgeTransparentStatusBar();
+            disableWebViewZoom();
         }
     }
 

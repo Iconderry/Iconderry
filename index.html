@@ -1,11 +1,11 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="light">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no, viewport-fit=cover" />
     <title>Iconderry - Free Vector Icons, SVG Studio & Custom Asset Generator</title>
     <meta name="description" content="Discover, customize, and export thousands of high-quality vector icons with live 3D effects, gradient filters, colors, and background badges." />
-    <meta name="theme-color" content="#121316" />
+    <meta name="theme-color" content="#ffffff" />
 
     <!-- Google Fonts for Pro 3D Typography & Canvas Elements -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -41,7 +41,45 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="apple-touch-icon" sizes="192x192" href="/pwa-192x192.png" />
-    <link rel="apple-touch-icon" sizes="512x512" href="/pwa-512x512.png" />
+    <!-- Immediate synchronous detection of Native Capacitor APK to prevent status-bar overlap -->
+    <script>
+      (function() {
+        var isCap = Boolean(
+          window.AndroidNativeDownloader ||
+          window.Capacitor ||
+          window.location.protocol === 'capacitor:' ||
+          /wv|Capacitor/i.test(navigator.userAgent) ||
+          (window.location.hostname === 'localhost' && /Android/i.test(navigator.userAgent))
+        );
+        if (isCap) {
+          window.IS_NATIVE_CAPACITOR = true;
+          document.documentElement.classList.add('is-native-capacitor');
+        }
+
+        // Prevent multi-touch browser pinch-to-zoom so it behaves exactly like a native app
+        window.addEventListener('touchstart', function(e) {
+          if (e.touches && e.touches.length > 1) {
+            e.preventDefault();
+          }
+        }, { passive: false });
+
+        window.addEventListener('touchmove', function(e) {
+          if (e.touches && e.touches.length > 1) {
+            e.preventDefault();
+          }
+        }, { passive: false });
+
+        window.addEventListener('gesturestart', function(e) {
+          e.preventDefault();
+        });
+        window.addEventListener('gesturechange', function(e) {
+          e.preventDefault();
+        });
+        window.addEventListener('gestureend', function(e) {
+          e.preventDefault();
+        });
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

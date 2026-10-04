@@ -39,7 +39,7 @@ const FAQ_ITEMS = [
   }
 ];
 
-export default function LicenseView({ appTheme = 'dark', onOpenStudio }) {
+export default function LicenseView({ appTheme = 'light', onOpenStudio }) {
   const [openFaqIndex, setOpenFaqIndex] = useState(0);
   const [copiedNotice, setCopiedNotice] = useState(false);
 
