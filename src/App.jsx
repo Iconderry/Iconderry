@@ -14,7 +14,7 @@ import {
   HelpCircle, Smartphone, MousePointer, Keyboard,
   FolderPlus, Folder, Tag, Edit2, FileUp, Grid2X2, Grid3X3, ArrowUpDown, Filter,
   Save, ClipboardPaste, Loader2, BookOpen, ShieldCheck, User, LogOut, Package,
-  Lock, Unlock, KeyRound, Eye, EyeOff
+  Lock, Unlock, KeyRound, Eye, EyeOff, Users
 } from 'lucide-react';
 import { INITIAL_ELEMENTS } from './initialData';
 import { downloadAsset } from './converter';
@@ -27,6 +27,10 @@ import { saveElementsToDB, loadElementsFromDB } from './idbStorage';
 import BlogView from './BlogView';
 import LicenseView from './LicenseView';
 import SettingsView from './SettingsView';
+import PrivacyView from './PrivacyView';
+import TermsView from './TermsView';
+import AboutView from './AboutView';
+import CommunityView from './CommunityView';
 import { isCssOrHtmlContent, convertCssToSvg, normalizeForeignObjectSvg } from './cssToSvgConverter';
 import AssetDetailModal from './AssetDetailModal';
 import AuthModal from './AuthModal';
@@ -1505,7 +1509,45 @@ export default function App() {
     );
   }, []);
 
-  const [activeTab, setActiveTab] = useState('browse');
+  const [activeTab, setActiveTab] = useState(() => {
+    try {
+      const hash = window.location.hash.replace(/^#/, '').toLowerCase();
+      if (['privacy', 'terms', 'about', 'community', 'blog', 'license', 'settings'].includes(hash)) {
+        return hash;
+      }
+    } catch (_) {}
+    return 'browse';
+  });
+
+  // Listen to browser hash changes for seamless back/forward navigation
+  useEffect(() => {
+    const handleHash = () => {
+      try {
+        const hash = window.location.hash.replace(/^#/, '').toLowerCase();
+        if (['privacy', 'terms', 'about', 'community', 'blog', 'license', 'settings', 'browse'].includes(hash)) {
+          setActiveTab(hash);
+        } else if (!hash) {
+          setActiveTab('browse');
+        }
+      } catch (_) {}
+    };
+    window.addEventListener('hashchange', handleHash);
+    return () => window.removeEventListener('hashchange', handleHash);
+  }, []);
+
+  const navigateToTab = (tab) => {
+    setActiveTab(tab);
+    try {
+      if (tab === 'browse') {
+        if (window.location.hash) {
+          history.pushState(null, '', window.location.pathname);
+        }
+      } else {
+        window.location.hash = tab;
+      }
+    } catch (_) {}
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
   const [selectedAsset, setSelectedAsset] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -8203,6 +8245,15 @@ export default function App() {
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> <span>License</span>
               </button>
               <button
+                onClick={() => setActiveTab('community')}
+                className={`flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${activeTab === 'community'
+                  ? 'bg-blue-600 text-white shadow-md'
+                  : appTheme === 'dark' ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+              >
+                <Users className="w-3.5 h-3.5 text-indigo-400" /> <span>Community</span>
+              </button>
+              <button
                 type="button"
                 onClick={() => setActiveTab('admin')}
                 className="flex items-center gap-1.5 px-3 sm:px-4 py-1.5 rounded-lg text-xs font-bold tracking-wide bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/35 border border-blue-400/40 transition-all cursor-pointer active:scale-95"
@@ -9296,12 +9347,38 @@ export default function App() {
         ) : activeTab === 'blog' ? (
           <BlogView
             appTheme={appTheme}
-            onOpenStudio={() => setActiveTab('browse')}
+            onOpenStudio={() => navigateToTab('browse')}
           />
         ) : activeTab === 'license' ? (
           <LicenseView
             appTheme={appTheme}
-            onOpenStudio={() => setActiveTab('browse')}
+            onOpenStudio={() => navigateToTab('browse')}
+          />
+        ) : activeTab === 'privacy' ? (
+          <PrivacyView
+            appTheme={appTheme}
+            onOpenStudio={() => navigateToTab('browse')}
+            onOpenTerms={() => navigateToTab('terms')}
+            onOpenLicense={() => navigateToTab('license')}
+          />
+        ) : activeTab === 'terms' ? (
+          <TermsView
+            appTheme={appTheme}
+            onOpenStudio={() => navigateToTab('browse')}
+            onOpenPrivacy={() => navigateToTab('privacy')}
+            onOpenLicense={() => navigateToTab('license')}
+          />
+        ) : activeTab === 'about' ? (
+          <AboutView
+            appTheme={appTheme}
+            onOpenStudio={() => navigateToTab('browse')}
+            onOpenLicense={() => navigateToTab('license')}
+            onOpenFeedback={() => navigateToTab('community')}
+          />
+        ) : activeTab === 'community' ? (
+          <CommunityView
+            appTheme={appTheme}
+            onOpenStudio={() => navigateToTab('browse')}
           />
         ) : activeTab === 'settings' ? (
           <SettingsView
@@ -9313,8 +9390,8 @@ export default function App() {
             setExportSize={setExportSize}
             elements={elements}
             setElements={setElements}
-            onBack={() => setActiveTab('browse')}
-            onOpenLicense={() => setActiveTab('license')}
+            onBack={() => navigateToTab('browse')}
+            onOpenLicense={() => navigateToTab('license')}
             onOpenStudio={() => {
               handleOpenEmptyStudio();
             }}
@@ -10122,27 +10199,27 @@ export default function App() {
               </h4>
               <ul className="space-y-1.5 text-xs">
                 <li>
-                  <button onClick={() => { setActiveTab('blog'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-cyan-400 transition font-semibold text-cyan-400 flex items-center gap-1.5">
+                  <button onClick={() => navigateToTab('blog')} className="hover:text-cyan-400 transition font-semibold text-cyan-400 flex items-center gap-1.5">
                     <BookOpen className="w-3.5 h-3.5" /> Blog &amp; Tutorials
                   </button>
                 </li>
                 <li>
-                  <button onClick={() => { setActiveTab('license'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="hover:text-cyan-400 transition flex items-center gap-1.5">
-                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Commercial License &amp; Terms
+                  <button onClick={() => navigateToTab('license')} className="hover:text-cyan-400 transition flex items-center gap-1.5">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Commercial License
                   </button>
                 </li>
                 <li>
-                  <button onClick={() => setActiveLegalModal('privacy')} className="hover:text-cyan-400 transition">
+                  <button onClick={() => navigateToTab('privacy')} className="hover:text-cyan-400 transition">
                     Privacy Policy
                   </button>
                 </li>
                 <li>
-                  <button onClick={() => setActiveLegalModal('terms')} className="hover:text-cyan-400 transition">
+                  <button onClick={() => navigateToTab('terms')} className="hover:text-cyan-400 transition">
                     Terms of Service
                   </button>
                 </li>
                 <li>
-                  <button onClick={() => setActiveLegalModal('about')} className="hover:text-cyan-400 transition">
+                  <button onClick={() => navigateToTab('about')} className="hover:text-cyan-400 transition">
                     About Iconderry
                   </button>
                 </li>
@@ -10155,18 +10232,17 @@ export default function App() {
                 Community
               </h4>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Need a specific icon or feature? Let us know and we'll create it for you!
+                Join our active community of 45,000+ creators, suggest new icon packs, and vote on upcoming releases!
               </p>
-              <button
-                onClick={() => {
-                  setFeedbackSubmitted(false);
-                  setActiveLegalModal('feedback');
-                }}
-                className="mt-1 px-3 py-1.5 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 text-xs font-semibold transition flex items-center gap-1.5"
-              >
-                <MessageSquarePlus className="w-3.5 h-3.5" />
-                <span>Request an Icon / Feedback</span>
-              </button>
+              <div className="flex flex-col gap-2 pt-1">
+                <button
+                  onClick={() => navigateToTab('community')}
+                  className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white text-xs font-semibold shadow-md shadow-blue-500/20 transition flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <MessageSquarePlus className="w-3.5 h-3.5" />
+                  <span>Community Hub &amp; Requests</span>
+                </button>
+              </div>
             </div>
           </div>
 
